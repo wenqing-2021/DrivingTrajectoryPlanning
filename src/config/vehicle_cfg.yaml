@@ -1,0 +1,7 @@
+
+vehicle_type: "car"
+length: 4.5
+width: 2.0
+wheel_base: 2.5
+front_overhang: 1.0
+rear_overhang: 1.0

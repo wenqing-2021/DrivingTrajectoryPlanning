@@ -51,14 +51,14 @@ if [[ $protoc_path == "" ]]; then
     apt-get install autoconf automake libtool -y
     git clone https://gitee.com/mirrors/protobufsource.git protobuf
     cd protobuf
-    git checkout 3.14.x
-    git clone https://gitee.com/mirrors/googletest.git third_party/googletest
-    git clone https://gitee.com/mirrors/google-benchmark.git third_party/benchmark
+    git checkout 3.19.0
     git submodule update --init --recursive
     ./autogen.sh
     ./configure
     make -j8 && make install
     ldconfig
+    pip3 install protobuf==3.19.0
+    pip3 install mypy-protobuf==3.0.0
 else
     echo "has installed protobuf"
 fi
@@ -72,20 +72,6 @@ if [[ $mpicc_path == "" ]]; then
     echo "has installed mpi4py"
 else
     echo "has installed mpi4py"
-fi
-
-# install ceres
-ceres_path=$(find /usr/local/include -name ceres)
-if [[ $ceres_path == "" ]]; then
-    echo "start installing ceres"
-    apt-get install -y libgoogle-glog-dev libgtest-dev libatlas-base-dev libsuitesparse-dev libgflags-dev
-    cd /root/workspace/ && git clone https://ceres-solver.googlesource.com/ceres-solver 
-    cd ceres-solver && git checkout 2.2.0
-    mkdir build && cd build
-    cmake ..
-    make -j8 && make install
-else
-    echo "has installed ceres"
 fi
 
 # install clangd-12
@@ -147,4 +133,16 @@ else
     cd $folder_path &&
     git clone https://gitee.com/mirrors/pybind11.git && cd pybind11 &&
     git checkout tags/v2.10.0 -b v2.10.0
+fi
+
+# install jupyternotebook
+pip_list=$(pip3 list)
+has_pkg "$pip_list" 'notebook'
+find_notebook=$?
+if [[ $find_notebook == 0 ]]; then
+    echo "start installing jupyter notebook"
+    pip3 install notebook
+    echo "has installed jupyter notebook"
+else
+    echo "has installed jupyter notebook"
 fi

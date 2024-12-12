@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package kinematic_model;
+
+message VehicleParam {
+    double length = 1;
+    double width = 2;
+    double wheel_base = 3;
+    double max_steer_angle = 4;
+    double max_acc = 5;
+    double max_velocity = 6;
+    double front_overhang = 9;
+    double rear_overhang = 10;
+    string vehicle_type = 11;
+}
+
+message StateVar {
+    double x = 1;
+    double y = 2;
+    double theta = 3;
+    double v = 4;
+    int32 nelement = 5;
+}
+
+message ControlVar {
+    double accelerate = 1;
+    double steer_angle = 2;
+    int32 nelement = 3;
+}

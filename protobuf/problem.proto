@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package problem;
+
+import "cost_map.proto";
+import "kinematic_model.proto";
+import "params.proto";
+
+message Polygon {
+    int32 vertex_num = 1;
+    repeated cost_map.Point vertex_pts = 2;
+}
+
+message MapBound {
+    double max_x = 1;
+    double min_x = 2;
+    double max_y = 3;
+    double min_y = 4;
+}
+
+message PlanProblem {
+    kinematic_model.StateVar init_state = 1;
+    kinematic_model.StateVar goal_state = 2;
+    int32 obstacle_num = 3;
+    repeated Polygon obstacle_list = 4;
+    MapBound map_bound = 5;
+}
+
+message PlanRes {
+    repeated kinematic_model.ControlVar control_list = 1;
+    repeated kinematic_model.StateVar state_list = 2;
+    bool solve_success = 3;
+}
+
+message SolverInput {
+    PlanProblem plan_problem = 1;
+    params.SolverParams solver_params = 2;
+}

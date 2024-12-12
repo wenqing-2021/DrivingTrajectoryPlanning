@@ -25,7 +25,9 @@ def _get_params(image_name, image_tag, container_name):
     }
     if "gpu" in container_name:
         params["runtime"] = "nvidia"
-        params["device_requests"] = [docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])]
+        params["device_requests"] = [
+            docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])
+        ]
     return params
 
 
@@ -114,7 +116,9 @@ def enter_docker():
         print(f"{idx}\t{container.name}\t{container.status}")
 
     # get the container name from input
-    input_container_idx = input("Please input the container idx for ENTER (q: quit, n: new a container): ")
+    input_container_idx = input(
+        "Please input the container idx for ENTER (q: quit, n: new a container): "
+    )
     if input_container_idx == "q":
         print("exit. NOT enter container.")
         return
@@ -179,7 +183,9 @@ def build_docker():
         images = client.images.list()
         for image in images:
             if image.tags[0] == image_name + ":" + image_tag:
-                print(f"image '{image_name}:{image_tag}' exist, please enter another name and tag")
+                print(
+                    f"image '{image_name}:{image_tag}' exist, please enter another name and tag"
+                )
                 enter_name = True
                 break
 
@@ -200,7 +206,9 @@ def remove_images():
     if container_names is None:
         return
     # get the container name from input
-    input_container_idx = input("Please input the container idx for DELETE (q: quit, c: continue): ")
+    input_container_idx = input(
+        "Please input the container idx for DELETE (q: quit, c: continue): "
+    )
     if input_container_idx == "q":
         print("exit. NOT delete container and images.")
         return
@@ -215,13 +223,17 @@ def remove_images():
             return
         input_container_name = container_names[int(input_container_idx)]
         mp_container = client.containers.get(input_container_name)
-        sure_delete = input(f"Are you sure to delete container '{input_container_name}'? (y/n):")
+        sure_delete = input(
+            f"Are you sure to delete container '{input_container_name}'? (y/n):"
+        )
         if sure_delete == "y":
             mp_container.stop()
             mp_container.remove()
             print(f"container '{input_container_name}' removed")
         else:
-            print(f"not delete container {input_container_name}, continue to delete image...")
+            print(
+                f"not delete container {input_container_name}, continue to delete image..."
+            )
 
     image_names = _list_images(client)
     if image_names is None:
@@ -257,7 +269,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="docker run")
     parser.add_argument("--build", "-b", action="store_true", help="build docker")
     parser.add_argument("--enter", "-e", action="store_true", help="enter docker")
-    parser.add_argument("--remove", "-r", action="store_true", help="remove container and images")
+    parser.add_argument(
+        "--remove", "-r", action="store_true", help="remove container and images"
+    )
     args = parser.parse_args()
     if args.build:
         build_docker()

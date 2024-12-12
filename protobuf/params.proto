@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package params;
+
+message SolverParams {
+    double max_iter = 1;
+}

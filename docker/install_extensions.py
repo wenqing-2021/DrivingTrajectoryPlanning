@@ -69,21 +69,23 @@ def install_extensions():
         print("has replace zsh_theme with powerlevel10k")
     else:
         print("无法找到要替换的zsh_theme")
-    
+
     # find plugins=(git)
-    plugins_pattern = r'plugins=\(git\)'  # 正则表达式模式，匹配 plugins=(git)
+    plugins_pattern = r"plugins=\(git\)"  # 正则表达式模式，匹配 plugins=(git)
     match_plugins = re.search(plugins_pattern, content)
     if match_plugins:
         # 找到匹配的文本
         old_text = match_plugins.group()
-        new_text = 'plugins=(git zsh-autosuggestions zsh-syntax-highlighting)'
+        new_text = "plugins=(git zsh-autosuggestions zsh-syntax-highlighting)"
         content = content.replace(old_text, new_text)
 
         # 3. 打开文件以进行写入
         with open(file_path, "w") as file:
             # 4. 将编辑后的内容写入文件
             file.write(content)
-        print("has replace plugins with git zsh-autosuggestions zsh-syntax-highlighting")
+        print(
+            "has replace plugins with git zsh-autosuggestions zsh-syntax-highlighting"
+        )
     else:
         print("无法找到要替换的plugins")
 
@@ -92,7 +94,9 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="install vscode extension")
-    parser.add_argument("--install", "-i", action="store_true", help="install extension")
+    parser.add_argument(
+        "--install", "-i", action="store_true", help="install extension"
+    )
     args = parser.parse_args()
     if args.install:
         install_extensions()

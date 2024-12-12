@@ -26,12 +26,12 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     openssl \
     tmux \
-    clangd-12 \
     gfortran \
     libssl-dev \
     libboost-all-dev \
     libeigen3-dev \
     libomp-dev \
+    libyaml-cpp-dev \
     python3-pip
 
 # install cmake
