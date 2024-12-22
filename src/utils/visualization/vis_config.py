@@ -6,6 +6,7 @@ COLOR_MAP = {
     "cyan": "#00FFFF",
     "magenta": "#FF00FF",
     "orange": "#FFA500",
+    "gray": "#808080",
 }
 
 FIG_VIS = {
@@ -20,7 +21,17 @@ FIG_VIS = {
 
 RENDER_VIS = {
     "obs_polygon": {
-        "color": COLOR_MAP["orange"],
+        "color": COLOR_MAP["gray"],
         "line_width": 2,
+    },
+    "init_state": {
+        "color": COLOR_MAP["green"],
+        "line_width": 2,
+        "fill_alpha": 0.0,
+    },
+    "goal_state": {
+        "color": COLOR_MAP["red"],
+        "line_width": 2,
+        "fill_alpha": 0.0,
     },
 }

@@ -14,7 +14,7 @@ PROTOBUF_PATH = "/root/workspace/AutomatedPark/build/install/protobuf"
 sys.path.append(PYBIND_PATH)
 sys.path.append(PROTOBUF_PATH)
 import solver_pybind
-from utils.load_case import build_problem, load_params
+from utils.plan_utils import build_problem, load_solver_params
 from utils.visualization.vis_tool import BokehVis
 from protobuf.problem_pb2 import PlanProblem, PlanRes, SolverInput
 from protobuf.params_pb2 import SolverParams
@@ -55,7 +55,7 @@ args = add_args()
 
 # ======================== load the case and solver params
 plan_problem: PlanProblem = build_problem(args.file)
-solver_params: SolverParams = load_params(args.params)
+solver_params: SolverParams = load_solver_params(args.params)
 
 # ======================== load the solver
 solver = solver_pybind.make_solver()

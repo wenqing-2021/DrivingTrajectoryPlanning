@@ -72,6 +72,7 @@ class PlanProblem(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
     INIT_STATE_FIELD_NUMBER: builtins.int
     GOAL_STATE_FIELD_NUMBER: builtins.int
+    VEHICLE_PARAM_FIELD_NUMBER: builtins.int
     OBSTACLE_NUM_FIELD_NUMBER: builtins.int
     OBSTACLE_LIST_FIELD_NUMBER: builtins.int
     MAP_BOUND_FIELD_NUMBER: builtins.int
@@ -79,6 +80,8 @@ class PlanProblem(google.protobuf.message.Message):
     def init_state(self) -> kinematic_model_pb2.StateVar: ...
     @property
     def goal_state(self) -> kinematic_model_pb2.StateVar: ...
+    @property
+    def vehicle_param(self) -> kinematic_model_pb2.VehicleParam: ...
     obstacle_num: builtins.int = ...
     @property
     def obstacle_list(
@@ -93,6 +96,7 @@ class PlanProblem(google.protobuf.message.Message):
         *,
         init_state: typing.Optional[kinematic_model_pb2.StateVar] = ...,
         goal_state: typing.Optional[kinematic_model_pb2.StateVar] = ...,
+        vehicle_param: typing.Optional[kinematic_model_pb2.VehicleParam] = ...,
         obstacle_num: builtins.int = ...,
         obstacle_list: typing.Optional[typing.Iterable[global___Polygon]] = ...,
         map_bound: typing.Optional[global___MapBound] = ...,
@@ -106,6 +110,8 @@ class PlanProblem(google.protobuf.message.Message):
             b"init_state",
             "map_bound",
             b"map_bound",
+            "vehicle_param",
+            b"vehicle_param",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -121,6 +127,8 @@ class PlanProblem(google.protobuf.message.Message):
             b"obstacle_list",
             "obstacle_num",
             b"obstacle_num",
+            "vehicle_param",
+            b"vehicle_param",
         ],
     ) -> None: ...
 

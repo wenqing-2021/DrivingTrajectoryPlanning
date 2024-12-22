@@ -21,9 +21,10 @@ message MapBound {
 message PlanProblem {
     kinematic_model.StateVar init_state = 1;
     kinematic_model.StateVar goal_state = 2;
-    int32 obstacle_num = 3;
-    repeated Polygon obstacle_list = 4;
-    MapBound map_bound = 5;
+    kinematic_model.VehicleParam vehicle_param = 3;
+    int32 obstacle_num = 4;
+    repeated Polygon obstacle_list = 5;
+    MapBound map_bound = 6;
 }
 
 message PlanRes {

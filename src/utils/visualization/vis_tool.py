@@ -14,6 +14,7 @@ from bokeh.models import (
 )
 from bokeh.plotting import figure, show
 from utils.visualization.vis_config import FIG_VIS, COLOR_MAP, RENDER_VIS
+from utils.plan_utils import convert_rear_to_mid
 from protobuf.problem_pb2 import PlanProblem
 from protobuf.params_pb2 import SolverParams
 
@@ -53,6 +54,7 @@ class BokehVis:
         return layout_dict
 
     def _build_plan_problem(self):
+        # build the obstacle polygons
         obs_polygons_x_list = []
         obs_polygons_y_list = []
         for i in range(self.plan_problem.obstacle_num):
@@ -72,11 +74,63 @@ class BokehVis:
         }
         self.update_attr(obs_polygon_data, "obs_polygon")
 
+        # build the goal and initial state
+        # convert the rearer center to the mid point
+        init_mid_pts = convert_rear_to_mid(
+            [self.plan_problem.init_state.x, self.plan_problem.init_state.y],
+            self.plan_problem.vehicle_param.rear_overhang,
+            self.plan_problem.vehicle_param.length,
+            self.plan_problem.init_state.theta,
+        )
+        initial_state_data = {
+            "x": [init_mid_pts[0]],
+            "y": [init_mid_pts[1]],
+            "head": [self.plan_problem.init_state.theta],
+            "vehicle_len": [self.plan_problem.vehicle_param.length],
+            "vehicle_width": [self.plan_problem.vehicle_param.width],
+        }
+        self.update_attr(initial_state_data, "initial_state")
+        goal_init_pts = convert_rear_to_mid(
+            [self.plan_problem.goal_state.x, self.plan_problem.goal_state.y],
+            self.plan_problem.vehicle_param.rear_overhang,
+            self.plan_problem.vehicle_param.length,
+            self.plan_problem.goal_state.theta,
+        )
+        goal_state_data = {
+            "x": [goal_init_pts[0]],
+            "y": [goal_init_pts[1]],
+            "head": [self.plan_problem.goal_state.theta],
+            "vehicle_len": [self.plan_problem.vehicle_param.length],
+            "vehicle_width": [self.plan_problem.vehicle_param.width],
+        }
+        self.update_attr(goal_state_data, "goal_state")
+
     def _render_plan_problem(self):
         # render the obstacles
         self.main_plotter.patches(
             xs="xs", ys="ys", source=self.obs_polygon, **RENDER_VIS["obs_polygon"]
         )
+        self.main_plotter.rect(
+            x="x",
+            y="y",
+            angle="head",
+            width="vehicle_len",
+            height="vehicle_width",
+            source=self.initial_state,
+            **RENDER_VIS["init_state"]
+        )
+        self.main_plotter.rect(
+            x="x",
+            y="y",
+            angle="head",
+            width="vehicle_len",
+            height="vehicle_width",
+            source=self.goal_state,
+            **RENDER_VIS["goal_state"]
+        )
+
+    def render(self):
+        self._render_plan_problem()
 
     def update_attr(self, data_dict: dict, attr_str: str):
         if not hasattr(self, attr_str):
@@ -90,5 +144,5 @@ class BokehVis:
         # add the layout into the doc
         self.doc.add_root(self.tabs)
         self.doc.title = FIG_VIS["title"]
-        self._render_plan_problem()
+        self.render()
         show(self.tabs)
