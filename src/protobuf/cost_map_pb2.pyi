@@ -12,28 +12,6 @@ import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor = ...
 
-class Point(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
-    X_FIELD_NUMBER: builtins.int
-    Y_FIELD_NUMBER: builtins.int
-    RISK_FIELD_NUMBER: builtins.int
-    x: builtins.float = ...
-    y: builtins.float = ...
-    risk: builtins.float = ...
-    def __init__(
-        self,
-        *,
-        x: builtins.float = ...,
-        y: builtins.float = ...,
-        risk: builtins.float = ...,
-    ) -> None: ...
-    def ClearField(
-        self,
-        field_name: typing_extensions.Literal["risk", b"risk", "x", b"x", "y", b"y"],
-    ) -> None: ...
-
-global___Point = Point
-
 class Index(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
     IDX_X_FIELD_NUMBER: builtins.int
@@ -53,32 +31,82 @@ class Index(google.protobuf.message.Message):
 
 global___Index = Index
 
-class CostMap(google.protobuf.message.Message):
+class Pos2D(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    X_FIELD_NUMBER: builtins.int
+    Y_FIELD_NUMBER: builtins.int
+    x: builtins.float = ...
+    y: builtins.float = ...
+    def __init__(
+        self,
+        *,
+        x: builtins.float = ...,
+        y: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["x", b"x", "y", b"y"]
+    ) -> None: ...
+
+global___Pos2D = Pos2D
+
+class Point(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    POSITION_FIELD_NUMBER: builtins.int
+    SAFE_DIS_FIELD_NUMBER: builtins.int
+    INDEX_FIELD_NUMBER: builtins.int
+    IS_OCCUPY_FIELD_NUMBER: builtins.int
+    @property
+    def position(self) -> global___Pos2D: ...
+    safe_dis: builtins.float = ...
+    @property
+    def index(self) -> global___Index: ...
+    is_occupy: builtins.bool = ...
+    def __init__(
+        self,
+        *,
+        position: typing.Optional[global___Pos2D] = ...,
+        safe_dis: builtins.float = ...,
+        index: typing.Optional[global___Index] = ...,
+        is_occupy: builtins.bool = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "index", b"index", "position", b"position"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "index",
+            b"index",
+            "is_occupy",
+            b"is_occupy",
+            "position",
+            b"position",
+            "safe_dis",
+            b"safe_dis",
+        ],
+    ) -> None: ...
+
+global___Point = Point
+
+class MapInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
     MIN_X_FIELD_NUMBER: builtins.int
     MAX_X_FIELD_NUMBER: builtins.int
     MIN_Y_FIELD_NUMBER: builtins.int
     MAX_Y_FIELD_NUMBER: builtins.int
+    X_SIZE_FIELD_NUMBER: builtins.int
+    Y_SIZE_FIELD_NUMBER: builtins.int
     RESOLUTION_FIELD_NUMBER: builtins.int
-    POINTS_FIELD_NUMBER: builtins.int
-    IDX_FIELD_NUMBER: builtins.int
     min_x: builtins.float = ...
     max_x: builtins.float = ...
     min_y: builtins.float = ...
     max_y: builtins.float = ...
+    x_size: builtins.int = ...
+    y_size: builtins.int = ...
     resolution: builtins.float = ...
-    @property
-    def points(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___Point
-    ]: ...
-    @property
-    def idx(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___Index
-    ]: ...
     def __init__(
         self,
         *,
@@ -86,15 +114,13 @@ class CostMap(google.protobuf.message.Message):
         max_x: builtins.float = ...,
         min_y: builtins.float = ...,
         max_y: builtins.float = ...,
+        x_size: builtins.int = ...,
+        y_size: builtins.int = ...,
         resolution: builtins.float = ...,
-        points: typing.Optional[typing.Iterable[global___Point]] = ...,
-        idx: typing.Optional[typing.Iterable[global___Index]] = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "idx",
-            b"idx",
             "max_x",
             b"max_x",
             "max_y",
@@ -103,10 +129,42 @@ class CostMap(google.protobuf.message.Message):
             b"min_x",
             "min_y",
             b"min_y",
-            "points",
-            b"points",
             "resolution",
             b"resolution",
+            "x_size",
+            b"x_size",
+            "y_size",
+            b"y_size",
+        ],
+    ) -> None: ...
+
+global___MapInfo = MapInfo
+
+class CostMap(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    MAP_INFO_FIELD_NUMBER: builtins.int
+    POINTS_FIELD_NUMBER: builtins.int
+    @property
+    def map_info(self) -> global___MapInfo: ...
+    @property
+    def points(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Point
+    ]: ...
+    def __init__(
+        self,
+        *,
+        map_info: typing.Optional[global___MapInfo] = ...,
+        points: typing.Optional[typing.Iterable[global___Point]] = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["map_info", b"map_info"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "map_info", b"map_info", "points", b"points"
         ],
     ) -> None: ...
 

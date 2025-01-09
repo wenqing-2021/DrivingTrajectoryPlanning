@@ -9,7 +9,7 @@ add_library(Solver
     ${SOLVER_HEADERS}
 )
 set_property(TARGET Solver PROPERTY POSITION_INDEPENDENT_CODE ON)
-target_include_directories(Solver PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(Solver PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(Solver PUBLIC Map ${UTILS_LIBRARIES})
 
 # add pybind11 module

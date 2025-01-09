@@ -15,17 +15,24 @@ from bokeh.models import (
 from bokeh.plotting import figure, show
 from utils.visualization.vis_config import FIG_VIS, COLOR_MAP, RENDER_VIS
 from utils.plan_utils import convert_rear_to_mid
-from protobuf.problem_pb2 import PlanProblem
+from protobuf.problem_pb2 import PlanProblem, PlanRes
 from protobuf.params_pb2 import SolverParams
+from protobuf.cost_map_pb2 import CostMap, Point
+from typing import List
+import numpy as np
 
 # output_notebook()
 
 
 class BokehVis:
-    def __init__(self, plan_problem: PlanProblem, solver_params: SolverParams):
+    def __init__(
+        self, plan_problem: PlanProblem, solver_params: SolverParams, plan_res: PlanRes
+    ):
         self.main_plotter = figure(**FIG_VIS["main_figure"])
+        self.esdf_plotter = figure(**FIG_VIS["esdf_figure"])
         self.plan_problem = plan_problem
         self.solver_params = solver_params
+        self.plan_res = plan_res
         self.doc = curdoc()
 
         # build the tabs
@@ -33,6 +40,9 @@ class BokehVis:
 
         # build the plan problem
         self._build_plan_problem()
+
+        # parse the plan result
+        self._parse_plan_result()
 
     def _build_tabs(self):
         layout_dict = self._build_layout()
@@ -48,8 +58,11 @@ class BokehVis:
         main_layout = column(
             row(Spacer(width=FIG_VIS["row_margin_width"]), self.main_plotter),
         )
+        esdf_layout = column(
+            row(Spacer(width=FIG_VIS["row_margin_width"]), self.esdf_plotter),
+        )
 
-        layout_dict.update({"main_figure": main_layout})
+        layout_dict.update({"main_figure": main_layout, "esdf_figure": esdf_layout})
 
         return layout_dict
 
@@ -105,6 +118,22 @@ class BokehVis:
         }
         self.update_attr(goal_state_data, "goal_state")
 
+    def _parse_plan_result(self):
+        # parse the plan result
+        # 1. parse esdf
+        cost_map: CostMap = self.plan_res.cost_map
+        safe_dis_map = np.zeros((cost_map.map_info.x_size, cost_map.map_info.y_size))
+        occ_pts_map = np.zeros((cost_map.map_info.x_size, cost_map.map_info.y_size, 3))
+        for point in cost_map.points:
+            idx_x = point.index.idx_x
+            idx_y = point.index.idx_y
+            safe_dis_map[idx_x, idx_y] = point.safe_dis
+            occ_pts_map[idx_x, idx_y] = [
+                point.position.x,
+                point.position.y,
+                point.is_occupy,
+            ]
+
     def _render_plan_problem(self):
         # render the obstacles
         self.main_plotter.patches(
@@ -129,8 +158,12 @@ class BokehVis:
             **RENDER_VIS["goal_state"]
         )
 
+    def _render_esdf_map(self):
+        pass
+
     def render(self):
         self._render_plan_problem()
+        self._render_esdf_map()
 
     def update_attr(self, data_dict: dict, attr_str: str):
         if not hasattr(self, attr_str):

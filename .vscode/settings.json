@@ -4,6 +4,10 @@
     "editor.formatOnSave": true,
     "editor.formatOnSaveMode": "file",
     },
+    "[python]": {
+        "editor.formatOnType": true,
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
     "clangd.path": "/usr/bin/clangd-12",
     // 头部注释
     "fileheader.customMade": {

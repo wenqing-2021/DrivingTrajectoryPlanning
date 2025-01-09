@@ -8,7 +8,7 @@ import "params.proto";
 
 message Polygon {
     int32 vertex_num = 1;
-    repeated cost_map.Point vertex_pts = 2;
+    repeated cost_map.Pos2D vertex_pts = 2;
 }
 
 message MapBound {
@@ -31,6 +31,7 @@ message PlanRes {
     repeated kinematic_model.ControlVar control_list = 1;
     repeated kinematic_model.StateVar state_list = 2;
     bool solve_success = 3;
+    cost_map.CostMap cost_map = 4;
 }
 
 message SolverInput {

@@ -32,6 +32,7 @@ set(UTILS_LIBRARIES ${UTILS_LIBRARIES}
 # add_subdirectory(src/forward_simulator)
 # add_subdirectory(src/risk_assessment)
 # add_subdirectory(src/ilqr_planner)
+add_subdirectory(src/common)
 add_subdirectory(src/map)
 add_subdirectory(src/solver)
 
@@ -54,5 +55,5 @@ install(
 )
 
 # add excutable
-# add_executable(risk_aware_planning test/risk_assessment/test_risk_assessment.cpp)
-# target_link_libraries(risk_aware_planning PUBLIC risk_assessment)
+add_executable(DEBUG_SOLVER src/solver/debug_solver.cpp)
+target_link_libraries(DEBUG_SOLVER PUBLIC Solver)

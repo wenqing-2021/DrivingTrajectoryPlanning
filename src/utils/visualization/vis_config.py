@@ -16,6 +16,11 @@ FIG_VIS = {
         "height": 720,
         "match_aspect": True,
     },
+    "esdf_figure": {
+        "width": 1280,
+        "height": 720,
+        "match_aspect": True,
+    },
     "row_margin_width": 50,
 }
 

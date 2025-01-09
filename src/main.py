@@ -18,16 +18,28 @@ from utils.plan_utils import build_problem, load_solver_params
 from utils.visualization.vis_tool import BokehVis
 from protobuf.problem_pb2 import PlanProblem, PlanRes, SolverInput
 from protobuf.params_pb2 import SolverParams
+from protobuf.cost_map_pb2 import CostMap
+import os
 
 
-def SolveProblem(solver, plan_problem: PlanProblem, solver_params: SolverParams):
+def SolveProblem(
+    solver,
+    plan_problem: PlanProblem,
+    solver_params: SolverParams,
+    args: argparse.Namespace,
+) -> PlanRes:
     solver_input = SolverInput()
     solver_input.plan_problem.CopyFrom(plan_problem)
     solver_input.solver_params.CopyFrom(solver_params)
     solver_input_str = solver_input.SerializeToString()
-    plan_res_str = solver.run(solver_input_str)
+    is_debug = args.debug
+    plan_res_str = solver.run(solver_input_str, is_debug)
+    cost_map_str = solver.get_cost_map()
     plan_res = PlanRes()
+    cost_map = CostMap()
+    cost_map.ParseFromString(cost_map_str)
     plan_res.ParseFromString(plan_res_str)
+    plan_res.cost_map.CopyFrom(cost_map)
 
     return plan_res
 
@@ -46,6 +58,12 @@ def add_args():
         type=str,
         default="/root/workspace/AutomatedPark/src/config/solver_params.yaml",
     )
+    args.add_argument(
+        "--vehicle_yaml",
+        type=str,
+        default="/root/workspace/AutomatedPark/src/config/vehicle_cfg.yaml",
+    )
+    args.add_argument("--debug", "-d", action="store_true")
     args = args.parse_args()
     return args
 
@@ -54,15 +72,15 @@ def add_args():
 args = add_args()
 
 # ======================== load the case and solver params
-plan_problem: PlanProblem = build_problem(args.file)
+plan_problem: PlanProblem = build_problem(args.file, args.vehicle_yaml)
 solver_params: SolverParams = load_solver_params(args.params)
 
 # ======================== load the solver
 solver = solver_pybind.make_solver()
 
 # ======================== solve the problem
-plan_res: PlanRes = SolveProblem(solver, plan_problem, solver_params)
+plan_res: PlanRes = SolveProblem(solver, plan_problem, solver_params, args)
 
 # ======================== save the result and visualization
-vis = BokehVis(plan_problem, solver_params)
+vis = BokehVis(plan_problem, solver_params, plan_res)
 vis.run()

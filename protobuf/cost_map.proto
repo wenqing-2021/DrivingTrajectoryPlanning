@@ -2,23 +2,34 @@ syntax = "proto3";
 
 package cost_map;
 
-message Point {
+message Index {
+    uint32 idx_x = 1;
+    uint32 idx_y = 2;
+}
+
+message Pos2D {
     double x = 1;
     double y = 2;
-    double risk = 3;
 }
 
-message Index {
-    int32 idx_x = 1;
-    int32 idx_y = 2;
+message Point {
+    Pos2D position = 1;
+    double safe_dis = 2;
+    Index index = 3;
+    bool is_occupy = 4;
 }
 
-message CostMap {
+message MapInfo {
     double min_x = 1;
     double max_x = 2;
     double min_y = 3;
     double max_y = 4;
-    double resolution = 5;
+    uint32 x_size = 5;
+    uint32 y_size = 6;
+    double resolution = 7;
+}
+
+message CostMap {
+    MapInfo map_info = 1;
     repeated Point points = 6;
-    repeated Index idx = 7;
 }

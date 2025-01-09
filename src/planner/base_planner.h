@@ -5,10 +5,10 @@ namespace planner {
 
 class BasePlanner {
   public:
-    BasePlanner() {
+    BasePlanner(){
         // Constructor
     };
-    virtual ~BasePlanner() {
+    virtual ~BasePlanner(){
         // Destructor
     };
 

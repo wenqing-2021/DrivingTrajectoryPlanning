@@ -1,11 +1,39 @@
 import yaml
 import numpy as np
-from protobuf.cost_map_pb2 import Point, CostMap
+from protobuf.cost_map_pb2 import Pos2D
 from protobuf.problem_pb2 import PlanProblem, MapBound, Polygon, PlanRes
 from protobuf.kinematic_model_pb2 import StateVar, VehicleParam
 from protobuf.params_pb2 import SolverParams
 from utils.load_case import Case
 from utils.math_utils import norm_angle
+
+COLOR2NUM = dict(
+    gray=30,
+    red=31,
+    green=32,
+    yellow=33,
+    blue=34,
+    magenta=35,
+    cyan=36,
+    white=37,
+    crimson=38,
+)
+
+
+def colorize(string, color, bold=False, highlight=False):
+    """
+    Colorize a string.
+
+    This function was originally written by John Schulman.
+    """
+    attr = []
+    num = COLOR2NUM[color]
+    if highlight:
+        num += 10
+    attr.append(str(num))
+    if bold:
+        attr.append("1")
+    return "\x1b[%sm%s\x1b[0m" % (";".join(attr), string)
 
 
 def convert_yaml_to_protobuf(file, protobuf_class):
@@ -21,10 +49,10 @@ def convert_yaml_to_protobuf(file, protobuf_class):
     return protobuf_class
 
 
-def build_problem(file: str) -> PlanProblem:
+def build_problem(file: str, vehicle_yaml: str) -> PlanProblem:
     case = Case()
     case.update(file)
-    print("Case loaded successfully!")
+    print(colorize("Case loaded successfully!", "green", bold=True))
     plan_problem = PlanProblem()
     plan_problem.map_bound.CopyFrom(
         MapBound(max_x=case.xmax, min_x=case.xmin, max_y=case.ymax, min_y=case.ymin)
@@ -37,7 +65,7 @@ def build_problem(file: str) -> PlanProblem:
         polygon = Polygon()
         polygon.vertex_num = len(case.obs[i])
         for j in range(len(case.obs[i])):
-            point = Point()
+            point = Pos2D()
             point.x = case.obs[i][j][0]
             point.y = case.obs[i][j][1]
             polygon.vertex_pts.append(point)
@@ -45,8 +73,13 @@ def build_problem(file: str) -> PlanProblem:
         plan_problem.obstacle_list.append(polygon)
 
     # load vehicle params
-    vehicle_param = convert_yaml_to_protobuf(
-        "/root/workspace/AutomatedPark/src/config/vehicle_cfg.yaml", VehicleParam()
+    vehicle_param = convert_yaml_to_protobuf(vehicle_yaml, VehicleParam())
+    print(
+        colorize(
+            f"Vehicle params loaded successfully from {vehicle_yaml}!",
+            "green",
+            bold=True,
+        )
     )
     plan_problem.vehicle_param.CopyFrom(vehicle_param)
 

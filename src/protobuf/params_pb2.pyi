@@ -13,14 +13,20 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor = ...
 class SolverParams(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
     MAX_ITER_FIELD_NUMBER: builtins.int
+    MAP_RESOLUTION_FIELD_NUMBER: builtins.int
     max_iter: builtins.float = ...
+    map_resolution: builtins.float = ...
     def __init__(
         self,
         *,
         max_iter: builtins.float = ...,
+        map_resolution: builtins.float = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["max_iter", b"max_iter"]
+        self,
+        field_name: typing_extensions.Literal[
+            "map_resolution", b"map_resolution", "max_iter", b"max_iter"
+        ],
     ) -> None: ...
 
 global___SolverParams = SolverParams

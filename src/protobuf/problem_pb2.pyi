@@ -24,13 +24,13 @@ class Polygon(google.protobuf.message.Message):
     def vertex_pts(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        cost_map_pb2.Point
+        cost_map_pb2.Pos2D
     ]: ...
     def __init__(
         self,
         *,
         vertex_num: builtins.int = ...,
-        vertex_pts: typing.Optional[typing.Iterable[cost_map_pb2.Point]] = ...,
+        vertex_pts: typing.Optional[typing.Iterable[cost_map_pb2.Pos2D]] = ...,
     ) -> None: ...
     def ClearField(
         self,
@@ -139,6 +139,7 @@ class PlanRes(google.protobuf.message.Message):
     CONTROL_LIST_FIELD_NUMBER: builtins.int
     STATE_LIST_FIELD_NUMBER: builtins.int
     SOLVE_SUCCESS_FIELD_NUMBER: builtins.int
+    COST_MAP_FIELD_NUMBER: builtins.int
     @property
     def control_list(
         self,
@@ -152,6 +153,8 @@ class PlanRes(google.protobuf.message.Message):
         kinematic_model_pb2.StateVar
     ]: ...
     solve_success: builtins.bool = ...
+    @property
+    def cost_map(self) -> cost_map_pb2.CostMap: ...
     def __init__(
         self,
         *,
@@ -162,12 +165,18 @@ class PlanRes(google.protobuf.message.Message):
             typing.Iterable[kinematic_model_pb2.StateVar]
         ] = ...,
         solve_success: builtins.bool = ...,
+        cost_map: typing.Optional[cost_map_pb2.CostMap] = ...,
     ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["cost_map", b"cost_map"]
+    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
             "control_list",
             b"control_list",
+            "cost_map",
+            b"cost_map",
             "solve_success",
             b"solve_success",
             "state_list",
