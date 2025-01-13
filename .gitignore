@@ -32,6 +32,6 @@
 *.app
 build/*
 .cache/*
-.vscode/*
+# .vscode/*
 *.pyc
 logs/*
