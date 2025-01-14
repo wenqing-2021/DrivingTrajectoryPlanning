@@ -11,7 +11,7 @@
             "program": "build/install/main.py",
             "console": "integratedTerminal",
             "args": [
-                "--debug",
+                // "--debug",
                 "--params",
                 "src/config/solver_params.yaml",
                 "--file",

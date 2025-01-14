@@ -44,9 +44,7 @@ class Map {
     cost_map::CostMap                    cost_map_;   // cost map
     std::vector<common::math::Polygon2d> obs_list_;   // obstacle list
 
-    std::vector<std::vector<double>> v_list_{MapDim::nSize};   // dim: [x, y]
-    std::vector<std::vector<double>> z_list_{MapDim::nSize};
-    std::vector<std::vector<double>> f_list_{MapDim::nSize};
+    std::vector<std::vector<double>> f_list_;
 
     // const Dim map_dim{x = 0, y = 1, nSize = 2};
 };

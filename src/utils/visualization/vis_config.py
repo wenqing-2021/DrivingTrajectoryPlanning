@@ -1,3 +1,5 @@
+from bokeh.palettes import Turbo256
+
 COLOR_MAP = {
     "red": "#FF0000",
     "green": "#00FF00",
@@ -7,6 +9,7 @@ COLOR_MAP = {
     "magenta": "#FF00FF",
     "orange": "#FFA500",
     "gray": "#808080",
+    "black": "#000000",
 }
 
 FIG_VIS = {
@@ -38,5 +41,17 @@ RENDER_VIS = {
         "color": COLOR_MAP["red"],
         "line_width": 2,
         "fill_alpha": 0.0,
+    },
+    "occ_square": {
+        "color": COLOR_MAP["black"],
+        "marker": "square",
+        "size": 20,
+    },
+    "esdf_contour": {
+        "contour": {
+            "fill_color": Turbo256,
+            "line_color": "black",
+        },
+        "max_levels": 25,
     },
 }

@@ -52,16 +52,15 @@ void Map::UpdateSafeDis(const std::uint32_t& dim, const std::uint32_t& idx) {
         return s;
     };
     // 1. initial
-    std::uint32_t        end;
-    std::vector<double>& v_list = v_list_[std::abs(int(idx - 1))];
-    std::vector<double>& z_list = z_list_[std::abs(int(idx - 1))];
+    std::uint32_t end;
     if (dim == MapDim::x) {
         end = cost_map_.map_info().y_size();
     } else {
         end = cost_map_.map_info().x_size();
     }
-    std::uint32_t k = 0;
-
+    std::uint32_t       k = 0;
+    std::vector<double> v_list(end, 0.0);
+    std::vector<double> z_list(end + 1, 0.0);
     z_list[0] = -std::numeric_limits<double>::max();
     z_list[1] = std::numeric_limits<double>::max();
 
@@ -108,9 +107,7 @@ void Map::InitCostMap(const problem::PlanProblem& plan_problem, const double& ma
     map_info->set_resolution(map_resolution);
     map_info->set_x_size(static_cast<uint32_t>(x_size));
     map_info->set_y_size(static_cast<uint32_t>(y_size));
-    Map::initValueList(cost_map_.map_info().x_size(), cost_map_.map_info().y_size(), v_list_);
     Map::initValueList(cost_map_.map_info().x_size(), cost_map_.map_info().y_size(), f_list_);
-    Map::initValueList(cost_map_.map_info().x_size() + 1, cost_map_.map_info().y_size() + 1, z_list_);
 
     // 2. create obstacle list
     const int obs_size = plan_problem.obstacle_num();

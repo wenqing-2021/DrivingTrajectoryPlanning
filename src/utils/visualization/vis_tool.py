@@ -133,6 +133,19 @@ class BokehVis:
                 point.position.y,
                 point.is_occupy,
             ]
+        occ_flat_pts_map = occ_pts_map.reshape(-1, 3)
+        safe_dis_map_src = dict(
+            xs=occ_pts_map[..., 0],
+            ys=occ_pts_map[..., 1],
+            safe_dis=safe_dis_map,
+        )
+        occ_pts_map_src = dict(
+            xs=occ_flat_pts_map[:, 0].tolist(),
+            ys=occ_flat_pts_map[:, 1].tolist(),
+            is_occ=occ_flat_pts_map[:, 2].tolist(),
+        )
+        self.update_attr(safe_dis_map_src, "safe_dis_map")
+        self.update_attr(occ_pts_map_src, "occ_pts_map")
 
     def _render_plan_problem(self):
         # render the obstacles
@@ -158,12 +171,32 @@ class BokehVis:
             **RENDER_VIS["goal_state"]
         )
 
-    def _render_esdf_map(self):
-        pass
+    def render_esdf_map(self):
+        self.esdf_plotter.contour(
+            x=self.safe_dis_map.data["xs"],
+            y=self.safe_dis_map.data["ys"],
+            z=self.safe_dis_map.data["safe_dis"],
+            levels=np.linspace(
+                np.min(self.safe_dis_map.data["safe_dis"]),
+                np.max(self.safe_dis_map.data["safe_dis"]),
+                RENDER_VIS["esdf_contour"]["max_levels"],
+            ),
+            **RENDER_VIS["esdf_contour"]["contour"]
+        )
+
+    def _render_occ_map(self):
+        self.esdf_plotter.scatter(
+            x="xs",
+            y="ys",
+            alpha="is_occ",
+            source=self.occ_pts_map,
+            **RENDER_VIS["occ_square"]
+        )
 
     def render(self):
         self._render_plan_problem()
-        self._render_esdf_map()
+        self.render_esdf_map()
+        self._render_occ_map()
 
     def update_attr(self, data_dict: dict, attr_str: str):
         if not hasattr(self, attr_str):
