@@ -20,7 +20,7 @@
 #include <cmath>
 #include <utility>
 
-#include "common/util/string_utils.h"
+#include "string_utils.h"
 #include "common/math/math_utils.h"
 #include "polygon2d.h"
 

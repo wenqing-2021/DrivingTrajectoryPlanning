@@ -21,11 +21,6 @@
 
 #pragma once
 
-/**
- * @namespace apollo::common::math
- * @brief apollo::common::math
- */
-namespace apollo {
 namespace common {
 namespace math {
 
@@ -33,6 +28,5 @@ namespace math {
 #define SIN_TABLE_SIZE 16385
 extern const float SIN_TABLE[SIN_TABLE_SIZE];
 
-}  // namespace math
-}  // namespace common
-}  // namespace apollo
+}   // namespace math
+}   // namespace common

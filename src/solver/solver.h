@@ -1,3 +1,4 @@
+#include "collision_check/gjk_check.h"
 #include "logger/logger.h"
 #include "map/map.h"
 #include "params.pb.h"
@@ -6,6 +7,8 @@
 #include <memory>
 
 namespace solver {
+
+namespace collision_check = planning::collision_check;
 
 struct SolverParams {
     double max_iter;
@@ -24,11 +27,16 @@ class Solver {
 
   private:
     void setMap(const std::shared_ptr<map::Map>& map_ptr) { map_ptr_ = map_ptr; };
+    void setCollisionCheck(const std::shared_ptr<collision_check::BaseCheck>& collision_check_ptr) {
+        collision_check_ptr_ = collision_check_ptr;
+    };
     void setStart(const Eigen::Vector3d& start_vec) { start_vec_ = start_vec; };
     void setGoal(const Eigen::Vector3d& goal_vec) { goal_vec_ = goal_vec; };
     void setSolverParams(const params::SolverParams& solver_params) { solver_params_ = solver_params; };
 
-    std::shared_ptr<map::Map> map_ptr_;
+    // define pointer to the submodule
+    std::shared_ptr<map::Map>                   map_ptr_;
+    std::shared_ptr<collision_check::BaseCheck> collision_check_ptr_;
 
     Eigen::Vector3d      start_vec_;   // [x, y, theta]
     Eigen::Vector3d      goal_vec_;

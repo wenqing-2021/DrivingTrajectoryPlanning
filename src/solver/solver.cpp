@@ -1,5 +1,6 @@
 #include "solver/solver.h"
 #include "params.pb.h"
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -27,6 +28,9 @@ void Solver::LoadProblem(const problem::PlanProblem& plan_problem, const params:
 
     // 3. Set plan params
     Solver::setSolverParams(solver_params);
+
+    // 4. Set collision check
+    Solver::setCollisionCheck(std::make_shared<collision_check::GJKCheck>(plan_problem.vehicle_param()));
 };
 
 const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {

@@ -21,7 +21,7 @@
 #include <cmath>
 
 #include "common/math/math_utils.h"
-#include "common/util/string_utils.h"
+#include "string_utils.h"
 
 namespace common {
 namespace math {

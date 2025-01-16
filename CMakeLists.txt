@@ -33,6 +33,7 @@ set(UTILS_LIBRARIES ${UTILS_LIBRARIES}
 # add_subdirectory(src/risk_assessment)
 # add_subdirectory(src/ilqr_planner)
 add_subdirectory(src/common)
+add_subdirectory(src/collision_check)
 add_subdirectory(src/map)
 add_subdirectory(src/solver)
 
