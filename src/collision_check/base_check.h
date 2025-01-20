@@ -6,8 +6,8 @@ namespace collision_check {
 
 class BaseCheck {
   public:
-    BaseCheck();
-    virtual ~BaseCheck() = 0;
+    BaseCheck() = default;
+    virtual ~BaseCheck(){};
 
     virtual bool Check(const common::math::Polygon2d& polygon1, const common::math::Pose& vehicle_pose) = 0;
 };

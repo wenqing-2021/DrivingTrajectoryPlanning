@@ -47,8 +47,7 @@ double Sqr(const double x);
  *
  * @return The cross product result.
  */
-double CrossProd(const Vec2d &start_point, const Vec2d &end_point_1,
-                 const Vec2d &end_point_2);
+double CrossProd(const Vec2d& start_point, const Vec2d& end_point_1, const Vec2d& end_point_2);
 
 /**
  * @brief Inner product between two 2-D vectors from the common start point,
@@ -59,8 +58,7 @@ double CrossProd(const Vec2d &start_point, const Vec2d &end_point_1,
  *
  * @return The inner product result.
  */
-double InnerProd(const Vec2d &start_point, const Vec2d &end_point_1,
-                 const Vec2d &end_point_2);
+double InnerProd(const Vec2d& start_point, const Vec2d& end_point_1, const Vec2d& end_point_2);
 
 /**
  * @brief Cross product between two vectors.
@@ -73,8 +71,7 @@ double InnerProd(const Vec2d &start_point, const Vec2d &end_point_1,
  *
  * @return The cross product result.
  */
-double CrossProd(const double x0, const double y0, const double x1,
-                 const double y1);
+double CrossProd(const double x0, const double y0, const double x1, const double y1);
 
 /**
  * @brief Inner product between two vectors.
@@ -87,8 +84,7 @@ double CrossProd(const double x0, const double y0, const double x1,
  *
  * @return The inner product result.
  */
-double InnerProd(const double x0, const double y0, const double x1,
-                 const double y1);
+double InnerProd(const double x0, const double y0, const double x1, const double y1);
 
 /**
  * @brief Wrap angle to [0, 2 * PI).
@@ -117,9 +113,9 @@ double AngleDiff(const double from, const double to);
  * @param value The target value to get its squared value.
  * @return Squared value of the input value.
  */
-template <typename T>
+template<typename T>
 inline T Square(const T value) {
-  return value * value;
+    return value * value;
 }
 
 /**
@@ -131,75 +127,78 @@ inline T Square(const T value) {
  * @param bound2 The other bound to clamp the value.
  * @return The clamped value.
  */
-template <typename T>
+template<typename T>
 T Clamp(const T value, T bound1, T bound2) {
-  if (bound1 > bound2) {
-    std::swap(bound1, bound2);
-  }
+    if (bound1 > bound2) { std::swap(bound1, bound2); }
 
-  if (value < bound1) {
-    return bound1;
-  } else if (value > bound2) {
-    return bound2;
-  }
-  return value;
+    if (value < bound1) {
+        return bound1;
+    } else if (value > bound2) {
+        return bound2;
+    }
+    return value;
 }
 
 // Gaussian
 double Gaussian(const double u, const double std, const double x);
 
-inline double Sigmoid(const double x) { return 1.0 / (1.0 + std::exp(-x)); }
+inline double Sigmoid(const double x) {
+    return 1.0 / (1.0 + std::exp(-x));
+}
 
 // Rotate a 2d vector counter-clockwise by theta
-Vec2d RotateVector2d(const Vec2d &v_in, const double theta);
+Vec2d RotateVector2d(const Vec2d& v_in, const double theta);
 
 inline std::pair<double, double> RFUToFLU(const double x, const double y) {
-  return std::make_pair(y, -x);
+    return std::make_pair(y, -x);
 }
 
 inline std::pair<double, double> FLUToRFU(const double x, const double y) {
-  return std::make_pair(-y, x);
+    return std::make_pair(-y, x);
 }
 
-inline void L2Norm(int feat_dim, float *feat_data) {
-  if (feat_dim == 0) {
-    return;
-  }
-  // feature normalization
-  float l2norm = 0.0f;
-  for (int i = 0; i < feat_dim; ++i) {
-    l2norm += feat_data[i] * feat_data[i];
-  }
-  if (l2norm == 0) {
-    float val = 1.f / std::sqrt(static_cast<float>(feat_dim));
-    for (int i = 0; i < feat_dim; ++i) {
-      feat_data[i] = val;
+inline void L2Norm(int feat_dim, float* feat_data) {
+    if (feat_dim == 0) { return; }
+    // feature normalization
+    float l2norm = 0.0f;
+    for (int i = 0; i < feat_dim; ++i) { l2norm += feat_data[i] * feat_data[i]; }
+    if (l2norm == 0) {
+        float val = 1.f / std::sqrt(static_cast<float>(feat_dim));
+        for (int i = 0; i < feat_dim; ++i) { feat_data[i] = val; }
+    } else {
+        l2norm = std::sqrt(l2norm);
+        for (int i = 0; i < feat_dim; ++i) { feat_data[i] /= l2norm; }
     }
-  } else {
-    l2norm = std::sqrt(l2norm);
-    for (int i = 0; i < feat_dim; ++i) {
-      feat_data[i] /= l2norm;
-    }
-  }
 }
 
 // Cartesian coordinates to Polar coordinates
 std::pair<double, double> Cartesian2Polar(double x, double y);
 
-template <class T>
-typename std::enable_if<!std::numeric_limits<T>::is_integer, bool>::type
-almost_equal(T x, T y, int ulp) {
-  // the machine epsilon has to be scaled to the magnitude of the values used
-  // and multiplied by the desired precision in ULPs (units in the last place)
-  // unless the result is subnormal
-  return std::fabs(x - y) <=
-         std::numeric_limits<T>::epsilon() * std::fabs(x + y) * ulp ||
-         std::fabs(x - y) < std::numeric_limits<T>::min();
+template<class T>
+typename std::enable_if<!std::numeric_limits<T>::is_integer, bool>::type almost_equal(T x, T y, int ulp) {
+    // the machine epsilon has to be scaled to the magnitude of the values used
+    // and multiplied by the desired precision in ULPs (units in the last place)
+    // unless the result is subnormal
+    return std::fabs(x - y) <= std::numeric_limits<T>::epsilon() * std::fabs(x + y) * ulp ||
+           std::fabs(x - y) < std::numeric_limits<T>::min();
 }
 
-std::vector<double> ToContinuousAngle(const std::vector<double> &angle);
+std::vector<double> ToContinuousAngle(const std::vector<double>& angle);
 
-std::vector<bool> GetPathGears(const std::vector<double> &x, const std::vector<double> &y, const std::vector<double> &theta);
+std::vector<bool> GetPathGears(const std::vector<double>& x, const std::vector<double>& y,
+                               const std::vector<double>& theta);
 
-}  // namespace math
-}  // namespace common
+inline std::vector<double> Product3D(const std::vector<double>& v1, const std::vector<double>& v2) {
+    return {v1[1] * v2[2] - v2[1] * v1[2], -(v1[0] * v2[2] - v2[0] * v1[2]), v1[0] * v2[1] - v2[0] * v1[1]};
+}
+
+inline double GetTriangleAera(const Vec2d& A, const Vec2d& B, const Vec2d& C) {
+    double a = A.Length();
+    double b = B.Length();
+    double c = C.Length();
+    double s = (a + b + c) / 2;
+    return std::sqrt(s * (s - a) * (s - b) * (s - c));
+}
+
+}   // namespace math
+}   // namespace common
