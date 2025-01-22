@@ -193,9 +193,9 @@ inline std::vector<double> Product3D(const std::vector<double>& v1, const std::v
 }
 
 inline double GetTriangleAera(const Vec2d& A, const Vec2d& B, const Vec2d& C) {
-    double a = A.Length();
-    double b = B.Length();
-    double c = C.Length();
+    double a = (B - C).Length();
+    double b = (A - C).Length();
+    double c = (A - B).Length();
     double s = (a + b + c) / 2;
     return std::sqrt(s * (s - a) * (s - b) * (s - c));
 }

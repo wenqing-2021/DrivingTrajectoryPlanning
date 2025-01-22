@@ -36,6 +36,25 @@
                     "ignoreFailures": true
                 }
             ],
+        },
+        {
+            "name": "C++ Debugger: Test_CollisionCheck",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/src/test/collision_check/TestCollisionCheck", // Update this path
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
         }
     ]
 }

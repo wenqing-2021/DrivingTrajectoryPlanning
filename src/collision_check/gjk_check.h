@@ -29,7 +29,7 @@ class GJKCheck : public BaseCheck {
     bool        nearestSimplex(const std::uint32_t& idx);
 
     const std::pair<Vec2d, Vec2d> getNearestEdge();
-
+    bool                          find_same_point_{false};
     kinematic_model::VehicleParam vehicle_param_;
     std::vector<Vec2d>            simplex_;   // only onsider 2D case, so the max size of simplex is 3 (traiangle)
     Vec2d                         support_vector_;

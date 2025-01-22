@@ -1,7 +1,10 @@
 #include "solver/solver.h"
 #include <fstream>
+#include <pybind11/cast.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
+#include <pybind11/stl.h>
+#include <string>
 #include <vector>
 
 namespace py = pybind11;
@@ -12,6 +15,24 @@ std::shared_ptr<Solver> make_solver() {
     auto solver_ptr = std::make_shared<Solver>();
 
     return solver_ptr;
+}
+
+bool TestCollisionChecker(const std::vector<std::vector<double>>& obs_polygon, const std::vector<double>& vehicle_pose,
+                          const std::string& vehicle_param_str) {
+    // 1. generate vehicle_param
+    kinematic_model::VehicleParam vehicle_param;
+    vehicle_param.ParseFromString(vehicle_param_str);
+    // 2. create GJKCheck instance
+    collision_check::GJKCheck collision_check(vehicle_param);
+    // 3. create polygon1 and polygon2
+    std::vector<common::math::Vec2d> polygon_points;
+    for (const auto& point : obs_polygon) {
+        common::math::Vec2d point_obj(point[0], point[1]);
+        polygon_points.push_back(point_obj);
+    }
+    common::math::Polygon2d polygon_obj(polygon_points);
+    common::math::Pose      vehicle_pose_obj(vehicle_pose[0], vehicle_pose[1], vehicle_pose[2]);
+    return collision_check.Check(polygon_obj, vehicle_pose_obj);
 }
 
 // 定义一个Pybind11模块
@@ -57,6 +78,14 @@ PYBIND11_MODULE(solver_pybind, m) {
 
             return cost_map_str;
         });
+
+    // bind the collsion check
+    m.def("TestCollisionChecker",
+          &TestCollisionChecker,
+          "Test the collision checker",
+          py::arg("obs_polygon"),
+          py::arg("vehicle_pose"),
+          py::arg("vehicle_param_str"));
 }
 
 }   // namespace solver

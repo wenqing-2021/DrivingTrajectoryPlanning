@@ -24,9 +24,12 @@ bool GJKCheck::Check(const Polygon2d& polygon1, const Pose& vehicle_pose) {
     // 2. check collision
     for (std::uint32_t idx = 1; idx <= kMaxIterNum; ++idx) {
         Vec2d support_point = getSupportPoint(polygon1, vehicle_polygon);
-        if (checkSupportPoint(support_point)) { return false; }
+        if (checkSupportPoint(support_point)) {
+            return false;
+        }   // The dot of support vector and support point is less than 0
         updateSimplex(support_point, idx);
-        if (nearestSimplex(idx)) { return true; }
+        if (find_same_point_) { return false; }     // find the same point in simplex
+        if (nearestSimplex(idx)) { return true; }   // Triangle includes the origin
     }
 
     LOG(ERROR) << "GJKCheck::Check: GJK algorithm failed to find collision.";
@@ -57,6 +60,10 @@ bool GJKCheck::nearestSimplex(const std::uint32_t& idx) {
     };
     if (idx == 1) {
         support_vector_ = updateSupportVec(simplex_.at(0), simplex_.at(1));
+        if (support_vector_.Length() < 1e-6) {
+            Vec2d AB        = simplex_.at(1) - simplex_.at(0);
+            support_vector_ = Vec2d(AB.y(), -AB.x());
+        }
         return false;
     } else {
         // 1. check the triangle is including the origin or not
@@ -77,7 +84,7 @@ bool GJKCheck::nearestSimplex(const std::uint32_t& idx) {
 }
 
 bool GJKCheck::checkSupportPoint(const Vec2d& support_point) {
-    return support_vector_.InnerProd(support_point) < 0.0;
+    return support_vector_.InnerProd(support_point) <= 0.0;
 }
 
 void GJKCheck::initialSimplex(const Polygon2d& polygon1, const Polygon2d& polygon2) {
@@ -94,10 +101,10 @@ Polygon2d const GJKCheck::CreateVehiclePolygon(const Pose& vehicle_pose) {
 
 const Vec2d GJKCheck::getSupportPoint(const Polygon2d& polygon1, const Polygon2d& polygon2) {
     const Vec2d rever_support_vector = support_vector_ * -1.0;
-    Vec2d       support_point_1;
-    Vec2d       support_point_2;
-    polygon1.ExtremePoints(support_vector_.Angle(), nullptr, &support_point_1);
-    polygon2.ExtremePoints(rever_support_vector.Angle(), nullptr, &support_point_2);
+    Vec2d       support_point_1, nearest_pts_1;
+    Vec2d       support_point_2, nearest_pts_2;
+    polygon1.ExtremePoints(support_vector_.Angle(), &nearest_pts_1, &support_point_1);
+    polygon2.ExtremePoints(rever_support_vector.Angle(), &nearest_pts_2, &support_point_2);
 
     return support_point_1 - support_point_2;
 }
@@ -130,6 +137,13 @@ void GJKCheck::updateSimplex(const Vec2d& support_point, const std::uint32_t& id
         simplex_[idx] = support_point;
         return;
     } else {
+        // 0. check the duplicate point
+        for (const Vec2d& point : simplex_) {
+            if (point == support_point) {
+                find_same_point_ = true;
+                return;
+            }
+        }
         // 1. pop the first point in simplex_
         simplex_.erase(simplex_.begin());
         // 2. push the new support point

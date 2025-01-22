@@ -15,6 +15,9 @@ project(AutomatedPark)
 find_package(Eigen3 REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(yaml-cpp REQUIRED)
+# Find GoogleTest package
+find_package(GTest REQUIRED)
+include_directories(${GTEST_INCLUDE_DIRS})
 add_subdirectory(third-party/pybind11)
 add_subdirectory(third-party/glog)
 add_subdirectory(protobuf)
@@ -58,3 +61,5 @@ install(
 # add excutable
 add_executable(DEBUG_SOLVER src/solver/debug_solver.cpp)
 target_link_libraries(DEBUG_SOLVER PUBLIC Solver)
+
+add_subdirectory(src/test/collision_check)
