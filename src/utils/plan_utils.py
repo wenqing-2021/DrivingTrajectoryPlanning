@@ -36,15 +36,20 @@ def colorize(string, color, bold=False, highlight=False):
     return "\x1b[%sm%s\x1b[0m" % (";".join(attr), string)
 
 
-def convert_yaml_to_protobuf(file, protobuf_class):
+def convert_yaml_to_protobuf(file, protobuf_class, input_dict=None):
     # read the yaml file
-    with open(file, "r") as f:
-        params = yaml.safe_load(f)
+    if file is not None and input_dict is None:
+        with open(file, "r") as f:
+            params = yaml.safe_load(f)
+    elif input_dict is not None:
+        params = input_dict
     # convert to protobuf
     attr_list = dir(protobuf_class)
     for key in attr_list:
-        if key in params:
+        if key in params and not isinstance(params[key], dict):
             setattr(protobuf_class, key, params[key])
+        elif key in params and isinstance(params[key], dict):
+            convert_yaml_to_protobuf(None, getattr(protobuf_class, key), params[key])
 
     return protobuf_class
 

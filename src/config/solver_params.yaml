@@ -1,2 +1,11 @@
 max_iter: 50
 map_resolution: 0.3 # meters
+
+
+hybrid_a_star_param: # NOTE: this name MUST be the same as the name in proto file
+  max_iter: 1000 # iterations
+  expand_s: 1.0 # m
+  max_steer_angle: 0.75 # rad
+  search_front_num: 5 # number of search front
+  search_back_num: 3 # number of search back
+  rs_radius: 15 # meters (in this circle, try RS curve to reach the goal)

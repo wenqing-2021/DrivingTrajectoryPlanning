@@ -2,7 +2,18 @@ syntax = "proto3";
 
 package params;
 
+message HybridAStarParams{
+    int32 max_iter = 1;
+    double expand_s = 2;
+    double max_steer_angle = 3;
+    int32 search_front_num = 4;
+    int32 search_back_num = 5;
+    double rs_radius = 6;
+    double wheel_base = 7;
+}
+
 message SolverParams {
     double max_iter = 1;
     double map_resolution = 2;
+    HybridAStarParams hybrid_a_star_param = 3;
 }
