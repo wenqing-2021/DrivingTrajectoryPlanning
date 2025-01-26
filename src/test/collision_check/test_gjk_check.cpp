@@ -47,10 +47,12 @@ TEST_F(GJKCheckTest, Collision) {
     Pose vehicle_pose(0.5, 0.0, 0.0);
 
     // Check for collision
-    bool collision = gjk_check_->Check(polygon1, vehicle_pose);
+    bool collision_1 = gjk_check_->Check(polygon1, vehicle_pose);
+    bool collision_2 = gjk_check_->Check(polygon2, vehicle_pose);
 
     // Expect collision
-    EXPECT_TRUE(collision);
+    EXPECT_TRUE(collision_1);
+    EXPECT_TRUE(collision_2);
 }
 
 int main(int argc, char** argv) {

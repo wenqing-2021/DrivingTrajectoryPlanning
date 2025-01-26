@@ -1,4 +1,5 @@
 #include "solver/solver.h"
+#include "collision_check/gjk_check.h"
 #include "params.pb.h"
 #include <memory>
 #include <string>
@@ -30,7 +31,9 @@ void Solver::LoadProblem(const problem::PlanProblem& plan_problem, const params:
     Solver::setSolverParams(solver_params);
 
     // 4. Set collision check
-    Solver::setCollisionCheck(std::make_shared<collision_check::GJKCheck>(plan_problem.vehicle_param()));
+    LOG(INFO) << "Set collision check...";
+    Solver::setCollisionCheck(
+        collision_check::BaseCheck::CreateChecker<collision_check::GJKCheck>(plan_problem.vehicle_param()));
 };
 
 const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {
@@ -38,6 +41,7 @@ const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {
     // 1. load plan problem
     const problem::PlanProblem plan_problem  = solver_input.plan_problem();
     const params::SolverParams solver_params = solver_input.solver_params();
+    LOG(INFO) << "Load problem from protobuf...";
     Solver::LoadProblem(plan_problem, solver_params);
 
     return plan_res_;

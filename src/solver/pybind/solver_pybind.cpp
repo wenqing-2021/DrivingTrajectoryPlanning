@@ -1,3 +1,4 @@
+#include "collision_check/gjk_check.h"
 #include "solver/solver.h"
 #include <fstream>
 #include <pybind11/cast.h>
@@ -23,7 +24,7 @@ bool TestCollisionChecker(const std::vector<std::vector<double>>& obs_polygon, c
     kinematic_model::VehicleParam vehicle_param;
     vehicle_param.ParseFromString(vehicle_param_str);
     // 2. create GJKCheck instance
-    collision_check::GJKCheck collision_check(vehicle_param);
+    const auto gjk_check = collision_check::BaseCheck::CreateChecker<collision_check::GJKCheck>(vehicle_param);
     // 3. create polygon1 and polygon2
     std::vector<common::math::Vec2d> polygon_points;
     for (const auto& point : obs_polygon) {
@@ -32,7 +33,7 @@ bool TestCollisionChecker(const std::vector<std::vector<double>>& obs_polygon, c
     }
     common::math::Polygon2d polygon_obj(polygon_points);
     common::math::Pose      vehicle_pose_obj(vehicle_pose[0], vehicle_pose[1], vehicle_pose[2]);
-    return collision_check.Check(polygon_obj, vehicle_pose_obj);
+    return gjk_check->Check(polygon_obj, vehicle_pose_obj);
 }
 
 // 定义一个Pybind11模块

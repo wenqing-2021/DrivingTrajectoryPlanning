@@ -1,10 +1,11 @@
-#include "collision_check/gjk_check.h"
+#include "collision_check/base_check.h"
 #include "logger/logger.h"
 #include "map/map.h"
 #include "params.pb.h"
 #include "problem.pb.h"
 #include <Eigen/Core>
 #include <memory>
+#include <utility>
 
 namespace solver {
 
@@ -26,9 +27,9 @@ class Solver {
     const cost_map::CostMap& getCostMap() const { return map_ptr_->GetCostMap(); };
 
   private:
-    void setMap(const std::shared_ptr<map::Map>& map_ptr) { map_ptr_ = map_ptr; };
-    void setCollisionCheck(const std::shared_ptr<collision_check::BaseCheck>& collision_check_ptr) {
-        collision_check_ptr_ = collision_check_ptr;
+    void setMap(std::shared_ptr<map::Map>&& map_ptr) { map_ptr_ = std::move(map_ptr); }
+    void setCollisionCheck(std::shared_ptr<collision_check::BaseCheck>&& collision_check_ptr) {
+        collision_check_ptr_ = std::move(collision_check_ptr);
     };
     void setStart(const Eigen::Vector3d& start_vec) { start_vec_ = start_vec; };
     void setGoal(const Eigen::Vector3d& goal_vec) { goal_vec_ = goal_vec; };
