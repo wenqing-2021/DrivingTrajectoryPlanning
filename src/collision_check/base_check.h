@@ -11,6 +11,12 @@ class BaseCheck {
     BaseCheck() = default;
     virtual ~BaseCheck(){};
 
+    /***
+     * @description: check the obstacle collides with the vehicle or not
+     * @param {Polygon2d&} polygon1
+     * @param {Pose&} vehicle_pose
+     * @return {bool} true if collide, false if not
+     */
     virtual bool Check(const common::math::Polygon2d& polygon1, const common::math::Pose& vehicle_pose) = 0;
 
     template<typename T_cls, typename T_param>

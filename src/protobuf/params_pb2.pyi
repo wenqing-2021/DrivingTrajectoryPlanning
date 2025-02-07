@@ -6,26 +6,96 @@ isort:skip_file
 import builtins
 import google.protobuf.descriptor
 import google.protobuf.message
+import typing
 import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor = ...
+
+class HybridAStarParams(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    MAX_ITER_FIELD_NUMBER: builtins.int
+    EXPAND_S_FIELD_NUMBER: builtins.int
+    MAX_STEER_ANGLE_FIELD_NUMBER: builtins.int
+    SEARCH_FRONT_NUM_FIELD_NUMBER: builtins.int
+    SEARCH_BACK_NUM_FIELD_NUMBER: builtins.int
+    RS_RADIUS_FIELD_NUMBER: builtins.int
+    RS_STEP_SIZE_FIELD_NUMBER: builtins.int
+    WHEEL_BASE_FIELD_NUMBER: builtins.int
+    max_iter: builtins.int = ...
+    expand_s: builtins.float = ...
+    max_steer_angle: builtins.float = ...
+    search_front_num: builtins.int = ...
+    search_back_num: builtins.int = ...
+    rs_radius: builtins.float = ...
+    rs_step_size: builtins.float = ...
+    wheel_base: builtins.float = ...
+    def __init__(
+        self,
+        *,
+        max_iter: builtins.int = ...,
+        expand_s: builtins.float = ...,
+        max_steer_angle: builtins.float = ...,
+        search_front_num: builtins.int = ...,
+        search_back_num: builtins.int = ...,
+        rs_radius: builtins.float = ...,
+        rs_step_size: builtins.float = ...,
+        wheel_base: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "expand_s",
+            b"expand_s",
+            "max_iter",
+            b"max_iter",
+            "max_steer_angle",
+            b"max_steer_angle",
+            "rs_radius",
+            b"rs_radius",
+            "rs_step_size",
+            b"rs_step_size",
+            "search_back_num",
+            b"search_back_num",
+            "search_front_num",
+            b"search_front_num",
+            "wheel_base",
+            b"wheel_base",
+        ],
+    ) -> None: ...
+
+global___HybridAStarParams = HybridAStarParams
 
 class SolverParams(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
     MAX_ITER_FIELD_NUMBER: builtins.int
     MAP_RESOLUTION_FIELD_NUMBER: builtins.int
+    HYBRID_A_STAR_PARAM_FIELD_NUMBER: builtins.int
     max_iter: builtins.float = ...
     map_resolution: builtins.float = ...
+    @property
+    def hybrid_a_star_param(self) -> global___HybridAStarParams: ...
     def __init__(
         self,
         *,
         max_iter: builtins.float = ...,
         map_resolution: builtins.float = ...,
+        hybrid_a_star_param: typing.Optional[global___HybridAStarParams] = ...,
     ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "hybrid_a_star_param", b"hybrid_a_star_param"
+        ],
+    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "map_resolution", b"map_resolution", "max_iter", b"max_iter"
+            "hybrid_a_star_param",
+            b"hybrid_a_star_param",
+            "map_resolution",
+            b"map_resolution",
+            "max_iter",
+            b"max_iter",
         ],
     ) -> None: ...
 

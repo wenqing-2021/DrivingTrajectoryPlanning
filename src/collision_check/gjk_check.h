@@ -23,10 +23,10 @@ class GJKCheck : public BaseCheck {
   private:
     const Vec2d getSupportPoint(const Polygon2d& polygon1, const Polygon2d& polygon2);
     void        initialSimplex(const Polygon2d& polygon1, const Polygon2d& polygon2);
-    void        updateSimplex(const Vec2d& support_point, const std::uint32_t& idx);
+    void        updateSimplex(const Vec2d& support_point, std::uint32_t idx);
     void        updateVehiclePolygon(const Pose& vehicle_pose);
     bool        checkSupportPoint(const Vec2d& support_point);
-    bool        nearestSimplex(const std::uint32_t& idx);
+    bool        nearestSimplex(std::uint32_t idx);
 
     const std::pair<Vec2d, Vec2d> getNearestEdge();
     bool                          find_same_point_{false};

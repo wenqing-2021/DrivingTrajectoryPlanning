@@ -7,7 +7,7 @@
 
 namespace map {
 
-Map::Map(const problem::PlanProblem& plan_problem, const double& map_resolution) {
+Map::Map(const problem::PlanProblem& plan_problem, double map_resolution) {
     // Load problem from protobuf
     // 1. set occ map
     InitCostMap(plan_problem, map_resolution);
@@ -37,7 +37,7 @@ void Map::UpdateESDF() {
     }
 };
 
-void Map::UpdateSafeDis(const std::uint32_t& dim, const std::uint32_t& idx) {
+void Map::UpdateSafeDis(std::uint32_t dim, std::uint32_t idx) {
     auto update_s = [this, &dim, &idx](std::uint32_t& q, int k, const std::vector<double>& v_list) -> double {
         double q_value;
         double v_value;
@@ -91,7 +91,7 @@ void Map::UpdateSafeDis(const std::uint32_t& dim, const std::uint32_t& idx) {
     };
 };
 
-void Map::InitCostMap(const problem::PlanProblem& plan_problem, const double& map_resolution) {
+void Map::InitCostMap(const problem::PlanProblem& plan_problem, double map_resolution) {
     const double map_min_x = plan_problem.map_bound().min_x();
     const double map_min_y = plan_problem.map_bound().min_y();
     const double map_max_x = plan_problem.map_bound().max_x();
@@ -154,17 +154,19 @@ void Map::InitCostMap(const problem::PlanProblem& plan_problem, const double& ma
     };
 };
 
-cost_map::Pos2D Map::ConvertIdxtoXY(const std::uint32_t& idx_x, const std::uint32_t& idx_y) {
+cost_map::Pos2D Map::ConvertIdxtoXY(std::uint32_t idx_x, std::uint32_t idx_y) {
     cost_map::Pos2D pos;
     pos.set_x(cost_map_.map_info().min_x() + idx_x * cost_map_.map_info().resolution());
     pos.set_y(cost_map_.map_info().min_y() + idx_y * cost_map_.map_info().resolution());
     return pos;
 };
 
-cost_map::Index Map::ConvertXYtoIdx(const double& x, const double& y) {
+cost_map::Index Map::ConvertXYtoIdx(double x, double y) {
     cost_map::Index idx;
-    idx.set_idx_x(static_cast<std::uint32_t>((x - cost_map_.map_info().min_x()) / cost_map_.map_info().resolution()));
-    idx.set_idx_y(static_cast<std::uint32_t>((y - cost_map_.map_info().min_y()) / cost_map_.map_info().resolution()));
+    idx.set_idx_x(
+        static_cast<std::uint32_t>(std::floor((x - cost_map_.map_info().min_x()) / cost_map_.map_info().resolution())));
+    idx.set_idx_y(
+        static_cast<std::uint32_t>(std::floor((y - cost_map_.map_info().min_y()) / cost_map_.map_info().resolution())));
     return idx;
 };
 

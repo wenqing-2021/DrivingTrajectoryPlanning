@@ -5,11 +5,16 @@ package params;
 message HybridAStarParams{
     int32 max_iter = 1;
     double expand_s = 2;
-    double max_steer_angle = 3;
-    int32 search_front_num = 4;
-    int32 search_back_num = 5;
-    double rs_radius = 6;
-    double wheel_base = 7;
+    int32 expand_step_num = 3;
+    double max_steer_angle = 4;
+    int32 search_front_num = 5;
+    int32 search_back_num = 6;
+    double rs_radius = 7;
+    double rs_step_size = 8;
+    double wheel_base = 9;
+    double node_resolution_x = 10;
+    double node_resolution_y = 11;
+    double node_resolution_theta = 12;
 }
 
 message SolverParams {

@@ -9,6 +9,9 @@
         "editor.defaultFormatter": "ms-python.black-formatter"
     },
     "clangd.path": "/usr/bin/clangd-12",
+    "clangd.arguments": [
+        "--header-insertion=never"
+    ],
     // 头部注释
     "fileheader.customMade": {
         // Author字段是文件的创建者 可以在specialOptions中更改特殊属性

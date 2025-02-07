@@ -45,7 +45,7 @@ const bool GJKCheck::CheckInTriangle(const Vec2d& A, const Vec2d& B, const Vec2d
     return std::abs(area_ABC - (area_ABD + area_ACD + area_BCD)) < 1e-6;
 }
 
-bool GJKCheck::nearestSimplex(const std::uint32_t& idx) {
+bool GJKCheck::nearestSimplex(std::uint32_t idx) {
     auto updateSupportVec = [](const Vec2d& A, const Vec2d& B) -> Vec2d {
         // 1. get the last two points
         Vec2d AB = B - A;
@@ -132,7 +132,7 @@ const std::pair<Vec2d, Vec2d> GJKCheck::getNearestEdge() {
     }
 }
 
-void GJKCheck::updateSimplex(const Vec2d& support_point, const std::uint32_t& idx) {
+void GJKCheck::updateSimplex(const Vec2d& support_point, std::uint32_t idx) {
     if (idx < 3) {
         simplex_[idx] = support_point;
         return;

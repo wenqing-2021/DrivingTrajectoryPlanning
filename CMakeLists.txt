@@ -38,6 +38,7 @@ set(UTILS_LIBRARIES ${UTILS_LIBRARIES}
 add_subdirectory(src/common)
 add_subdirectory(src/collision_check)
 add_subdirectory(src/map)
+add_subdirectory(src/planner)
 add_subdirectory(src/solver)
 
 # BUILD PYBIND11 MODULE
