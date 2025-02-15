@@ -93,7 +93,8 @@ def build_problem(file: str, vehicle_yaml: str) -> PlanProblem:
 
 def load_solver_params(file):
     solver_params = convert_yaml_to_protobuf(file, SolverParams())
-
+    print("Solver params loaded successfully!")
+    print(f"Solver params: {solver_params}")
     return solver_params
 
 

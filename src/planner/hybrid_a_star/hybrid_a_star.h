@@ -1,8 +1,8 @@
 #pragma once
 
 #include "collision_check/base_check.h"
+#include "common/math/angle.h"
 #include "common/math/math_utils.h"
-#include "logger/logger.h"
 #include "map/map.h"
 #include "params.pb.h"
 #include "planner/hybrid_a_star/rs_path.h"
@@ -22,7 +22,12 @@ class HybridAstar {
                 const std::shared_ptr<collision_check::BaseCheck>& collison_checker);
     ~HybridAstar() = default;
 
-    bool Plan(const Eigen::Vector3d& start_vec, const Eigen::Vector3d& goal_vec);
+    bool        Plan(const Eigen::Vector3d& start_vec, const Eigen::Vector3d& goal_vec);
+    inline void GetPath(std::vector<Eigen::Vector3d>& path, double& path_length) {
+        path        = final_path_;
+        path_length = path_length_;
+    };
+    inline std::vector<Eigen::Vector3d>& GetDebugNodeList() { return debug_node_list_; };
 
   private:
     enum NODE_STATUS
@@ -55,20 +60,17 @@ class HybridAstar {
         double                y_;
         double                theta_;
         double                steer_angle_;
-        std::uint32_t         index_x_;
-        std::uint32_t         index_y_;
         NODE_STATUS           status_;   // open or closed
         bool                  is_forward_;
         double                g_value_;
         double                h_value_;
         double                f_value_;
         std::shared_ptr<Node> parent_ptr_;
-        std::shared_ptr<Node> child_ptr_;
         Eigen::Vector3d       pose_;
     };
     struct CompareNode {
         bool operator()(const std::shared_ptr<Node>& lhs, const std::shared_ptr<Node>& rhs) const {
-            return lhs->f_value_ < rhs->f_value_;   // Greater f_value will have higher priority
+            return lhs->f_value_ > rhs->f_value_;   // smaller f_value will have higher priority
         }
     };
 
@@ -85,8 +87,11 @@ class HybridAstar {
             std::floor((x - map_ptr_->GetCostMap().map_info().min_x()) / hybrid_params_.node_resolution_x()));
         index_y = static_cast<std::uint32_t>(
             std::floor((y - map_ptr_->GetCostMap().map_info().min_y()) / hybrid_params_.node_resolution_y()));
-        index_theta = static_cast<std::uint32_t>(
-            std::floor(common::math::NormalizeAngle(theta) / hybrid_params_.node_resolution_theta()));
+        // convert degree to radian
+        double resolution_theta =
+            common::math::Angle<std::int32_t>::from_deg(hybrid_params_.node_resolution_theta()).to_rad();
+        index_theta =
+            static_cast<std::uint32_t>(std::floor((common::math::NormalizeAngle(theta) + M_PI) / resolution_theta));
     };
 
   private:
@@ -106,6 +111,7 @@ class HybridAstar {
     std::priority_queue<std::shared_ptr<Node>, std::vector<std::shared_ptr<Node>>, CompareNode> open_list_;
     std::vector<std::vector<std::vector<std::shared_ptr<Node>>>>                                node_map_;
 
+    std::vector<Eigen::Vector3d>                debug_node_list_;
     static constexpr double                     kEpsilon = 1e-6;
     params::HybridAStarParams                   hybrid_params_;
     std::shared_ptr<map::Map>                   map_ptr_;

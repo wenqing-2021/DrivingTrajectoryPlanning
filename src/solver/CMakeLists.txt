@@ -10,7 +10,7 @@ add_library(Solver
 )
 set_property(TARGET Solver PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_include_directories(Solver PUBLIC ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(Solver PUBLIC Map ${UTILS_LIBRARIES})
+target_link_libraries(Solver PUBLIC Map ${UTILS_LIBRARIES} Planner)
 
 # add pybind11 module
 file(GLOB SOLVER_PYBIND_SRC

@@ -1,7 +1,7 @@
 #include "collision_check/base_check.h"
-#include "logger/logger.h"
 #include "map/map.h"
 #include "params.pb.h"
+#include "planner/trajectory_planner.h"
 #include "problem.pb.h"
 #include <Eigen/Core>
 #include <memory>
@@ -38,6 +38,7 @@ class Solver {
     // define pointer to the submodule
     std::shared_ptr<map::Map>                   map_ptr_;
     std::shared_ptr<collision_check::BaseCheck> collision_check_ptr_;
+    std::unique_ptr<planning::TrajPlanner>      traj_planner_ptr_;
 
     Eigen::Vector3d      start_vec_;   // [x, y, theta]
     Eigen::Vector3d      goal_vec_;

@@ -14,4 +14,4 @@ set_property(TARGET Planner PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Include directories for headers
 target_include_directories(Planner PUBLIC ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(Planner PUBLIC ${UTILS_LIBRARIES})
+target_link_libraries(Planner PUBLIC ${UTILS_LIBRARIES} HybridAStar)

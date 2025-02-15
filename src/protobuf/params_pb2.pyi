@@ -11,45 +11,95 @@ import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor = ...
 
+class HybridAStarGCost(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    REVERSE_COST_FIELD_NUMBER: builtins.int
+    HEAD_CHANGE_COST_FIELD_NUMBER: builtins.int
+    reverse_cost: builtins.float = ...
+    head_change_cost: builtins.float = ...
+    def __init__(
+        self,
+        *,
+        reverse_cost: builtins.float = ...,
+        head_change_cost: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "head_change_cost", b"head_change_cost", "reverse_cost", b"reverse_cost"
+        ],
+    ) -> None: ...
+
+global___HybridAStarGCost = HybridAStarGCost
+
 class HybridAStarParams(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
     MAX_ITER_FIELD_NUMBER: builtins.int
     EXPAND_S_FIELD_NUMBER: builtins.int
+    EXPAND_STEP_NUM_FIELD_NUMBER: builtins.int
     MAX_STEER_ANGLE_FIELD_NUMBER: builtins.int
     SEARCH_FRONT_NUM_FIELD_NUMBER: builtins.int
     SEARCH_BACK_NUM_FIELD_NUMBER: builtins.int
     RS_RADIUS_FIELD_NUMBER: builtins.int
     RS_STEP_SIZE_FIELD_NUMBER: builtins.int
     WHEEL_BASE_FIELD_NUMBER: builtins.int
+    NODE_RESOLUTION_X_FIELD_NUMBER: builtins.int
+    NODE_RESOLUTION_Y_FIELD_NUMBER: builtins.int
+    NODE_RESOLUTION_THETA_FIELD_NUMBER: builtins.int
+    G_COST_FIELD_NUMBER: builtins.int
     max_iter: builtins.int = ...
     expand_s: builtins.float = ...
+    expand_step_num: builtins.int = ...
     max_steer_angle: builtins.float = ...
     search_front_num: builtins.int = ...
     search_back_num: builtins.int = ...
     rs_radius: builtins.float = ...
     rs_step_size: builtins.float = ...
     wheel_base: builtins.float = ...
+    node_resolution_x: builtins.float = ...
+    node_resolution_y: builtins.float = ...
+    node_resolution_theta: builtins.float = ...
+    @property
+    def g_cost(self) -> global___HybridAStarGCost: ...
     def __init__(
         self,
         *,
         max_iter: builtins.int = ...,
         expand_s: builtins.float = ...,
+        expand_step_num: builtins.int = ...,
         max_steer_angle: builtins.float = ...,
         search_front_num: builtins.int = ...,
         search_back_num: builtins.int = ...,
         rs_radius: builtins.float = ...,
         rs_step_size: builtins.float = ...,
         wheel_base: builtins.float = ...,
+        node_resolution_x: builtins.float = ...,
+        node_resolution_y: builtins.float = ...,
+        node_resolution_theta: builtins.float = ...,
+        g_cost: typing.Optional[global___HybridAStarGCost] = ...,
     ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["g_cost", b"g_cost"]
+    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
             "expand_s",
             b"expand_s",
+            "expand_step_num",
+            b"expand_step_num",
+            "g_cost",
+            b"g_cost",
             "max_iter",
             b"max_iter",
             "max_steer_angle",
             b"max_steer_angle",
+            "node_resolution_theta",
+            b"node_resolution_theta",
+            "node_resolution_x",
+            b"node_resolution_x",
+            "node_resolution_y",
+            b"node_resolution_y",
             "rs_radius",
             b"rs_radius",
             "rs_step_size",

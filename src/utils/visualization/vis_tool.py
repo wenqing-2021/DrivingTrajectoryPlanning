@@ -18,6 +18,7 @@ from utils.plan_utils import convert_rear_to_mid
 from protobuf.problem_pb2 import PlanProblem, PlanRes
 from protobuf.params_pb2 import SolverParams
 from protobuf.cost_map_pb2 import CostMap, Point
+from protobuf.kinematic_model_pb2 import StateVar
 from typing import List
 import numpy as np
 
@@ -26,14 +27,16 @@ import numpy as np
 
 class BokehVis:
     def __init__(
-        self, plan_problem: PlanProblem, solver_params: SolverParams, plan_res: PlanRes
+        self, plan_problem: PlanProblem, solver_params: SolverParams, plan_res: PlanRes, debug: bool = False
     ):
         self.main_plotter = figure(**FIG_VIS["main_figure"])
         self.esdf_plotter = figure(**FIG_VIS["esdf_figure"])
         self.plan_problem = plan_problem
         self.solver_params = solver_params
         self.plan_res = plan_res
+        self.init_path_dict = {}
         self.doc = curdoc()
+        self.debug = debug
 
         # build the tabs
         self._build_tabs()
@@ -147,6 +150,22 @@ class BokehVis:
         self.update_attr(safe_dis_map_src, "safe_dis_map")
         self.update_attr(occ_pts_map_src, "occ_pts_map")
 
+        # 2. parse init path
+        is_success = self.plan_res.solve_success
+        if is_success or self.debug:
+            init_path = self.plan_res.init_path
+            
+            # print("init_path size: ", len(init_path))
+            init_path_parse = np.zeros((len(init_path), 3))
+            for idx, state in enumerate(init_path):
+                init_path_parse[idx] = [state.x, state.y, state.theta]
+                # print(f"state {idx}: {state.x}, {state.y}, {state.theta} \n")
+
+            self.init_path_dict.update(
+                {"x": init_path_parse[:, 0], "y": init_path_parse[:, 1], "head": init_path_parse[:, 2]}
+            )
+            self.update_attr(self.init_path_dict, "init_path")
+
     def _render_plan_problem(self):
         # render the obstacles
         self.main_plotter.patches(
@@ -193,10 +212,45 @@ class BokehVis:
             **RENDER_VIS["occ_square"]
         )
 
+    def render_init_path(self):
+        if hasattr(self, "init_path"):
+            self.main_plotter.line(
+                x="x", y="y", source=self.init_path, **RENDER_VIS["init_path"]
+            )
+            self.main_plotter.scatter(
+                x="x",
+                y="y",
+                source=self.init_path,
+                **RENDER_VIS["init_path_scatter"]
+            )
+
+            # render rectangles
+            init_path_x = self.init_path_dict["x"]
+            init_path_y = self.init_path_dict["y"]
+            init_path_head = self.init_path_dict["head"]
+            for idx in range(len(init_path_x)):
+                # print(f"start to render rectangle{idx}")
+                init_path_mid_pts = convert_rear_to_mid(
+                    [init_path_x[idx], init_path_y[idx]],
+                    self.plan_problem.vehicle_param.rear_overhang,
+                    self.plan_problem.vehicle_param.length,
+                    init_path_head[idx],
+                )
+                self.main_plotter.rect(
+                    x=init_path_mid_pts[0],
+                    y=init_path_mid_pts[1],
+                    angle=init_path_head[idx],
+                    width=self.plan_problem.vehicle_param.length,
+                    height=self.plan_problem.vehicle_param.width,
+                    **RENDER_VIS["init_path_rect"]
+                )
+            
+
     def render(self):
         self._render_plan_problem()
-        self.render_esdf_map()
         self._render_occ_map()
+        self.render_esdf_map()
+        self.render_init_path()
 
     def update_attr(self, data_dict: dict, attr_str: str):
         if not hasattr(self, attr_str):
@@ -211,4 +265,3 @@ class BokehVis:
         self.doc.add_root(self.tabs)
         self.doc.title = FIG_VIS["title"]
         self.render()
-        show(self.tabs)

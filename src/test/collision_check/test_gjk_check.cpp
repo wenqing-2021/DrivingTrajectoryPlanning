@@ -14,6 +14,9 @@ class GJKCheckTest : public ::testing::Test {
         // Set up vehicle parameters
         vehicle_param_.set_length(4.5);
         vehicle_param_.set_width(2.0);
+        vehicle_param_.set_wheel_base(2.5);
+        vehicle_param_.set_front_overhang(1.0);
+        vehicle_param_.set_rear_overhang(1.0);
 
         // Initialize GJKCheck object
         gjk_check_ = std::make_unique<GJKCheck>(vehicle_param_);
@@ -53,6 +56,21 @@ TEST_F(GJKCheckTest, Collision) {
     // Expect collision
     EXPECT_TRUE(collision_1);
     EXPECT_TRUE(collision_2);
+}
+
+TEST_F(GJKCheckTest, vehicle_collision) {
+    // 1. define the obstacle polygon
+    std::vector<Vec2d> points_obs = {Vec2d(-26.757860973806402, -21.9245275091866),
+                                     Vec2d(-12.8250820695946, -16.3677593831667),
+                                     Vec2d(-13.544498316309999, -14.5639289410347),
+                                     Vec2d(-27.4772772205218, -20.1206970670546)};
+    Polygon2d          obs_polygon(points_obs);
+    Pose               vehicle_pose(-15.0, -15.0, 0.0);
+
+    bool collision = gjk_check_->Check(obs_polygon, vehicle_pose);
+
+    // Expect collision
+    EXPECT_TRUE(collision);
 }
 
 int main(int argc, char** argv) {

@@ -82,5 +82,5 @@ solver = solver_pybind.make_solver()
 plan_res: PlanRes = SolveProblem(solver, plan_problem, solver_params, args)
 
 # ======================== save the result and visualization
-vis = BokehVis(plan_problem, solver_params, plan_res)
+vis = BokehVis(plan_problem, solver_params, plan_res, args.debug)
 vis.run()

@@ -31,7 +31,7 @@ int main() {
     solver_input.ParseFromString(solver_input_str);
 
     solver::Solver solver;
-    solver.Run(solver_input);
+    const auto&    plan_res = solver.Run(solver_input);
 
     return 0;
 }

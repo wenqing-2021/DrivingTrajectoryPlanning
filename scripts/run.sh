@@ -2,4 +2,4 @@
 
 cd build/install
 
-bokeh serve --show main.py
+bokeh serve --show main.py --args "$@"

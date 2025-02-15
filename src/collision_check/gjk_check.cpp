@@ -1,4 +1,5 @@
 #include "gjk_check.h"
+#include "common/math/line_segment2d.h"
 #include "common/math/math_utils.h"
 #include "common/math/polygon2d.h"
 #include "common/math/vec2d.h"
@@ -11,14 +12,21 @@ namespace collision_check {
 
 GJKCheck::GJKCheck(const kinematic_model::VehicleParam& vehicle_param) {
     vehicle_param_ = vehicle_param;
+    initialSuportVec();
+}
+
+void GJKCheck::initialSuportVec() {
     // 1. initial simplex
+    simplex_.clear();
     simplex_.resize(3, Vec2d(0.0, 0.0));
-    support_vector_ = Vec2d(1.0, 0.0);   // initial with x-axis
+    support_vector_  = Vec2d(1.0, 0.0);   // initial with x-axis
+    find_same_point_ = false;
 }
 
 bool GJKCheck::Check(const Polygon2d& polygon1, const Pose& vehicle_pose) {
     const Polygon2d vehicle_polygon = CreateVehiclePolygon(vehicle_pose);
     // 1. initial simplex
+    initialSuportVec();
     initialSimplex(polygon1, vehicle_polygon);   // simplex size is zero
     support_vector_ = -1.0 * simplex_.front();   // update support vector
     // 2. check collision
@@ -53,7 +61,7 @@ bool GJKCheck::nearestSimplex(std::uint32_t idx) {
         // 2.  compute the support vector
         std::vector<double> vec_AB        = {AB.x(), AB.y(), 0.0};
         std::vector<double> vec_AO        = {AO.x(), AO.y(), 0.0};
-        std::vector<double> vec_normal    = Product3D(vec_AB, vec_AB);
+        std::vector<double> vec_normal    = Product3D(vec_AB, vec_AO);
         std::vector<double> vec_AB_normal = Product3D(vec_normal, vec_AB);
         // 3. update the support vector
         return Vec2d(vec_AB_normal[0], vec_AB_normal[1]);
@@ -93,8 +101,12 @@ void GJKCheck::initialSimplex(const Polygon2d& polygon1, const Polygon2d& polygo
 }
 
 Polygon2d const GJKCheck::CreateVehiclePolygon(const Pose& vehicle_pose) {
-    const Vec2d vehicle_position(vehicle_pose.x(), vehicle_pose.y());
-    Box2d       vehicle_box(vehicle_position, vehicle_pose.theta(), vehicle_param_.length(), vehicle_param_.width());
+    double vehicle_pose_mid_x = vehicle_pose.x() + (vehicle_param_.length() / 2 - vehicle_param_.rear_overhang()) *
+                                                       std::cos(vehicle_pose.theta());
+    double vehicle_pose_mid_y = vehicle_pose.y() + (vehicle_param_.length() / 2 - vehicle_param_.rear_overhang()) *
+                                                       std::sin(vehicle_pose.theta());
+    Vec2d vehicle_pose_mid(vehicle_pose_mid_x, vehicle_pose_mid_y);
+    Box2d vehicle_box(vehicle_pose_mid, vehicle_pose.theta(), vehicle_param_.length(), vehicle_param_.width());
 
     return Polygon2d(vehicle_box);
 }
@@ -111,24 +123,26 @@ const Vec2d GJKCheck::getSupportPoint(const Polygon2d& polygon1, const Polygon2d
 
 const std::pair<Vec2d, Vec2d> GJKCheck::getNearestEdge() {
     // 1. find the nearest edge to the origin from the simplex
-    const Vec2d  A       = simplex_.at(0);
-    const Vec2d  B       = simplex_.at(1);
-    const Vec2d  C       = simplex_.at(2);
-    const Vec2d  O       = Vec2d(0.0, 0.0);
-    const double dist_AB = CrossProd(A, B, O) / (B - A).Length();
-    const double dist_BC = CrossProd(B, C, O) / (C - B).Length();
-    const double dist_CA = CrossProd(C, A, O) / (A - C).Length();
+    const LineSegment2d AB(simplex_.at(0), simplex_.at(1));
+    const LineSegment2d BC(simplex_.at(1), simplex_.at(2));
+    const LineSegment2d CA(simplex_.at(2), simplex_.at(0));
+    const Vec2d         O(0.0, 0.0);
+    const double        dist_AB = std::abs(AB.ProductOntoUnit(O));
+    const double        dist_BC = std::abs(BC.ProductOntoUnit(O));
+    const double        dist_CA = std::abs(CA.ProductOntoUnit(O));
     if (dist_AB < dist_BC && dist_AB < dist_CA) {
         // 2. put the furthest point in the front
-        simplex_.at(0) = C;
-        simplex_.at(2) = A;
-        return std::make_pair(A, B);
+        auto temp      = simplex_.at(2);
+        simplex_.at(2) = simplex_.at(0);
+        simplex_.at(0) = temp;
+        return std::make_pair(simplex_.at(2), simplex_.at(1));
     } else if (dist_BC < dist_AB && dist_BC < dist_CA) {
-        return std::make_pair(B, C);
+        return std::make_pair(simplex_.at(1), simplex_.at(2));
     } else {
-        simplex_.at(0) = B;
-        simplex_.at(1) = A;
-        return std::make_pair(C, A);
+        auto temp      = simplex_.at(1);
+        simplex_.at(1) = simplex_.at(0);
+        simplex_.at(0) = temp;
+        return std::make_pair(simplex_.at(1), simplex_.at(2));
     }
 }
 

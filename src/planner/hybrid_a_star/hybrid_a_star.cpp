@@ -1,4 +1,5 @@
 #include "planner/hybrid_a_star/hybrid_a_star.h"
+#include "logger/logger.h"
 #include <cmath>
 
 
@@ -12,7 +13,7 @@ HybridAstar::HybridAstar(const params::HybridAStarParams& hybrid_params, const s
     setCollisionChecker(collison_checker);
 
     // 2. set the RS_path_ptr
-    double turning_radius = hybrid_params_.max_steer_angle() / std::tan(hybrid_params_.wheel_base());
+    double turning_radius = hybrid_params_.wheel_base() / std::tan(hybrid_params_.max_steer_angle());
     setRSPath(std::make_unique<RSPath>(turning_radius));
 
     // 3. set hybrid astar node status
@@ -25,12 +26,17 @@ HybridAstar::HybridAstar(const params::HybridAStarParams& hybrid_params, const s
         static_cast<std::uint32_t>(std::floor((map_max_x - map_min_x) / hybrid_params_.node_resolution_x()));
     const std::uint32_t HYBRID_ASTAR_Y_SIZE =
         static_cast<std::uint32_t>(std::floor((map_max_y - map_min_y) / hybrid_params_.node_resolution_y()));
+    double resolution_theta =
+        common::math::Angle<std::int32_t>::from_deg(hybrid_params_.node_resolution_theta()).to_rad();
     const std::uint32_t HYBRID_ASTAR_THETA_SIZE =
-        static_cast<std::uint32_t>(360 / hybrid_params_.node_resolution_theta());   // convert to rad
+        static_cast<std::uint32_t>(std::floor((M_PI + M_PI) / resolution_theta));
     node_map_.resize(HYBRID_ASTAR_X_SIZE);
-    for (auto& node_x : node_map_) {
-        node_x.resize(HYBRID_ASTAR_Y_SIZE);
-        for (auto& node_y : node_x) { node_y.resize(HYBRID_ASTAR_THETA_SIZE); }
+    for (uint32_t i = 0; i < HYBRID_ASTAR_X_SIZE; ++i) {
+        node_map_[i].resize(HYBRID_ASTAR_Y_SIZE);
+        for (uint32_t j = 0; j < HYBRID_ASTAR_Y_SIZE; ++j) {
+            node_map_[i][j].resize(HYBRID_ASTAR_THETA_SIZE);
+            for (uint32_t k = 0; k < HYBRID_ASTAR_THETA_SIZE; ++k) { node_map_[i][j][k] = nullptr; }
+        }
     }
 }
 
@@ -43,6 +49,7 @@ bool HybridAstar::Plan(const Eigen::Vector3d& start_vec, const Eigen::Vector3d& 
               << "x" << goal_vec_.x() << "y" << goal_vec_.y() << "theta" << goal_vec_.z();
     // 1. initial the first node
     initNode();
+
     bool reach_goal = false;
     int  iter       = 0;
 
@@ -51,6 +58,11 @@ bool HybridAstar::Plan(const Eigen::Vector3d& start_vec, const Eigen::Vector3d& 
         // 2.1 select the node with the lowest f value
         selected_node_ = open_list_.top();
         open_list_.pop();
+        debug_node_list_.push_back(Eigen::Vector3d(selected_node_->x_, selected_node_->y_, selected_node_->theta_));
+        LOG(INFO) << "Hybrid A* planner is running..."
+                  << "Current node: "
+                  << "x is [" << selected_node_->x_ << "] y is [" << selected_node_->y_ << "] theta is ["
+                  << selected_node_->theta_ << "]";
         // 2.2 check if the node can reach the goal with RS path
         if (tryRSPath(selected_node_)) {
             reach_goal = true;
@@ -114,7 +126,15 @@ bool HybridAstar::isReach(const std::shared_ptr<Node>& node_ptr) {
 void HybridAstar::initNode() {
     selected_node_ = std::make_shared<Node>(start_vec_.x(), start_vec_.y(), start_vec_.z(), 0.0, true, nullptr);
     selected_node_->setValue(0.0, 0.0);
-    open_list_.push(std::move(selected_node_));
+    selected_node_->status_ = NODE_STATUS::OPEN;
+    open_list_.push(selected_node_);
+    std::uint32_t index_x, index_y, index_theta;
+    convertToIndex(start_vec_.x(), start_vec_.y(), start_vec_.z(), index_x, index_y, index_theta);
+    node_map_[index_x][index_y][index_theta] = selected_node_;
+    LOG(INFO) << "inital node is created in node_map"
+              << ", x is [" << node_map_[index_x][index_y][index_theta]->x_ << "]"
+              << ", y is [" << node_map_[index_x][index_y][index_theta]->y_ << "]"
+              << ", theta is [" << node_map_[index_x][index_y][index_theta]->theta_ << "]";
 };
 
 void HybridAstar::expandNode(const std::shared_ptr<Node>& node_ptr) {
@@ -127,20 +147,18 @@ void HybridAstar::expandNode(const std::shared_ptr<Node>& node_ptr) {
     for (int i = 0; i < expand_num; ++i) {
         double expand_s, is_forward, child_steer_angle;
         if (i < front_expand_num) {
-            double expand_s          = hybrid_params_.expand_s();
-            bool   is_forward        = true;
-            double child_steer_angle = -max_steer_angle + i * 2 * max_steer_angle / (front_expand_num - 1);
+            expand_s          = hybrid_params_.expand_s();
+            is_forward        = true;
+            child_steer_angle = -max_steer_angle + i * 2 * max_steer_angle / (front_expand_num - 1);
         } else {
-            double expand_s   = -hybrid_params_.expand_s();
-            bool   is_forward = false;
-            double child_steer_angle =
-                -max_steer_angle + (i - front_expand_num) * 2 * max_steer_angle / (back_expand_num - 1);
+            expand_s          = -hybrid_params_.expand_s();
+            is_forward        = false;
+            child_steer_angle = -max_steer_angle + (i - front_expand_num) * 2 * max_steer_angle / (back_expand_num - 1);
         }
         double child_x, child_y, child_theta;
         if (!getChildNode(expand_s, child_steer_angle, child_x, child_y, child_theta, node_ptr)) { continue; }
         std::uint32_t index_x, index_y, index_theta;
         convertToIndex(child_x, child_y, child_theta, index_x, index_y, index_theta);
-        if (isCollide(child_x, child_y, child_theta)) { continue; }
         if (node_map_[index_x][index_y][index_theta] == nullptr) {
             // 2.2 create the new node
             auto child_node_ptr =
@@ -149,7 +167,8 @@ void HybridAstar::expandNode(const std::shared_ptr<Node>& node_ptr) {
             double child_h_value = calcHValue(child_node_ptr);
             child_node_ptr->setValue(child_g_value, child_h_value);
             child_node_ptr->status_ = NODE_STATUS::OPEN;
-            open_list_.push(std::move(child_node_ptr));
+            open_list_.push(child_node_ptr);
+            node_map_[index_x][index_y][index_theta] = child_node_ptr;
         } else if (node_map_[index_x][index_y][index_theta]->status_ == NODE_STATUS::OPEN) {
             double new_child_g_value = calcGValue(node_ptr, node_map_[index_x][index_y][index_theta]);
             double new_child_h_value = calcHValue(node_map_[index_x][index_y][index_theta]);
@@ -198,7 +217,7 @@ bool HybridAstar::getChildNode(const double expand_s, const double steer_angle, 
 
 bool HybridAstar::isCollide(double x, double y, double theta) {
     for (const auto& obstacle_polygon : map_ptr_->GetObsList()) {
-        if (collision_checker_->Check(obstacle_polygon, {x, y, theta})) { return true; }
+        if (collision_checker_->Check(obstacle_polygon, common::math::Pose(x, y, theta))) { return true; }
     }
     if (!map_ptr_->IsInMap(x, y)) { return true; }
 
@@ -206,21 +225,49 @@ bool HybridAstar::isCollide(double x, double y, double theta) {
 };
 
 double HybridAstar::calcHValue(const std::shared_ptr<Node>& child_node_ptr) {
-    // pass
     double h_value = 0.0;
+    // use Manhattan distance as the heuristic function
+    double to_goal_dis = std::sqrt((child_node_ptr->x_ - goal_vec_.x()) * (child_node_ptr->x_ - goal_vec_.x()) +
+                                   (child_node_ptr->y_ - goal_vec_.y()) * (child_node_ptr->y_ - goal_vec_.y()));
+    if (to_goal_dis < hybrid_params_.rs_radius()) {
+        double rs_path_length = rs_path_ptr_->Distance(child_node_ptr->x_,
+                                                       child_node_ptr->y_,
+                                                       child_node_ptr->theta_,
+                                                       goal_vec_.x(),
+                                                       goal_vec_.y(),
+                                                       goal_vec_.z());
+        h_value += rs_path_length;
+    } else {
+        h_value += std::abs(child_node_ptr->x_ - goal_vec_.x()) + std::abs(child_node_ptr->y_ - goal_vec_.y());
+    }
 
     return h_value;
 };
 
 double HybridAstar::calcGValue(const std::shared_ptr<Node>& curr_node_ptr,
                                const std::shared_ptr<Node>& child_node_ptr) {
-    // pass
     double g_value = 0.0;
-
+    if (!child_node_ptr->is_forward_) { g_value += hybrid_params_.g_cost().reverse_cost(); }
+    const double head_change = std::abs(common::math::NormalizeAngle(child_node_ptr->theta_ - curr_node_ptr->theta_));
+    g_value += hybrid_params_.g_cost().head_change_cost() * head_change;
     return g_value;
 };
 
-void HybridAstar::finishPath(){};
+void HybridAstar::finishPath() {
+    // 1. get the revert path
+    while (selected_node_ != nullptr) {
+        final_path_.push_back(Eigen::Vector3d(selected_node_->x_, selected_node_->y_, selected_node_->theta_));
+        if (selected_node_->parent_ptr_ != nullptr) {
+            path_length_ += std::sqrt((selected_node_->x_ - selected_node_->parent_ptr_->x_) *
+                                          (selected_node_->x_ - selected_node_->parent_ptr_->x_) +
+                                      (selected_node_->y_ - selected_node_->parent_ptr_->y_) *
+                                          (selected_node_->y_ - selected_node_->parent_ptr_->y_));
+        }
+        selected_node_ = selected_node_->parent_ptr_;
+    }
+    std::reverse(final_path_.begin(), final_path_.end());
+    final_path_.insert(final_path_.end(), final_rs_path_.begin(), final_rs_path_.end());
+};
 
 }   // namespace frontend
 }   // namespace planning

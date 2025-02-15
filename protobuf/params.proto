@@ -2,6 +2,11 @@ syntax = "proto3";
 
 package params;
 
+message HybridAStarGCost{
+    double reverse_cost = 1;
+    double head_change_cost = 2;
+}
+
 message HybridAStarParams{
     int32 max_iter = 1;
     double expand_s = 2;
@@ -15,6 +20,7 @@ message HybridAStarParams{
     double node_resolution_x = 10;
     double node_resolution_y = 11;
     double node_resolution_theta = 12;
+    HybridAStarGCost g_cost = 13;
 }
 
 message SolverParams {

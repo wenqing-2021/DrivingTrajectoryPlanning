@@ -1,5 +1,6 @@
 #include "collision_check/gjk_check.h"
 #include "solver/solver.h"
+#include <filesystem>
 #include <fstream>
 #include <pybind11/cast.h>
 #include <pybind11/pybind11.h>

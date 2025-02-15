@@ -21,6 +21,7 @@ class GJKCheck : public BaseCheck {
     const bool      CheckInTriangle(const Vec2d& A, const Vec2d& B, const Vec2d& C, const Vec2d& D);
 
   private:
+    void        initialSuportVec();
     const Vec2d getSupportPoint(const Polygon2d& polygon1, const Polygon2d& polygon2);
     void        initialSimplex(const Polygon2d& polygon1, const Polygon2d& polygon2);
     void        updateSimplex(const Vec2d& support_point, std::uint32_t idx);
@@ -33,7 +34,7 @@ class GJKCheck : public BaseCheck {
     kinematic_model::VehicleParam vehicle_param_;
     std::vector<Vec2d>            simplex_;   // only onsider 2D case, so the max size of simplex is 3 (traiangle)
     Vec2d                         support_vector_;
-    const std::uint32_t           kMaxIterNum = 20;
+    const std::uint32_t           kMaxIterNum = 50;
 };
 
 

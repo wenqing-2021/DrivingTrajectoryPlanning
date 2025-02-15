@@ -11,7 +11,7 @@
             "program": "build/install/main.py",
             "console": "integratedTerminal",
             "args": [
-                // "--debug",
+                "--debug",
                 "--params",
                 "src/config/solver_params.yaml",
                 "--file",
@@ -38,7 +38,7 @@
             ],
         },
         {
-            "name": "C++ Debugger: Test_CollisionCheck",
+            "name": "C++: Test_CollisionCheck",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/src/test/collision_check/TestCollisionCheck", // Update this path
