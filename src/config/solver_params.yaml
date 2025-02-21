@@ -15,3 +15,6 @@ hybrid_a_star_param: # NOTE: the following key's name MUST be the same as those 
   node_resolution_x: 0.5 # meters
   node_resolution_y: 0.5 # meters
   node_resolution_theta: 10 # degrees
+  g_cost:
+    reverse_cost: 1.0
+    head_change_cost: 0.5 
