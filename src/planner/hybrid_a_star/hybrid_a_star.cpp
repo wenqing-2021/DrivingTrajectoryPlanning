@@ -155,14 +155,17 @@ void HybridAstar::expandNode(const std::shared_ptr<Node>& node_ptr) {
             is_forward        = false;
             child_steer_angle = -max_steer_angle + (i - front_expand_num) * 2 * max_steer_angle / (back_expand_num - 1);
         }
-        double child_x, child_y, child_theta;
-        if (!getChildNode(expand_s, child_steer_angle, child_x, child_y, child_theta, node_ptr)) { continue; }
+        double                       child_x, child_y, child_theta;
+        std::vector<Eigen::Vector3d> path_from_parent;
+        if (!getChildNode(expand_s, child_steer_angle, child_x, child_y, child_theta, node_ptr, path_from_parent)) {
+            continue;
+        }
         std::uint32_t index_x, index_y, index_theta;
         convertToIndex(child_x, child_y, child_theta, index_x, index_y, index_theta);
         if (node_map_[index_x][index_y][index_theta] == nullptr) {
             // 2.2 create the new node
-            auto child_node_ptr =
-                std::make_shared<Node>(child_x, child_y, child_theta, child_steer_angle, is_forward, node_ptr);
+            auto child_node_ptr = std::make_shared<Node>(
+                child_x, child_y, child_theta, child_steer_angle, is_forward, node_ptr, path_from_parent);
             double child_g_value = calcGValue(node_ptr, child_node_ptr);
             double child_h_value = calcHValue(child_node_ptr);
             child_node_ptr->setValue(child_g_value, child_h_value);
@@ -176,11 +179,11 @@ void HybridAstar::expandNode(const std::shared_ptr<Node>& node_ptr) {
             if (new_f_value < node_map_[index_x][index_y][index_theta]->f_value_) {
                 // 2.2 update the node
                 node_map_[index_x][index_y][index_theta]->setValue(new_child_g_value, new_child_h_value);
-                node_map_[index_x][index_y][index_theta]->parent_ptr_ = node_ptr;
-                node_map_[index_x][index_y][index_theta]->steer_angle_ =
-                    node_map_[index_x][index_y][index_theta]->steer_angle_;
-                node_map_[index_x][index_y][index_theta]->is_forward_ =
-                    node_map_[index_x][index_y][index_theta]->is_forward_;
+                node_map_[index_x][index_y][index_theta]->parent_ptr_  = node_ptr;
+                node_map_[index_x][index_y][index_theta]->steer_angle_ = child_steer_angle;
+                node_map_[index_x][index_y][index_theta]->is_forward_  = is_forward;
+                node_map_[index_x][index_y][index_theta]->path_from_parent_.clear();
+                node_map_[index_x][index_y][index_theta]->path_from_parent_ = path_from_parent;
             }
         } else if (node_map_[index_x][index_y][index_theta]->status_ == NODE_STATUS::CLOSE) {
             continue;
@@ -202,7 +205,8 @@ void HybridAstar::expandNode(const std::shared_ptr<Node>& node_ptr) {
  * @return {bool} true if success, otherwise false
  */
 bool HybridAstar::getChildNode(const double expand_s, const double steer_angle, double& child_x, double& child_y,
-                               double& child_theta, const std::shared_ptr<Node>& node_ptr) {
+                               double& child_theta, const std::shared_ptr<Node>& node_ptr,
+                               std::vector<Eigen::Vector3d>& path_from_parent) {
     const double& wheel_base = hybrid_params_.wheel_base();
     for (std::uint32_t step_num = 0; step_num < hybrid_params_.expand_step_num(); ++step_num) {
         double expand_s_step = expand_s / hybrid_params_.expand_step_num() * (step_num + 1);
@@ -210,8 +214,10 @@ bool HybridAstar::getChildNode(const double expand_s, const double steer_angle, 
             common::math::NormalizeAngle(node_ptr->theta_ + std::tan(steer_angle) * expand_s_step / wheel_base);
         child_x = node_ptr->x_ + expand_s_step * std::cos(child_theta);
         child_y = node_ptr->y_ + expand_s_step * std::sin(child_theta);
+        path_from_parent.push_back(Eigen::Vector3d(child_x, child_y, child_theta));
         if (isCollide(child_x, child_y, child_theta)) { return false; }
     }
+    path_from_parent.pop_back();
     return true;
 };
 
@@ -257,6 +263,9 @@ void HybridAstar::finishPath() {
     // 1. get the revert path
     while (selected_node_ != nullptr) {
         final_path_.push_back(Eigen::Vector3d(selected_node_->x_, selected_node_->y_, selected_node_->theta_));
+        for (auto i = selected_node_->path_from_parent_.rbegin(); i != selected_node_->path_from_parent_.rend(); ++i) {
+            final_path_.push_back(*i);
+        }
         if (selected_node_->parent_ptr_ != nullptr) {
             path_length_ += std::sqrt((selected_node_->x_ - selected_node_->parent_ptr_->x_) *
                                           (selected_node_->x_ - selected_node_->parent_ptr_->x_) +

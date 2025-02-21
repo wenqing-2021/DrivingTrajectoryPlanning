@@ -27,7 +27,11 @@ import numpy as np
 
 class BokehVis:
     def __init__(
-        self, plan_problem: PlanProblem, solver_params: SolverParams, plan_res: PlanRes, debug: bool = False
+        self,
+        plan_problem: PlanProblem,
+        solver_params: SolverParams,
+        plan_res: PlanRes,
+        debug: bool = False,
     ):
         self.main_plotter = figure(**FIG_VIS["main_figure"])
         self.esdf_plotter = figure(**FIG_VIS["esdf_figure"])
@@ -154,7 +158,7 @@ class BokehVis:
         is_success = self.plan_res.solve_success
         if is_success or self.debug:
             init_path = self.plan_res.init_path
-            
+
             # print("init_path size: ", len(init_path))
             init_path_parse = np.zeros((len(init_path), 3))
             for idx, state in enumerate(init_path):
@@ -162,7 +166,11 @@ class BokehVis:
                 # print(f"state {idx}: {state.x}, {state.y}, {state.theta} \n")
 
             self.init_path_dict.update(
-                {"x": init_path_parse[:, 0], "y": init_path_parse[:, 1], "head": init_path_parse[:, 2]}
+                {
+                    "x": init_path_parse[:, 0],
+                    "y": init_path_parse[:, 1],
+                    "head": init_path_parse[:, 2],
+                }
             )
             self.update_attr(self.init_path_dict, "init_path")
 
@@ -218,10 +226,7 @@ class BokehVis:
                 x="x", y="y", source=self.init_path, **RENDER_VIS["init_path"]
             )
             self.main_plotter.scatter(
-                x="x",
-                y="y",
-                source=self.init_path,
-                **RENDER_VIS["init_path_scatter"]
+                x="x", y="y", source=self.init_path, **RENDER_VIS["init_path_scatter"]
             )
 
             # render rectangles
@@ -244,7 +249,6 @@ class BokehVis:
                     height=self.plan_problem.vehicle_param.width,
                     **RENDER_VIS["init_path_rect"]
                 )
-            
 
     def render(self):
         self._render_plan_problem()

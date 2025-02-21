@@ -10,7 +10,7 @@ hybrid_a_star_param: # NOTE: the following key's name MUST be the same as those 
   search_front_num: 5 # number of search front
   search_back_num: 3 # number of search back
   rs_radius: 15 # meters (in this circle, try RS curve to reach the goal)
-  rs_step_size: 0.2 # meters (step size of RS path for collision check)
+  rs_step_size: 0.3 # meters (step size of RS path for collision check)
   wheel_base: 2.5 # meters
   node_resolution_x: 0.5 # meters
   node_resolution_y: 0.5 # meters

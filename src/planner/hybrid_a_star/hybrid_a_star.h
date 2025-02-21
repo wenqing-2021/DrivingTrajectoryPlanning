@@ -39,13 +39,15 @@ class HybridAstar {
     struct Node {
       public:
         explicit Node(double x, double y, double theta, double steer_angle, bool is_forward,
-                      const std::shared_ptr<Node>& parent_ptr)
+                      const std::shared_ptr<Node>&        parent_ptr,
+                      const std::vector<Eigen::Vector3d>& path_from_parent = {})
             : x_(x)
             , y_(y)
             , theta_(theta)
             , is_forward_(is_forward)
             , steer_angle_(steer_angle)
-            , parent_ptr_(parent_ptr) {
+            , parent_ptr_(parent_ptr)
+            , path_from_parent_(path_from_parent) {
             pose_ << x, y, theta;
         };
 
@@ -56,17 +58,19 @@ class HybridAstar {
         };
 
       public:
-        double                x_;
-        double                y_;
-        double                theta_;
-        double                steer_angle_;
-        NODE_STATUS           status_;   // open or closed
-        bool                  is_forward_;
-        double                g_value_;
-        double                h_value_;
-        double                f_value_;
-        std::shared_ptr<Node> parent_ptr_;
-        Eigen::Vector3d       pose_;
+        double x_;
+        double y_;
+        double theta_;
+        double steer_angle_;
+        bool   is_forward_;
+        double g_value_;
+        double h_value_;
+        double f_value_;
+
+        NODE_STATUS                  status_;   // open or closed
+        std::shared_ptr<Node>        parent_ptr_;
+        Eigen::Vector3d              pose_;
+        std::vector<Eigen::Vector3d> path_from_parent_;
     };
     struct CompareNode {
         bool operator()(const std::shared_ptr<Node>& lhs, const std::shared_ptr<Node>& rhs) const {
@@ -103,7 +107,8 @@ class HybridAstar {
     double calcGValue(const std::shared_ptr<Node>& curr_node_ptr, const std::shared_ptr<Node>& child_node_ptr);
     void   expandNode(const std::shared_ptr<Node>& node_ptr);
     bool   getChildNode(const double expand_s, const double steer_angle, double& child_x, double& child_y,
-                        double& child_theta, const std::shared_ptr<Node>& node_ptr);
+                        double& child_theta, const std::shared_ptr<Node>& node_ptr,
+                        std::vector<Eigen::Vector3d>& path_from_parent);
     void   finishPath();
     void   initNode();
 
@@ -112,7 +117,7 @@ class HybridAstar {
     std::vector<std::vector<std::vector<std::shared_ptr<Node>>>>                                node_map_;
 
     std::vector<Eigen::Vector3d>                debug_node_list_;
-    static constexpr double                     kEpsilon = 1e-6;
+    static constexpr double                     kEpsilon = 1e-3;
     params::HybridAStarParams                   hybrid_params_;
     std::shared_ptr<map::Map>                   map_ptr_;
     std::shared_ptr<collision_check::BaseCheck> collision_checker_;

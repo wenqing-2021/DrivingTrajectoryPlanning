@@ -58,13 +58,13 @@ RENDER_VIS = {
         "color": COLOR_MAP["magenta"],
         "line_width": 2,
     },
-    "init_path_rect":{
+    "init_path_rect": {
         "fill_alpha": 0.0,
         "line_width": 2,
         "color": COLOR_MAP["magenta"],
     },
-    "init_path_scatter":{
+    "init_path_scatter": {
         "color": COLOR_MAP["magenta"],
         "size": 9,
-    }
+    },
 }
