@@ -3,14 +3,18 @@ Author: wenqing yuansj@hnu.edu.cn
 FilePath: /AutomatedPark/src/main.py
 Description: The main entry of the project
 
-Copyright (c) 2024 by wenqing, All Rights Reserved. 
+Copyright (c) 2024 by wenqing, All Rights Reserved.
 """
 
 import argparse
 import sys
+import os
 
-PYBIND_PATH = "/root/workspace/AutomatedPark/build/pybind_modules"
-PROTOBUF_PATH = "/root/workspace/AutomatedPark/build/install/protobuf"
+# Get the directory of the current script
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Construct relative paths, only works for run main in the build/install directory
+PYBIND_PATH = os.path.join(SCRIPT_DIR, "../pybind_modules")
+PROTOBUF_PATH = os.path.join(SCRIPT_DIR, "../install/protobuf")
 sys.path.append(PYBIND_PATH)
 sys.path.append(PROTOBUF_PATH)
 import solver_pybind
@@ -19,7 +23,6 @@ from utils.visualization.vis_tool import BokehVis
 from protobuf.problem_pb2 import PlanProblem, PlanRes, SolverInput
 from protobuf.params_pb2 import SolverParams
 from protobuf.cost_map_pb2 import CostMap
-import os
 
 
 def SolveProblem(
@@ -50,18 +53,18 @@ def add_args():
         "--file",
         "-f",
         type=str,
-        default="/root/workspace/AutomatedPark/data/BenchmarkCases/Case1.csv",
+        default=os.path.join(SCRIPT_DIR, "../../data/BenchmarkCases/Case1.csv"),
     )
     args.add_argument(
         "--params",
         "-p",
         type=str,
-        default="/root/workspace/AutomatedPark/src/config/solver_params.yaml",
+        default=os.path.join(SCRIPT_DIR, "../../src/config/solver_params.yaml"),
     )
     args.add_argument(
         "--vehicle_yaml",
         type=str,
-        default="/root/workspace/AutomatedPark/src/config/vehicle_cfg.yaml",
+        default=os.path.join(SCRIPT_DIR, "../../src/config/vehicle_cfg.yaml"),
     )
     args.add_argument("--debug", "-d", action="store_true")
     args = args.parse_args()

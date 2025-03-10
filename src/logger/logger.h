@@ -19,9 +19,11 @@ class Logger {
     static void CloseLogger() { google::ShutdownGoogleLogging(); }
 
     static std::pair<std::string, std::string> LoadYaml(const std::string& logger_name) {
-        YAML::Node  logger_config = YAML::LoadFile("/root/workspace/AutomatedPark/src/config/logger.yaml");
-        YAML::Node  yaml_file     = logger_config[logger_name];
-        std::string log_dir       = yaml_file["log_dir"].as<std::string>();
+        std::filesystem::path exe_path      = std::filesystem::current_path();
+        std::filesystem::path config_path   = exe_path.concat("/config/logger.yaml");
+        YAML::Node            logger_config = YAML::LoadFile(config_path.string());
+        YAML::Node            yaml_file     = logger_config[logger_name];
+        std::string           log_dir       = yaml_file["log_dir"].as<std::string>();
         // check the logger directory is exist or not
         if (!std::filesystem::exists(log_dir) || !std::filesystem::is_directory(log_dir)) {
             std::filesystem::create_directories(log_dir);

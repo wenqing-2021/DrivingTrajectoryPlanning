@@ -47,11 +47,11 @@ fi
 protoc_path=$(which protoc)
 if [[ $protoc_path == "" ]]; then
     echo "start installing protobuf"
-    cd /root/workspace
+    cd /workspace
     apt-get install autoconf automake libtool -y
     git clone https://gitee.com/mirrors/protobufsource.git protobuf
     cd protobuf
-    git checkout 3.19.0
+    git checkout v3.19.0
     git submodule update --init --recursive
     ./autogen.sh
     ./configure
@@ -62,6 +62,17 @@ if [[ $protoc_path == "" ]]; then
 else
     echo "has installed protobuf"
 fi
+
+# install gtest
+cd /workspace
+if [ -d "googletest" ]; then
+    echo "googletest exists."
+else
+    git clone https://github.com/google/googletest.git && cd googletest &&
+    git checkout release-1.12.1 && mkdir build && cd build &&
+    cmake .. && make && make install
+fi
+
 
 # # install MPI
 mpicc_path=$(which mpicc)
@@ -80,7 +91,7 @@ then
     echo "clangd-12 has installed"
 else
     echo "clangd-12 has not installed, start to install it."
-    apt-get install -y clang-12
+    apt-get install -y clangd-12
     update-alternatives --install /usr/bin/clangd clangd /usr/bin/clangd-12 100
 fi
 
