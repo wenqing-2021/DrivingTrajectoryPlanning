@@ -23,8 +23,36 @@ message HybridAStarParams{
     HybridAStarGCost g_cost = 13;
 }
 
+message MPCSolverParams {
+    double max_acc = 1;
+    double min_acc = 2;
+    double max_v = 3;
+    double min_v = 4;
+    double w_u = 5;
+    double w_delta_u = 6;
+    double w_ref = 7;
+}
+
+message PiecewiseJerkParams {
+    double max_iter = 1;
+    double min_v = 2;
+    double max_v = 3;
+    double min_acc = 4;
+    double max_acc = 5;
+    double w_jerk = 6;
+    double w_speed = 7;
+    double w_acc = 8;
+    double w_s_ref = 9;
+    double w_v_ref = 10;
+    double w_s_end = 11;
+    double w_v_end = 12;
+    double w_a_end = 13;
+}
+
 message SolverParams {
     double max_iter = 1;
     double map_resolution = 2;
     HybridAStarParams hybrid_a_star_param = 3;
+    MPCSolverParams mpc_solver_param = 4;
+    PiecewiseJerkParams piesewise_jerk_params = 5;
 }

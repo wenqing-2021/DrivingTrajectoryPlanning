@@ -7,6 +7,7 @@ TrajPlanner::TrajPlanner(const params::SolverParams& solver_params, const std::s
     // Constructor
     hybrid_astar_ptr_ =
         std::make_unique<frontend::HybridAstar>(solver_params.hybrid_a_star_param(), map_ptr, collision_checker);
+    pwj_speed_ptr_ = std::make_unique<pwjspeed>(solver_params.piesewise_jerk_params());
 };
 
 bool TrajPlanner::Process(const Eigen::Vector3d& start_vec, const Eigen::Vector3d& goal_vec) {
@@ -21,6 +22,15 @@ bool TrajPlanner::Process(const Eigen::Vector3d& start_vec, const Eigen::Vector3
         LOG(INFO) << "The debug node list size is: " << debug_node_list_.size();
         return false;
     }
+
+    // 2. backend plan
+    LOG(INFO) << "Start to optimize the speed profile...";
+    // 2.1 set the path
+    // 2.2 optimize the speed
+    // 2.3 get the optimized speed
+
+    // 3. generate the trajectory
+    LOG(INFO) << "Start to generate the trajectory...";
 
     return true;
 };
