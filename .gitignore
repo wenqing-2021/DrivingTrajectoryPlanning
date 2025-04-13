@@ -35,4 +35,5 @@ build/*
 # .vscode/*
 *.pyc
 logs/*
+src/logs/*
 figures/*

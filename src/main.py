@@ -13,8 +13,8 @@ import os
 # Get the directory of the current script
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # Construct relative paths, only works for run main in the build/install directory
-PYBIND_PATH = os.path.join(SCRIPT_DIR, "../pybind_modules")
-PROTOBUF_PATH = os.path.join(SCRIPT_DIR, "../install/protobuf")
+PYBIND_PATH = os.path.join(SCRIPT_DIR, "../../pybind_modules")
+PROTOBUF_PATH = os.path.join(SCRIPT_DIR, "../../install/src/protobuf")
 sys.path.append(PYBIND_PATH)
 sys.path.append(PROTOBUF_PATH)
 import solver_pybind
@@ -53,18 +53,18 @@ def add_args():
         "--file",
         "-f",
         type=str,
-        default=os.path.join(SCRIPT_DIR, "../../data/BenchmarkCases/Case1.csv"),
+        default=os.path.join(SCRIPT_DIR, "../../../data/BenchmarkCases/Case1.csv"),
     )
     args.add_argument(
         "--params",
         "-p",
         type=str,
-        default=os.path.join(SCRIPT_DIR, "../../src/config/solver_params.yaml"),
+        default="config/solver_params.yaml",
     )
     args.add_argument(
         "--vehicle_yaml",
         type=str,
-        default=os.path.join(SCRIPT_DIR, "../../src/config/vehicle_cfg.yaml"),
+        default="config/vehicle_cfg.yaml",
     )
     args.add_argument("--debug", "-d", action="store_true")
     args = args.parse_args()

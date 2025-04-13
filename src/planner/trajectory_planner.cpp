@@ -25,9 +25,12 @@ bool TrajPlanner::Process(const Eigen::Vector3d& start_vec, const Eigen::Vector3
 
     // 2. backend plan
     LOG(INFO) << "Start to optimize the speed profile...";
-    // 2.1 set the path
-    // 2.2 optimize the speed
-    // 2.3 get the optimized speed
+    if (pwj_speed_ptr_->Optimize(frontend_path_, start_vec)) {
+        LOG(INFO) << "The speed profile has been optimized...";
+    } else {
+        LOG(WARNING) << "Failed to optimize the speed profile...";
+        return false;
+    }
 
     // 3. generate the trajectory
     LOG(INFO) << "Start to generate the trajectory...";

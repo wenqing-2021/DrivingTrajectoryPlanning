@@ -1,4 +1,5 @@
 
+#include "logger/logger.h"
 #include "problem.pb.h"
 #include "solver/solver.h"
 #include <fstream>
@@ -9,6 +10,7 @@ std::string load_protobuf_str(const std::string& fileAddress) {
     std::ifstream file(fileAddress, std::ios::binary);
     if (!file) {
         // Handle file open error
+        LOG(WARNING) << "Failed to open file: " << fileAddress;
         return "";
     }
 
@@ -22,7 +24,7 @@ std::string load_protobuf_str(const std::string& fileAddress) {
 int main() {
     std::cout << "start to test sovler" << std::endl;
     // 1. load protobuf
-    std::string solver_input_str_path = "src/solver/debug/solver_input_str.pb";
+    std::string solver_input_str_path = "solver/debug/solver_input_str.pb";
 
     std::string solver_input_str = load_protobuf_str(solver_input_str_path);
 

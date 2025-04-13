@@ -19,6 +19,11 @@ FIG_VIS = {
         "height": 720,
         "match_aspect": True,
     },
+    "velocity_figure": {
+        "width": 1280,
+        "height": 720,
+        "match_aspect": True,
+    },
     "esdf_figure": {
         "width": 1280,
         "height": 720,
@@ -58,6 +63,10 @@ RENDER_VIS = {
         "color": COLOR_MAP["magenta"],
         "line_width": 2,
     },
+    "init_traj": {
+        "color": COLOR_MAP["red"],
+        "line_width": 2,
+    },
     "init_path_rect": {
         "fill_alpha": 0.0,
         "line_width": 2,
@@ -65,6 +74,10 @@ RENDER_VIS = {
     },
     "init_path_scatter": {
         "color": COLOR_MAP["magenta"],
+        "size": 9,
+    },
+    "init_traj_scatter": {
+        "color": COLOR_MAP["red"],
         "size": 9,
     },
 }

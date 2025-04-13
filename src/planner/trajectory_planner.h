@@ -12,13 +12,13 @@ class TrajPlanner {
                 const std::shared_ptr<collision_check::BaseCheck>& collision_checker);
     ~TrajPlanner() = default;
 
-    bool        Process(const Eigen::Vector3d& start_vec,
-                        const Eigen::Vector3d& goal_vec);              // main function to generate the trajectory
-    inline void GetInitPath(std::vector<Eigen::Vector3d>& init_path,   // get the init path
-                            double&                       init_path_length) {
-        init_path        = frontend_path_;
-        init_path_length = frontend_path_length_;
-    };
+    bool                                             Process(const Eigen::Vector3d& start_vec,
+                                                             const Eigen::Vector3d& goal_vec);   // main function to generate the trajectory
+    inline const std::vector<Eigen::Vector3d>* const GetInitPath() { return &frontend_path_; };
+    inline const double GetInitPathLength() { return frontend_path_length_; };   // get the init path length
+    inline const std::vector<Eigen::Vector3d>* const GetInitTraj() {
+        return pwj_speed_ptr_->GetResult();
+    };                                                                                      // get the init traj
     inline std::vector<Eigen::Vector3d>& GetDebugNodeList() { return debug_node_list_; };   // get the debug node list
     std::string                          GetName() const { return name_; };             // get the name of the planner
     void                                 SetName(std::string name) { name_ = name; };   // set the name of the planner

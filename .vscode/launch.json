@@ -25,7 +25,7 @@
             "program": "${workspaceFolder}/build/DEBUG_SOLVER", // Update this path
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/src",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",

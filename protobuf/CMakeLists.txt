@@ -10,5 +10,5 @@ target_include_directories(ProtoLib PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(ProtoLib PUBLIC ${PROTOBUF_LIBRARIES})
 install(
     FILES ${PROTO_PY}
-    DESTINATION ${CMAKE_BINARY_DIR}/install/protobuf
+    DESTINATION ${CMAKE_BINARY_DIR}/install/src/protobuf
 )

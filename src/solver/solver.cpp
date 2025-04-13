@@ -52,19 +52,8 @@ const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {
     // 2. process
     LOG(INFO) << "Process...";
     if (traj_planner_ptr_->Process(start_vec_, goal_vec_)) {
-        std::vector<Eigen::Vector3d> init_path;
-        double                       init_path_length;
-        traj_planner_ptr_->GetInitPath(init_path, init_path_length);
-        LOG(INFO) << "The init path is found...";
-        plan_res_.clear_init_path();
-        for (const auto& point : init_path) {
-            kinematic_model::StateVar init_path_state;
-            init_path_state.set_x(point.x());
-            init_path_state.set_y(point.y());
-            init_path_state.set_theta(point.z());
-            plan_res_.add_init_path()->CopyFrom(init_path_state);
-        }
-        plan_res_.set_init_path_length(init_path_length);
+        setInitPath();
+        setInitTraj();
         plan_res_.set_solve_success(true);
     } else {
         LOG(WARNING) << "Failed to find the init path...";
@@ -80,6 +69,42 @@ const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {
     }
 
     return plan_res_;
+};
+
+void Solver::setInitPath() {
+    // 1. set the init path
+    LOG(INFO) << "Set init path...";
+    const auto* const init_path_ptr    = traj_planner_ptr_->GetInitPath();
+    double            init_path_length = traj_planner_ptr_->GetInitPathLength();
+    plan_res_.clear_init_path();
+    for (const auto& point : *init_path_ptr) {
+        kinematic_model::StateVar init_path_state;
+        init_path_state.set_x(point.x());
+        init_path_state.set_y(point.y());
+        init_path_state.set_theta(point.z());
+        plan_res_.add_init_path()->CopyFrom(init_path_state);
+    }
+    plan_res_.set_init_path_length(init_path_length);
+    LOG(INFO) << "The init path is found and set...";
+};
+
+void Solver::setInitTraj() {
+    // 2. set the init traj
+    LOG(INFO) << "Set init traj...";
+    const auto* const init_traj_ptr = traj_planner_ptr_->GetInitTraj();
+    if (init_traj_ptr == nullptr) {
+        LOG(WARNING) << "Failed to get the init traj...";
+        return;
+    }
+    plan_res_.clear_init_traj();
+    for (const auto& point : *init_traj_ptr) {
+        kinematic_model::StateVar init_traj_state;
+        init_traj_state.set_x(point.x());
+        init_traj_state.set_y(point.y());
+        init_traj_state.set_v(point.z());
+        plan_res_.add_init_traj()->CopyFrom(init_traj_state);
+    }
+    LOG(INFO) << "Have set init traj...";
 };
 
 }   // namespace solver

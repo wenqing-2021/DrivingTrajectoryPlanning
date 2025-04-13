@@ -12,4 +12,4 @@ set_property(TARGET PiecewiseJerkSpeedOptimizer PROPERTY POSITION_INDEPENDENT_CO
 
 # Include directories for headers
 target_include_directories(PiecewiseJerkSpeedOptimizer PUBLIC ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(PiecewiseJerkSpeedOptimizer PUBLIC ${UTILS_LIBRARIES})
+target_link_libraries(PiecewiseJerkSpeedOptimizer PUBLIC ${UTILS_LIBRARIES} QPSolver)

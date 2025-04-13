@@ -40,13 +40,12 @@ message PiecewiseJerkParams {
     double min_acc = 4;
     double max_acc = 5;
     double w_jerk = 6;
-    double w_speed = 7;
-    double w_acc = 8;
-    double w_s_ref = 9;
-    double w_v_ref = 10;
-    double w_s_end = 11;
-    double w_v_end = 12;
-    double w_a_end = 13;
+    double w_acc = 7;
+    double w_s_ref = 8;
+    double w_v_ref = 9;
+    double w_s_end = 10;
+    double w_v_end = 11;
+    double w_a_end = 12;
 }
 
 message SolverParams {

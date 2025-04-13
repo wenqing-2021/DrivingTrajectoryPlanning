@@ -57,7 +57,7 @@ ENDFOREACH()
 
 install(
     DIRECTORY ./src/
-    DESTINATION ${CMAKE_BINARY_DIR}/install/
+    DESTINATION ${CMAKE_BINARY_DIR}/install/src/
     FILES_MATCHING PATTERN "*.py" PATTERN "*.yaml"
 )
 

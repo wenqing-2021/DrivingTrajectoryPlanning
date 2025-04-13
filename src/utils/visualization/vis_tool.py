@@ -35,6 +35,7 @@ class BokehVis:
     ):
         self.main_plotter = figure(**FIG_VIS["main_figure"])
         self.esdf_plotter = figure(**FIG_VIS["esdf_figure"])
+        self.velocity_plotter = figure(**FIG_VIS["velocity_figure"])
         self.plan_problem = plan_problem
         self.solver_params = solver_params
         self.plan_res = plan_res
@@ -64,6 +65,10 @@ class BokehVis:
         layout_dict = {}
         main_layout = column(
             row(Spacer(width=FIG_VIS["row_margin_width"]), self.main_plotter),
+            row(
+                Spacer(width=FIG_VIS["row_margin_width"]),
+                self.velocity_plotter,
+            ),
         )
         esdf_layout = column(
             row(Spacer(width=FIG_VIS["row_margin_width"]), self.esdf_plotter),
@@ -173,6 +178,22 @@ class BokehVis:
                 }
             )
             self.update_attr(self.init_path_dict, "init_path")
+        
+        # 3. parse init velocity
+        if is_success:
+            init_traj = self.plan_res.init_traj
+            init_traj_traj = np.zeros((len(init_traj), 3))
+            init_traj_stamp = np.arange(len(init_traj))
+            for idx, state in enumerate(init_traj):
+                init_traj_traj[idx] = [state.x, state.y, state.v]
+                # print(f"state {idx}: {state.x}, {state.y}, {state.theta} \n")
+            init_traj_dict = {
+                "t": init_traj_stamp,
+                "v": init_traj_traj[:, 2],
+                "x": init_traj_traj[:, 0],
+                "y": init_traj_traj[:, 1],
+            }
+            self.update_attr(init_traj_dict, "init_traj")
 
     def _render_plan_problem(self):
         # render the obstacles
@@ -249,12 +270,22 @@ class BokehVis:
                     height=self.plan_problem.vehicle_param.width,
                     **RENDER_VIS["init_path_rect"]
                 )
+    
+    def render_init_traj(self):
+        if hasattr(self, "init_path"):
+            self.velocity_plotter.line(
+                x="t", y="v", source=self.init_traj, **RENDER_VIS["init_traj"]
+            )
+            self.velocity_plotter.scatter(
+                x="t", y="v", source=self.init_traj, **RENDER_VIS["init_traj_scatter"]
+            )
 
     def render(self):
         self._render_plan_problem()
         self._render_occ_map()
         self.render_esdf_map()
         self.render_init_path()
+        self.render_init_traj()
 
     def update_attr(self, data_dict: dict, attr_str: str):
         if not hasattr(self, attr_str):

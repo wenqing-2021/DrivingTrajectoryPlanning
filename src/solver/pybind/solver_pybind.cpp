@@ -58,7 +58,7 @@ PYBIND11_MODULE(solver_pybind, m) {
                      if (file.is_open()) {
                          file << solver_input_str;
                          file.close();
-                         std::cout << "save solver input to solver_input_str.pb" << std::endl;
+                         std::cout << "save solver input to " << save_dir << "/solver_input_str.pb" << std::endl;
                      } else {
                          std::cerr << "Failed to open file src/solver/debug/solver_input_str.pb for writing"
                                    << std::endl;

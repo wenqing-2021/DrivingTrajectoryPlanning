@@ -27,3 +27,18 @@ mpc_solver_param:
   min_acc: -2.5 # m/s^2
   max_v: 5.0 # m/s
   min_v: -5.0 # m/s
+
+piesewise_jerk_params:
+  max_iter: 100 # m/s^2
+  min_acc: -2.5 # m/s^2
+  max_acc: 2.5 # m/s^2
+  max_v: 5.0 # m/s
+  min_v: -5.0 # m/s
+  # ======= weight =======
+  w_jerk: 1.0
+  w_acc: 1.0
+  w_s_ref: 10.0
+  w_v_ref: 5.0
+  w_s_end: 100.0
+  w_v_end: 100.0
+  w_a_end: 100.0
