@@ -14,7 +14,7 @@ class PiecewiseJerkSpeedOptimizer {
     bool   optimizeSpeed(const std::vector<Eigen::Vector3d>& path);
     void   getShiftSegPaths(const std::vector<Eigen::Vector3d>&        path,
                             std::vector<std::vector<Eigen::Vector3d>>* shift_seg_paths);
-    void   initVariables();
+    void   initVariables(std::size_t N);
     void   buildObjective();
     void   buildConstraint();
     double getSpeedDirect(const double init_path_head, const double vehicle_head);

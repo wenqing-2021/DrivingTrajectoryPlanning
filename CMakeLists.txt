@@ -13,6 +13,7 @@ project(AutomatedPark)
 
 # find necessary packages
 find_package(Eigen3 REQUIRED)
+find_package(OsqpEigen REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(yaml-cpp REQUIRED)
 # Find GoogleTest package
@@ -27,6 +28,7 @@ set(UTILS_LIBRARIES "" CACHE INTERNAL "LIST FOR UTILS LIBRARIES")
 set(UTILS_LIBRARIES ${UTILS_LIBRARIES}
     Logger
     Eigen3::Eigen
+    OsqpEigen::OsqpEigen
     ProtoLib
     yaml-cpp
 )

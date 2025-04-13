@@ -157,3 +157,20 @@ if [[ $find_notebook == 0 ]]; then
 else
     echo "has installed jupyter notebook"
 fi
+
+# install osqp 0.6.3
+cd /workspace
+git clone --recursive -b release-0.6.3 https://github.com/oxfordcontrol/osqp.git
+cd osqp
+mkdir build
+cd build
+cmake -G "Unix Makefiles" ..
+cmake --build . --target install
+
+# install osqp-eign
+cd /workspace
+git clone --recursive -b v0.10.0 https://github.com/robotology/osqp-eigen.git
+cd osqp-eigen
+mkdir build
+cd build
+cmake .. && make && make install
