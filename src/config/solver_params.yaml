@@ -35,10 +35,10 @@ piesewise_jerk_params:
   max_v: 5.0 # m/s
   min_v: -5.0 # m/s
   # ======= weight =======
-  w_jerk: 1.0
-  w_acc: 1.0
+  w_jerk: 15.0
+  w_acc: 10.0
   w_s_ref: 10.0
   w_v_ref: 5.0
-  w_s_end: 100.0
-  w_v_end: 100.0
-  w_a_end: 100.0
+  w_s_end: 50.0
+  w_v_end: 50.0
+  w_a_end: 50.0
