@@ -12,6 +12,8 @@ class PiecewiseJerkSpeedOptimizer {
     bool Optimize(const std::vector<Eigen::Vector3d>& path, const Eigen::Vector3d& vehicle_pose);
     inline const std::vector<Eigen::Vector3d>* const GetResult() const { return &result_traj_; };
 
+    const double GetDt() const { return kDt; };
+
   private:
     bool   optimizeSpeed(const std::vector<Eigen::Vector3d>& path);
     bool   getShiftSegPaths(const std::vector<Eigen::Vector3d>&        path,

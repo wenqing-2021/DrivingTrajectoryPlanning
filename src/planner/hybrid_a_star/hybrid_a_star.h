@@ -22,12 +22,10 @@ class HybridAstar {
                 const std::shared_ptr<collision_check::BaseCheck>& collison_checker);
     ~HybridAstar() = default;
 
-    bool        Plan(const Eigen::Vector3d& start_vec, const Eigen::Vector3d& goal_vec);
-    inline void GetPath(std::vector<Eigen::Vector3d>& path, double& path_length) {
-        path        = final_path_;
-        path_length = path_length_;
-    };
-    inline std::vector<Eigen::Vector3d>& GetDebugNodeList() { return debug_node_list_; };
+    bool                                      Plan(const Eigen::Vector3d& start_vec, const Eigen::Vector3d& goal_vec);
+    inline void                               GetPathLength(double& path_length) { path_length = path_length_; };
+    const std::vector<Eigen::Vector3d>* const GetPath() { return &final_path_; };   // get the final path
+    inline std::vector<Eigen::Vector3d>&      GetDebugNodeList() { return debug_node_list_; };
 
   private:
     enum NODE_STATUS

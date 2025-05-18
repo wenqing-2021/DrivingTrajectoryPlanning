@@ -38,7 +38,8 @@ void Solver::LoadProblem(const problem::PlanProblem& plan_problem, const params:
 
     // 5. Set trajectory planner
     LOG(INFO) << "Set trajectory planner...";
-    traj_planner_ptr_ = std::make_unique<planning::TrajPlanner>(solver_params, map_ptr_, collision_check_ptr_);
+    traj_planner_ptr_ = std::make_unique<planning::TrajPlanner>(
+        solver_params, map_ptr_, collision_check_ptr_, plan_problem.vehicle_param());
 };
 
 const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {

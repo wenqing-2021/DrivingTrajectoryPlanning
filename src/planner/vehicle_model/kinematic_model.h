@@ -1,8 +1,11 @@
 #include "kinematic_model.pb.h"
+#include <Eigen/Core>
 
 namespace planning {
 namespace vehicle_model {
 
+using opt_status  = Eigen::MatrixXd;
+using opt_control = Eigen::MatrixXd;
 class KinematicModel {
   public:
     KinematicModel(const kinematic_model::VehicleParam& vehicle_param);
@@ -10,6 +13,11 @@ class KinematicModel {
 
     void InitState(const kinematic_model::StateVar& state_var);
     void UpdateState(const kinematic_model::ControlVar& control_var, const double& delta_time);
+    const kinematic_model::VehicleParam& GetVehicleParam() const { return vehicle_param_; }
+
+  public:
+    static const std::size_t kStateSize   = 3;
+    static const std::size_t kControlSize = 2;
 
   private:
     kinematic_model::VehicleParam vehicle_param_;
@@ -20,8 +28,9 @@ class KinematicModel {
     double x_{0.0};
     double y_{0.0};
     double theta_{0.0};
-    double steer_angle_{0.0};
     double velocity_{0.0};
+    double steer_angle_{0.0};
+    double acceleration_{0.0};
 };
 
 }   // namespace vehicle_model

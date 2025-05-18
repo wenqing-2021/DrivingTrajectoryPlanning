@@ -178,7 +178,7 @@ class BokehVis:
                 }
             )
             self.update_attr(self.init_path_dict, "init_path")
-        
+
         # 3. parse init velocity
         if is_success:
             init_traj = self.plan_res.init_traj
@@ -270,7 +270,7 @@ class BokehVis:
                     height=self.plan_problem.vehicle_param.width,
                     **RENDER_VIS["init_path_rect"]
                 )
-    
+
     def render_init_traj(self):
         if hasattr(self, "init_path"):
             self.velocity_plotter.line(
