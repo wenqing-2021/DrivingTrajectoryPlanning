@@ -14,14 +14,12 @@ class TrajPlanner {
                 const kinematic_model::VehicleParam&               vehicle_param);
     ~TrajPlanner() = default;
 
-    bool                                             Process(const Eigen::Vector3d& start_vec,
-                                                             const Eigen::Vector3d& goal_vec);   // main function to generate the trajectory
-    inline const std::vector<Eigen::Vector3d>* const GetInitPath() { return hybrid_astar_ptr_->GetPath(); };
-    inline const double GetInitPathLength() { return frontend_path_length_; };   // get the init path length
-    inline const std::vector<Eigen::Vector3d>* const GetInitTraj() {
-        return pwj_speed_ptr_->GetResult();
-    };                                                                                      // get the init traj
+    bool                Process(const Eigen::Vector3d& start_vec,
+                                const Eigen::Vector3d& goal_vec);   // main function to generate the trajectory
+    inline const double GetInitPathLength() { return frontend_path_length_; };              // get the init path length
     inline std::vector<Eigen::Vector3d>& GetDebugNodeList() { return debug_node_list_; };   // get the debug node list
+    const vehicle_model::opt_status&     GetInitStates() const { return init_states_; };    // get the init states
+    const vehicle_model::opt_control&    GetInitControls() const { return init_controls_; };   // get the init controls
 
   private:
     bool setStatusControls(const std::vector<Eigen::Vector3d>* const init_path_ptr,

@@ -34,8 +34,8 @@ class Solver {
     void setStart(const Eigen::Vector3d& start_vec) { start_vec_ = start_vec; };
     void setGoal(const Eigen::Vector3d& goal_vec) { goal_vec_ = goal_vec; };
     void setSolverParams(const params::SolverParams& solver_params) { solver_params_ = solver_params; };
-    void setInitPath();
-    void setInitTraj();
+    void setInitTraj(const planning::vehicle_model::opt_status&  init_states,
+                     const planning::vehicle_model::opt_control& init_controls);
     // define pointer to the submodule
     std::shared_ptr<map::Map>                   map_ptr_;
     std::shared_ptr<collision_check::BaseCheck> collision_check_ptr_;

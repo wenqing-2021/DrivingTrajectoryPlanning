@@ -32,9 +32,9 @@ message PlanRes {
     repeated kinematic_model.StateVar state_list = 2;
     bool solve_success = 3;
     cost_map.CostMap cost_map = 4;
-    repeated kinematic_model.StateVar init_path = 5;
+    repeated kinematic_model.StateVar init_traj = 5;
     double init_path_length = 6;
-    repeated kinematic_model.StateVar init_traj = 7;
+    repeated kinematic_model.ControlVar init_controls = 7;
 }
 
 message SolverInput {

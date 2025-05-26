@@ -24,6 +24,7 @@ bool PiecewiseJerkSpeedOptimizer::Optimize(const std::vector<Eigen::Vector3d>& p
         return false;
     }
     LOG(INFO) << "The shift segment trajs size is: " << shift_seg_trajs.size();
+    segment_num_ = shift_seg_trajs.size();
     // 2. optimize the speed for each segment and fill the result path
     double init_path_head =
         common::math::NormalizeAngle(std::atan2(path[1].y() - path[0].y(), path[1].x() - path[0].x()));
@@ -38,7 +39,11 @@ bool PiecewiseJerkSpeedOptimizer::Optimize(const std::vector<Eigen::Vector3d>& p
             LOG(INFO) << "The speed optimization for segment " << i << " is success";
             const Eigen::VectorXd* const res = qp_solver_ptr_->GetResult();
             // 2.3 if optimize success, fill the result path
-            for (std::size_t j = 0; j < shift_seg_trajs[i].size(); ++j) {
+            std::size_t start_j = 0;
+            if (i > 0) {
+                start_j = 1;   // skip the first point of the segment if it is not the first segment
+            }
+            for (std::size_t j = start_j; j < shift_seg_trajs[i].size(); ++j) {
                 shift_seg_trajs[i][j].z() = speed_direct * (*res)(j + shift_seg_trajs[i].size());
                 // insert x, y, v into the result path
                 result_traj_.push_back(shift_seg_trajs[i][j]);
@@ -270,10 +275,12 @@ bool PiecewiseJerkSpeedOptimizer::initBounds(const std::vector<Eigen::Vector3d>&
     double max_a = pwj_params_.max_acc();
     double min_a = pwj_params_.min_acc();
 
-    lower_bound_.segment(0, path_point_num).array()                            = 0.0;     // lower s
-    lower_bound_.segment(path_point_num, path_point_num).array()               = min_v;   // lower v
-    lower_bound_.segment(2 * path_point_num, path_point_num).array()           = min_a;   // lower a
-    lower_bound_.segment(3 * path_point_num, 2 * (path_point_num - 1)).array() = 0.0;     // equal constraint system
+    lower_bound_.segment(0, path_point_num).array()                            = 0.0;         // lower s
+    lower_bound_.segment(path_point_num, path_point_num).array()               = min_v;       // lower v
+    lower_bound_.segment(2 * path_point_num, path_point_num).array()           = min_a;       // lower a
+    lower_bound_.segment(3 * path_point_num, 2 * (path_point_num - 1)).array() = 0.0;         // equal constraint system
+    lower_bound_.segment(2 * path_point_num - 1, 1).array()                    = -kEpsilon;   // last v
+    lower_bound_.segment(3 * path_point_num - 1, 1).array()                    = -kEpsilon;   // last a
     Eigen::Vector3d init_value;
     init_value(0) = init_variables_(0);
     init_value(1) = init_variables_(path_point_num);
@@ -288,8 +295,10 @@ bool PiecewiseJerkSpeedOptimizer::initBounds(const std::vector<Eigen::Vector3d>&
     upper_bound_.segment(2 * path_point_num, path_point_num).array()           = max_a;   // upper a
     upper_bound_.segment(3 * path_point_num, 2 * (path_point_num - 1)).array() = 0.0;     // equal constraint system
     upper_bound_.segment(3 * path_point_num + 2 * (path_point_num - 1), 2).array() =
-        init_value.segment(0, 2).array() + kEpsilon;                                              // initial s, v
-    upper_bound_.segment(3 * path_point_num + 2 * (path_point_num - 1) + 2, 1).array() = max_a;   // initial a
+        init_value.segment(0, 2).array() + kEpsilon;                                                 // initial s, v
+    upper_bound_.segment(3 * path_point_num + 2 * (path_point_num - 1) + 2, 1).array() = max_a;      // initial a
+    upper_bound_.segment(2 * path_point_num - 1, 1).array()                            = kEpsilon;   // last v
+    upper_bound_.segment(3 * path_point_num - 1, 1).array()                            = kEpsilon;   // last a
 
     return true;
 }

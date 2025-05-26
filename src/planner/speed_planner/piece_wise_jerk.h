@@ -12,7 +12,8 @@ class PiecewiseJerkSpeedOptimizer {
     bool Optimize(const std::vector<Eigen::Vector3d>& path, const Eigen::Vector3d& vehicle_pose);
     inline const std::vector<Eigen::Vector3d>* const GetResult() const { return &result_traj_; };
 
-    const double GetDt() const { return kDt; };
+    const double      GetDt() const { return kDt; };
+    const std::size_t GetSegmentNum() const { return segment_num_; };
 
   private:
     bool   optimizeSpeed(const std::vector<Eigen::Vector3d>& path);
@@ -36,9 +37,10 @@ class PiecewiseJerkSpeedOptimizer {
 
     std::vector<Eigen::Vector3d> result_traj_;
     params::PiecewiseJerkParams  pwj_params_;
-    constexpr static double      kDt      = 0.1;
-    constexpr static double      kDt2     = kDt * kDt;
-    constexpr static double      kEpsilon = 1e-3;
+    std::size_t                  segment_num_ = 0;   // the number of segments
+    constexpr static double      kDt          = 0.1;
+    constexpr static double      kDt2         = kDt * kDt;
+    constexpr static double      kEpsilon     = 1e-3;
 };
 
 }   // namespace backend

@@ -20,8 +20,13 @@ FIG_VIS = {
         "match_aspect": True,
     },
     "velocity_figure": {
-        "width": 1280,
-        "height": 720,
+        "width": 720,
+        "height": 360,
+        "match_aspect": True,
+    },
+    "control_figure": {
+        "width": 720,
+        "height": 360,
         "match_aspect": True,
     },
     "esdf_figure": {
@@ -78,6 +83,22 @@ RENDER_VIS = {
     },
     "init_traj_scatter": {
         "color": COLOR_MAP["red"],
+        "size": 9,
+    },
+    "init_control_acc": {
+        "color": COLOR_MAP["green"],
+        "line_width": 2,
+    },
+    "init_control_acc_scatter": {
+        "color": COLOR_MAP["green"],
+        "size": 9,
+    },
+    "init_control_steer": {
+        "color": COLOR_MAP["blue"],
+        "line_width": 2,
+    },
+    "init_control_steer_scatter": {
+        "color": COLOR_MAP["blue"],
         "size": 9,
     },
 }

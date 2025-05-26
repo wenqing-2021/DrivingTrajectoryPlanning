@@ -140,9 +140,9 @@ class PlanRes(google.protobuf.message.Message):
     STATE_LIST_FIELD_NUMBER: builtins.int
     SOLVE_SUCCESS_FIELD_NUMBER: builtins.int
     COST_MAP_FIELD_NUMBER: builtins.int
-    INIT_PATH_FIELD_NUMBER: builtins.int
-    INIT_PATH_LENGTH_FIELD_NUMBER: builtins.int
     INIT_TRAJ_FIELD_NUMBER: builtins.int
+    INIT_PATH_LENGTH_FIELD_NUMBER: builtins.int
+    INIT_CONTROLS_FIELD_NUMBER: builtins.int
     @property
     def control_list(
         self,
@@ -159,17 +159,17 @@ class PlanRes(google.protobuf.message.Message):
     @property
     def cost_map(self) -> cost_map_pb2.CostMap: ...
     @property
-    def init_path(
+    def init_traj(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         kinematic_model_pb2.StateVar
     ]: ...
     init_path_length: builtins.float = ...
     @property
-    def init_traj(
+    def init_controls(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        kinematic_model_pb2.StateVar
+        kinematic_model_pb2.ControlVar
     ]: ...
     def __init__(
         self,
@@ -182,9 +182,11 @@ class PlanRes(google.protobuf.message.Message):
         ] = ...,
         solve_success: builtins.bool = ...,
         cost_map: typing.Optional[cost_map_pb2.CostMap] = ...,
-        init_path: typing.Optional[typing.Iterable[kinematic_model_pb2.StateVar]] = ...,
-        init_path_length: builtins.float = ...,
         init_traj: typing.Optional[typing.Iterable[kinematic_model_pb2.StateVar]] = ...,
+        init_path_length: builtins.float = ...,
+        init_controls: typing.Optional[
+            typing.Iterable[kinematic_model_pb2.ControlVar]
+        ] = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["cost_map", b"cost_map"]
@@ -196,8 +198,8 @@ class PlanRes(google.protobuf.message.Message):
             b"control_list",
             "cost_map",
             b"cost_map",
-            "init_path",
-            b"init_path",
+            "init_controls",
+            b"init_controls",
             "init_path_length",
             b"init_path_length",
             "init_traj",

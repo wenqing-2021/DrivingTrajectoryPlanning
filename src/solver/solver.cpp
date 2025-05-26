@@ -53,18 +53,21 @@ const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {
     // 2. process
     LOG(INFO) << "Process...";
     if (traj_planner_ptr_->Process(start_vec_, goal_vec_)) {
-        setInitPath();
-        setInitTraj();
+        setInitTraj(traj_planner_ptr_->GetInitStates(),
+                    traj_planner_ptr_->GetInitControls());   // set the init traj
+        LOG(INFO) << "The init traj has been set...";
         plan_res_.set_solve_success(true);
     } else {
         LOG(WARNING) << "Failed to find the init path...";
         const auto& debug_node_list = traj_planner_ptr_->GetDebugNodeList();
+        plan_res_.clear_init_traj();
         for (const auto& point : debug_node_list) {
             kinematic_model::StateVar debug_node;
             debug_node.set_x(point.x());
             debug_node.set_y(point.y());
             debug_node.set_theta(point.z());
-            plan_res_.add_init_path()->CopyFrom(debug_node);
+            debug_node.set_v(0.0);
+            plan_res_.add_init_traj()->CopyFrom(debug_node);
         }
         plan_res_.set_solve_success(false);
     }
@@ -72,38 +75,39 @@ const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {
     return plan_res_;
 };
 
-void Solver::setInitPath() {
-    // 1. set the init path
-    LOG(INFO) << "Set init path...";
-    const auto* const init_path_ptr    = traj_planner_ptr_->GetInitPath();
-    double            init_path_length = traj_planner_ptr_->GetInitPathLength();
-    plan_res_.clear_init_path();
-    for (const auto& point : *init_path_ptr) {
-        kinematic_model::StateVar init_path_state;
-        init_path_state.set_x(point.x());
-        init_path_state.set_y(point.y());
-        init_path_state.set_theta(point.z());
-        plan_res_.add_init_path()->CopyFrom(init_path_state);
-    }
-    plan_res_.set_init_path_length(init_path_length);
-    LOG(INFO) << "The init path is found and set...";
-};
-
-void Solver::setInitTraj() {
-    // 2. set the init traj
+void Solver::setInitTraj(const planning::vehicle_model::opt_status&  init_states,
+                         const planning::vehicle_model::opt_control& init_controls) {
+    // 1. check the init_states and init_controls
     LOG(INFO) << "Set init traj...";
-    const auto* const init_traj_ptr = traj_planner_ptr_->GetInitTraj();
-    if (init_traj_ptr == nullptr) {
-        LOG(WARNING) << "Failed to get the init traj...";
+    if (init_states.rows() < 2) {
+        LOG(WARNING) << "The init states size is less than 2";
+        return;
+    } else if (init_states.rows() != init_controls.rows() + 1) {
+        LOG(WARNING) << "The init states size is not equal to the init controls size + 1";
         return;
     }
     plan_res_.clear_init_traj();
-    for (const auto& point : *init_traj_ptr) {
-        kinematic_model::StateVar init_traj_state;
-        init_traj_state.set_x(point.x());
-        init_traj_state.set_y(point.y());
-        init_traj_state.set_v(point.z());
+    for (int i = 0; i < init_states.rows(); ++i) {
+        kinematic_model::StateVar   init_traj_state;
+        kinematic_model::ControlVar init_traj_control;
+
+        const double x     = init_states(i, 0);
+        const double y     = init_states(i, 1);
+        const double theta = init_states(i, 2);
+        const double v     = init_states(i, 3);
+        init_traj_state.set_x(x);
+        init_traj_state.set_y(y);
+        init_traj_state.set_theta(theta);
+        init_traj_state.set_v(v);
         plan_res_.add_init_traj()->CopyFrom(init_traj_state);
+
+        if (i < init_controls.rows()) {
+            const double a     = init_controls(i, 0);
+            const double delta = init_controls(i, 1);
+            init_traj_control.set_accelerate(a);
+            init_traj_control.set_steer_angle(delta);
+            plan_res_.add_init_controls()->CopyFrom(init_traj_control);
+        }
     }
     LOG(INFO) << "Have set init traj...";
 };
