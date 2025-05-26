@@ -18,7 +18,7 @@ from utils.plan_utils import convert_rear_to_mid
 from protobuf.problem_pb2 import PlanProblem, PlanRes
 from protobuf.params_pb2 import SolverParams
 from protobuf.cost_map_pb2 import CostMap, Point
-from protobuf.kinematic_model_pb2 import StateVar
+from protobuf.kinematic_model_pb2 import StateVar, ControlVar
 from typing import List
 import numpy as np
 
@@ -36,10 +36,12 @@ class BokehVis:
         self.main_plotter = figure(**FIG_VIS["main_figure"])
         self.esdf_plotter = figure(**FIG_VIS["esdf_figure"])
         self.velocity_plotter = figure(**FIG_VIS["velocity_figure"])
+        self.control_plotter = figure(**FIG_VIS["control_figure"])
         self.plan_problem = plan_problem
         self.solver_params = solver_params
         self.plan_res = plan_res
-        self.init_path_dict = {}
+        self.init_traj_dict = {}
+        self.init_controls_dict = {}
         self.doc = curdoc()
         self.debug = debug
 
@@ -64,10 +66,18 @@ class BokehVis:
     def _build_layout(self):
         layout_dict = {}
         main_layout = column(
-            row(Spacer(width=FIG_VIS["row_margin_width"]), self.main_plotter),
             row(
                 Spacer(width=FIG_VIS["row_margin_width"]),
-                self.velocity_plotter,
+                self.main_plotter,
+                Spacer(width=FIG_VIS["row_margin_width"]),
+                column(
+                    row(
+                        self.velocity_plotter,
+                    ),
+                    row(
+                        self.control_plotter,
+                    ),
+                ),
             ),
         )
         esdf_layout = column(
@@ -161,39 +171,39 @@ class BokehVis:
 
         # 2. parse init path
         is_success = self.plan_res.solve_success
-        if is_success or self.debug:
-            init_path = self.plan_res.init_path
+        init_traj = self.plan_res.init_traj
+        state_num = len(StateVar.DESCRIPTOR.fields)
+        init_traj_stamp = np.arange(len(init_traj))
+        # print("init_path size: ", len(init_path))
+        init_traj_parse = np.zeros((len(init_traj), state_num))
+        for idx, state in enumerate(init_traj):
+            init_traj_parse[idx] = [state.x, state.y, state.theta, state.v]
+            # print(f"state {idx}: {state.x}, {state.y}, {state.theta} \n")
 
-            # print("init_path size: ", len(init_path))
-            init_path_parse = np.zeros((len(init_path), 3))
-            for idx, state in enumerate(init_path):
-                init_path_parse[idx] = [state.x, state.y, state.theta]
-                # print(f"state {idx}: {state.x}, {state.y}, {state.theta} \n")
+        self.init_traj_dict = {
+            "t": init_traj_stamp,
+            "x": init_traj_parse[:, 0],
+            "y": init_traj_parse[:, 1],
+            "head": init_traj_parse[:, 2],
+            "v": init_traj_parse[:, 3],
+        }
+        self.update_attr(self.init_traj_dict, "init_traj")
 
-            self.init_path_dict.update(
-                {
-                    "x": init_path_parse[:, 0],
-                    "y": init_path_parse[:, 1],
-                    "head": init_path_parse[:, 2],
-                }
-            )
-            self.update_attr(self.init_path_dict, "init_path")
-
-        # 3. parse init velocity
+        # 3. parse init controls
         if is_success:
-            init_traj = self.plan_res.init_traj
-            init_traj_traj = np.zeros((len(init_traj), 3))
-            init_traj_stamp = np.arange(len(init_traj))
-            for idx, state in enumerate(init_traj):
-                init_traj_traj[idx] = [state.x, state.y, state.v]
-                # print(f"state {idx}: {state.x}, {state.y}, {state.theta} \n")
-            init_traj_dict = {
+            init_controls = self.plan_res.init_controls
+            control_num = len(ControlVar.DESCRIPTOR.fields)
+            init_traj_stamp = np.arange(len(init_controls))
+            init_controls_parse = np.zeros((len(init_controls), control_num))
+            for idx, control in enumerate(init_controls):
+                init_controls_parse[idx] = [control.accelerate, control.steer_angle]
+
+            self.init_controls_dict = {
                 "t": init_traj_stamp,
-                "v": init_traj_traj[:, 2],
-                "x": init_traj_traj[:, 0],
-                "y": init_traj_traj[:, 1],
+                "acc": init_controls_parse[:, 0],
+                "steer": init_controls_parse[:, 1],
             }
-            self.update_attr(init_traj_dict, "init_traj")
+            self.update_attr(self.init_controls_dict, "init_controls")
 
     def _render_plan_problem(self):
         # render the obstacles
@@ -242,18 +252,18 @@ class BokehVis:
         )
 
     def render_init_path(self):
-        if hasattr(self, "init_path"):
+        if hasattr(self, "init_traj"):
             self.main_plotter.line(
-                x="x", y="y", source=self.init_path, **RENDER_VIS["init_path"]
+                x="x", y="y", source=self.init_traj, **RENDER_VIS["init_path"]
             )
             self.main_plotter.scatter(
-                x="x", y="y", source=self.init_path, **RENDER_VIS["init_path_scatter"]
+                x="x", y="y", source=self.init_traj, **RENDER_VIS["init_path_scatter"]
             )
 
             # render rectangles
-            init_path_x = self.init_path_dict["x"]
-            init_path_y = self.init_path_dict["y"]
-            init_path_head = self.init_path_dict["head"]
+            init_path_x = self.init_traj_dict["x"]
+            init_path_y = self.init_traj_dict["y"]
+            init_path_head = self.init_traj_dict["head"]
             for idx in range(len(init_path_x)):
                 # print(f"start to render rectangle{idx}")
                 init_path_mid_pts = convert_rear_to_mid(
@@ -272,12 +282,41 @@ class BokehVis:
                 )
 
     def render_init_traj(self):
-        if hasattr(self, "init_path"):
+        if hasattr(self, "init_traj"):
             self.velocity_plotter.line(
                 x="t", y="v", source=self.init_traj, **RENDER_VIS["init_traj"]
             )
             self.velocity_plotter.scatter(
                 x="t", y="v", source=self.init_traj, **RENDER_VIS["init_traj_scatter"]
+            )
+
+        if hasattr(self, "init_controls"):
+            self.velocity_plotter.line(
+                x="t",
+                y="acc",
+                source=self.init_controls,
+                **RENDER_VIS["init_control_acc"]
+            )
+            self.velocity_plotter.scatter(
+                x="t",
+                y="acc",
+                source=self.init_controls,
+                **RENDER_VIS["init_control_acc_scatter"]
+            )
+
+    def render_init_controls(self):
+        if hasattr(self, "init_controls"):
+            self.control_plotter.line(
+                x="t",
+                y="steer",
+                source=self.init_controls,
+                **RENDER_VIS["init_control_steer"]
+            )
+            self.control_plotter.scatter(
+                x="t",
+                y="steer",
+                source=self.init_controls,
+                **RENDER_VIS["init_control_steer_scatter"]
             )
 
     def render(self):
@@ -286,6 +325,7 @@ class BokehVis:
         self.render_esdf_map()
         self.render_init_path()
         self.render_init_traj()
+        self.render_init_controls()
 
     def update_attr(self, data_dict: dict, attr_str: str):
         if not hasattr(self, attr_str):

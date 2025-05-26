@@ -37,7 +37,7 @@ bool TrajPlanner::Process(const Eigen::Vector3d& start_vec, const Eigen::Vector3
 
     // 3. generate the trajectory
     LOG(INFO) << "Start to generate the init trajectory status and controls...";
-
+    if (!setStatusControls(frontend_path, pwj_speed_ptr_->GetResult())) { return false; }
 
     return true;
 };
@@ -49,11 +49,12 @@ bool TrajPlanner::setStatusControls(const std::vector<Eigen::Vector3d>* const in
         LOG(WARNING) << "The init path size is less than 2";
         return false;
     } else if (init_path_ptr->size() != init_traj_ptr->size()) {
-        LOG(WARNING) << "The init path size is less than 2";
+        LOG(WARNING) << "The init path size is not equal to the init traj size"
+                     << "| path size is" << init_path_ptr->size() << " | traj size is " << init_traj_ptr->size();
         return false;
     }
-    init_states_.resize(init_path_ptr->size(), vehicle_model::KinematicModel::kStateSize);
-    init_controls_.resize(init_path_ptr->size() - 1, vehicle_model::KinematicModel::kControlSize);
+    init_states_.resize(init_path_ptr->size(), vehicle_model::KinematicModel::GetStateSize());
+    init_controls_.resize(init_path_ptr->size() - 1, vehicle_model::KinematicModel::GetControlSize());
     for (std::size_t i = 0; i < init_path_ptr->size(); ++i) {
         init_states_(i, 0) = (*init_path_ptr)[i].x();   // x
         init_states_(i, 1) = (*init_path_ptr)[i].y();   // y

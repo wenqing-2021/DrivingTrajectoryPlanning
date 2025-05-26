@@ -16,8 +16,15 @@ class KinematicModel {
     const kinematic_model::VehicleParam& GetVehicleParam() const { return vehicle_param_; }
 
   public:
-    static const std::size_t kStateSize   = 3;
-    static const std::size_t kControlSize = 2;
+    static std::size_t GetStateSize() {
+        static const std::size_t kStateSize = kinematic_model::StateVar::descriptor()->field_count();
+        return kStateSize;
+    }
+
+    static std::size_t GetControlSize() {
+        static const std::size_t kControlSize = kinematic_model::ControlVar::descriptor()->field_count();
+        return kControlSize;
+    }
 
   private:
     kinematic_model::VehicleParam vehicle_param_;

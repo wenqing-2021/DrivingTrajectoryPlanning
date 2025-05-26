@@ -174,3 +174,9 @@ cd osqp-eigen
 mkdir build
 cd build
 cmake .. && make && make install
+
+# install eigen-debug
+cd /workspace
+git clone https://github.com/fandesfyf/EigenGdb.git
+cd EigenGdb
+./setup.sh
