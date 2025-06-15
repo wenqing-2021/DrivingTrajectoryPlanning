@@ -180,3 +180,11 @@ cd /workspace
 git clone https://github.com/fandesfyf/EigenGdb.git
 cd EigenGdb
 ./setup.sh
+
+# install ECOS
+cd /workspace
+git clone https://github.com/embotech/ecos.git
+git checkout 5d3aa62
+mkdir build
+cd build
+cmake .. && make && make install

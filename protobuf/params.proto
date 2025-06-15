@@ -23,16 +23,6 @@ message HybridAStarParams{
     HybridAStarGCost g_cost = 13;
 }
 
-message MPCSolverParams {
-    double max_acc = 1;
-    double min_acc = 2;
-    double max_v = 3;
-    double min_v = 4;
-    double w_u = 5;
-    double w_delta_u = 6;
-    double w_ref = 7;
-}
-
 message PiecewiseJerkParams {
     double max_iter = 1;
     double min_v = 2;
@@ -52,6 +42,5 @@ message SolverParams {
     double max_iter = 1;
     double map_resolution = 2;
     HybridAStarParams hybrid_a_star_param = 3;
-    MPCSolverParams mpc_solver_param = 4;
-    PiecewiseJerkParams piesewise_jerk_params = 5;
+    PiecewiseJerkParams piesewise_jerk_params = 4;
 }

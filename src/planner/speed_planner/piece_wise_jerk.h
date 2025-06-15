@@ -22,8 +22,6 @@ class PiecewiseJerkSpeedOptimizer {
     bool   initVariables(const std::vector<Eigen::Vector3d>& path);
     bool   initHessianGradient(const std::vector<Eigen::Vector3d>& path);
     bool   initBounds(const std::vector<Eigen::Vector3d>& path);
-    void   buildObjective();
-    void   buildConstraint();
     double getSpeedDirect(const double init_path_head, const double vehicle_head);
 
     std::unique_ptr<QPSolver> qp_solver_ptr_ = nullptr;
