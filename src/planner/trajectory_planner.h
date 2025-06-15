@@ -1,5 +1,6 @@
 #pragma once
 #include "collision_check/base_check.h"
+#include "planner/admm/admm_planner.h"
 #include "planner/hybrid_a_star/hybrid_a_star.h"
 #include "planner/speed_planner/piece_wise_jerk.h"
 #include "vehicle_model/kinematic_model.h"
@@ -7,6 +8,7 @@
 
 namespace planning {
 using pwjspeed = backend::PiecewiseJerkSpeedOptimizer;
+using admmopt  = backend::ADMMSolver;
 class TrajPlanner {
   public:
     TrajPlanner(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr,
@@ -27,6 +29,7 @@ class TrajPlanner {
 
     std::unique_ptr<frontend::HybridAstar>         hybrid_astar_ptr_;   // pointer to the hybrid A* planner
     std::unique_ptr<pwjspeed>                      pwj_speed_ptr_;
+    std::unique_ptr<admmopt>                       admm_solver_ptr_;   // pointer to the ADMM solver
     std::shared_ptr<kinematic_model::VehicleParam> vehicle_param_ptr_;
     std::vector<Eigen::Vector3d>                   debug_node_list_;
     double                                         frontend_path_length_{0.0};

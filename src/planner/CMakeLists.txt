@@ -3,6 +3,7 @@ project(Planner)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/hybrid_a_star)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/qp_solver)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/speed_planner)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/admm)
 
 # Add source files and header files
 file(GLOB PLANNER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
@@ -16,4 +17,4 @@ set_property(TARGET Planner PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Include directories for headers
 target_include_directories(Planner PUBLIC ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(Planner PUBLIC ${UTILS_LIBRARIES} HybridAStar PiecewiseJerkSpeedOptimizer)
+target_link_libraries(Planner PUBLIC ${UTILS_LIBRARIES} HybridAStar PiecewiseJerkSpeedOptimizer ADMMSolver)

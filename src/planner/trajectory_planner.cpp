@@ -9,11 +9,12 @@ TrajPlanner::TrajPlanner(const params::SolverParams& solver_params, const std::s
     hybrid_astar_ptr_ =
         std::make_unique<frontend::HybridAstar>(solver_params.hybrid_a_star_param(), map_ptr, collision_checker);
     pwj_speed_ptr_     = std::make_unique<pwjspeed>(solver_params.piesewise_jerk_params());
+    admm_solver_ptr_   = std::make_unique<admmopt>();
     vehicle_param_ptr_ = std::make_shared<kinematic_model::VehicleParam>(vehicle_param);
 };
 
 bool TrajPlanner::Process(const Eigen::Vector3d& start_vec, const Eigen::Vector3d& goal_vec) {
-    // 1. frontend plan
+    // 1. frontend path plan
     LOG(INFO) << "Start to search the frontend path...";
     if (hybrid_astar_ptr_->Plan(start_vec, goal_vec)) {
         LOG(INFO) << "The frontend path is found...";
@@ -25,7 +26,7 @@ bool TrajPlanner::Process(const Eigen::Vector3d& start_vec, const Eigen::Vector3
         return false;
     }
 
-    // 2. backend plan
+    // 2. backend speed plan
     LOG(INFO) << "Start to optimize the speed profile...";
     const std::vector<Eigen::Vector3d>* const frontend_path = hybrid_astar_ptr_->GetPath();
     if (pwj_speed_ptr_->Optimize(*frontend_path, start_vec)) {
@@ -35,9 +36,22 @@ bool TrajPlanner::Process(const Eigen::Vector3d& start_vec, const Eigen::Vector3
         return false;
     }
 
-    // 3. generate the trajectory
+    // 3. generate the trajectory with TrajOptimizer
     LOG(INFO) << "Start to generate the init trajectory status and controls...";
     if (!setStatusControls(frontend_path, pwj_speed_ptr_->GetResult())) { return false; }
+    LOG(INFO) << "The init trajectory status and controls have been set...";
+
+    // 4. solve the trajectory optimization problem with ADMM
+    LOG(INFO) << "Start to solve the trajectory optimization problem with ADMM...";
+    if (admm_solver_ptr_->Solve()) {
+        LOG(INFO) << "The trajectory optimization problem has been solved successfully...";
+    } else {
+        LOG(WARNING) << "Failed to solve the trajectory optimization problem...";
+        return false;
+    }
+    auto final_states   = admm_solver_ptr_->GetStatesResult();
+    auto final_controls = admm_solver_ptr_->GetControlsResult();
+    LOG(INFO) << "The final trajectory size is: " << final_states.size();
 
     return true;
 };
