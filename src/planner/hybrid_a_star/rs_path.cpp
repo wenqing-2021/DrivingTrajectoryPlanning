@@ -26,7 +26,7 @@
  ******************************************************************************/
 
 #include "rs_path.h"
-#include "logger/logger.h"
+#include "logger.h"
 #include <vector>
 
 namespace planning {

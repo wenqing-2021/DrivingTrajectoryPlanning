@@ -1,7 +1,7 @@
 #pragma once
-#include "common/math/polygon2d.h"
-#include "common/math/pose.h"
 #include "kinematic_model.pb.h"
+#include "math/polygon2d.h"
+#include "math/pose.h"
 #include <memory>
 namespace planning {
 namespace collision_check {

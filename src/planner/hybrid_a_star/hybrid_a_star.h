@@ -1,11 +1,11 @@
 #pragma once
 
-#include "collision_check/base_check.h"
-#include "common/math/angle.h"
-#include "common/math/math_utils.h"
-#include "map/map.h"
+#include "base_check.h"
+#include "map.h"
+#include "math/angle.h"
+#include "math/math_utils.h"
 #include "params.pb.h"
-#include "planner/hybrid_a_star/rs_path.h"
+#include "rs_path.h"
 #include <Eigen/Core>
 #include <iomanip>
 #include <memory>

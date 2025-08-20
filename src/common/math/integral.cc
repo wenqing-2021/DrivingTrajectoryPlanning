@@ -14,7 +14,7 @@
  * limitations under the License.
  *****************************************************************************/
 
-#include "common/math/integral.h"
+#include "math/integral.h"
 
 #include <array>
 

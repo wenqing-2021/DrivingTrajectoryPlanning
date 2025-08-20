@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common/math/polygon2d.h"
 #include "cost_map.pb.h"
+#include "math/polygon2d.h"
 #include "params.pb.h"
 #include "problem.pb.h"
 #include <Eigen/Core>

@@ -1,6 +1,6 @@
 #include "Eigen/Core"
 #include "params.pb.h"
-#include "planner/qp_solver/qp_solver.h"
+#include "qp_solver/qp_solver.h"
 namespace planning {
 namespace backend {
 

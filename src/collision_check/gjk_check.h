@@ -1,9 +1,9 @@
 #pragma once
 #include "base_check.h"
-#include "common/math/box2d.h"
-#include "common/math/polygon2d.h"
-#include "common/math/vec2d.h"
 #include "kinematic_model.pb.h"
+#include "math/box2d.h"
+#include "math/polygon2d.h"
+#include "math/vec2d.h"
 #include <vector>
 
 namespace planning {

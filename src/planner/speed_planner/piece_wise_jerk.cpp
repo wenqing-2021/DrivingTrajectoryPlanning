@@ -1,8 +1,8 @@
 #include "piece_wise_jerk.h"
 #include "OsqpEigen/OsqpEigen.h"
-#include "common/math/math_utils.h"
-#include "logger/logger.h"
-#include "planner/vehicle_model/kinematic_model.h"
+#include "logger.h"
+#include "math/math_utils.h"
+#include "vehicle_model/kinematic_model.h"
 namespace planning {
 namespace backend {
 

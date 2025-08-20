@@ -1,5 +1,5 @@
-#include "planner/trajectory_planner.h"
-#include "logger/logger.h"
+#include "trajectory_planner.h"
+#include "logger.h"
 namespace planning {
 
 TrajPlanner::TrajPlanner(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr,

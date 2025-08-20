@@ -23,6 +23,7 @@ add_subdirectory(third-party/pybind11)
 add_subdirectory(third-party/glog)
 add_subdirectory(protobuf)
 add_subdirectory(src/logger)
+add_subdirectory(src/common)
 set(PYBIND_LIBRARIES "" CACHE INTERNAL "LIST FOR PYBIND11 LIBRARIES")
 set(UTILS_LIBRARIES "" CACHE INTERNAL "LIST FOR UTILS LIBRARIES")
 set(UTILS_LIBRARIES ${UTILS_LIBRARIES}
@@ -31,13 +32,14 @@ set(UTILS_LIBRARIES ${UTILS_LIBRARIES}
     OsqpEigen::OsqpEigen
     ProtoLib
     yaml-cpp
+    Common
 )
 
 # add include directories
 # add_subdirectory(src/forward_simulator)
 # add_subdirectory(src/risk_assessment)
 # add_subdirectory(src/ilqr_planner)
-add_subdirectory(src/common)
+
 add_subdirectory(src/collision_check)
 add_subdirectory(src/map)
 add_subdirectory(src/planner)

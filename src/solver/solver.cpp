@@ -1,7 +1,7 @@
 #include "solver/solver.h"
 #include "collision_check/gjk_check.h"
 #include "kinematic_model.pb.h"
-#include "logger/logger.h"
+#include "logger.h"
 #include <memory>
 #include <string>
 #include <utility>

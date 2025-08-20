@@ -20,7 +20,7 @@
 #include <cassert>
 #include <cmath>
 
-#include "common/math/math_utils.h"
+#include "math/math_utils.h"
 #include "string_utils.h"
 
 namespace common {
