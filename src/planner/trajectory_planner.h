@@ -1,8 +1,8 @@
 #pragma once
-#include "collision_check/base_check.h"
-#include "planner/admm/admm_planner.h"
-#include "planner/hybrid_a_star/hybrid_a_star.h"
-#include "planner/speed_planner/piece_wise_jerk.h"
+#include "admm/admm_planner.h"
+#include "base_check.h"
+#include "hybrid_a_star/hybrid_a_star.h"
+#include "speed_planner/piece_wise_jerk.h"
 #include "vehicle_model/kinematic_model.h"
 #include <string>
 

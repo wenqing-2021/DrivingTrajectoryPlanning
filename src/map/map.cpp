@@ -1,5 +1,5 @@
-#include "map/map.h"
-#include "logger/logger.h"
+#include "map.h"
+#include "logger.h"
 #include "problem.pb.h"
 #include <cstddef>
 #include <limits>

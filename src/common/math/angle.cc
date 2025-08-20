@@ -14,9 +14,9 @@
  * limitations under the License.
  *****************************************************************************/
 
-#include "common/math/angle.h"
+#include "math/angle.h"
 
-#include "common/math/sin_table.h"
+#include "math/sin_table.h"
 
 
 namespace common {

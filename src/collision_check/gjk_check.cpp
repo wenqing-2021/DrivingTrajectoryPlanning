@@ -1,9 +1,9 @@
 #include "gjk_check.h"
-#include "common/math/line_segment2d.h"
-#include "common/math/math_utils.h"
-#include "common/math/polygon2d.h"
-#include "common/math/vec2d.h"
-#include "logger/logger.h"
+#include "logger.h"
+#include "math/line_segment2d.h"
+#include "math/math_utils.h"
+#include "math/polygon2d.h"
+#include "math/vec2d.h"
 #include <vector>
 
 

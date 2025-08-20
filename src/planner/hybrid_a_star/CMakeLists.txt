@@ -11,5 +11,5 @@ add_library(HybridAStar
 set_property(TARGET HybridAStar PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Include directories for headers
-target_include_directories(HybridAStar PUBLIC ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(HybridAStar PUBLIC ${UTILS_LIBRARIES})
+target_include_directories(HybridAStar PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(HybridAStar PUBLIC ${UTILS_LIBRARIES} Map)

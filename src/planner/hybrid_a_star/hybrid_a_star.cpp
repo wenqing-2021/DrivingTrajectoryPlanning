@@ -1,5 +1,5 @@
-#include "planner/hybrid_a_star/hybrid_a_star.h"
-#include "logger/logger.h"
+#include "hybrid_a_star.h"
+#include "logger.h"
 #include <cmath>
 
 

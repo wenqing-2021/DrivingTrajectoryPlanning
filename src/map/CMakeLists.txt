@@ -11,5 +11,5 @@ add_library(Map
 set_property(TARGET Map PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Include directories for headers
-target_include_directories(Map PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(Map PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(Map PUBLIC ${UTILS_LIBRARIES})

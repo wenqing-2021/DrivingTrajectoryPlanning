@@ -1,8 +1,8 @@
-#include "collision_check/gjk_check.h"
-#include "common/math/polygon2d.h"
-#include "common/math/pose.h"
-#include "common/math/vec2d.h"
+#include "gjk_check.h"
 #include "kinematic_model.pb.h"
+#include "math/polygon2d.h"
+#include "math/pose.h"
+#include "math/vec2d.h"
 #include <gtest/gtest.h>
 
 using namespace planning::collision_check;
