@@ -1,8 +1,7 @@
 #include "piece_wise_jerk.h"
 #include "OsqpEigen/OsqpEigen.h"
-#include "logger.h"
 #include "math/math_utils.h"
-#include "vehicle_model/kinematic_model.h"
+
 namespace planning {
 namespace backend {
 
@@ -15,7 +14,7 @@ PiecewiseJerkSpeedOptimizer::PiecewiseJerkSpeedOptimizer(const params::Piecewise
 };
 
 bool PiecewiseJerkSpeedOptimizer::Optimize(const std::vector<Eigen::Vector3d>& path,
-                                           const Eigen::Vector3d&              vehicle_pose) {
+                                           const vehicle_model::VehiclePose&   vehicle_pose) {
     result_traj_.clear();
     std::vector<std::vector<Eigen::Vector3d>> shift_seg_trajs;   // [x, y, v]
     // 1. get the shift segment paths
@@ -28,7 +27,7 @@ bool PiecewiseJerkSpeedOptimizer::Optimize(const std::vector<Eigen::Vector3d>& p
     // 2. optimize the speed for each segment and fill the result path
     double init_path_head =
         common::math::NormalizeAngle(std::atan2(path[1].y() - path[0].y(), path[1].x() - path[0].x()));
-    double speed_direct = getSpeedDirect(init_path_head, vehicle_pose.z());
+    double speed_direct = getSpeedDirect(init_path_head, vehicle_pose.theta);
     for (std::size_t i = 0; i < shift_seg_trajs.size(); ++i) {
         // 2.1 optimize the speed
         if (!optimizeSpeed(shift_seg_trajs[i])) {

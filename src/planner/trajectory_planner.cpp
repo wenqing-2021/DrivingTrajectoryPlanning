@@ -1,5 +1,5 @@
 #include "trajectory_planner.h"
-#include "logger.h"
+
 namespace planning {
 
 TrajPlanner::TrajPlanner(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr,
@@ -13,7 +13,7 @@ TrajPlanner::TrajPlanner(const params::SolverParams& solver_params, const std::s
     vehicle_param_ptr_ = std::make_shared<kinematic_model::VehicleParam>(vehicle_param);
 };
 
-bool TrajPlanner::Process(const Eigen::Vector3d& start_vec, const Eigen::Vector3d& goal_vec) {
+bool TrajPlanner::Process(const vehicle_model::VehiclePose& start_vec, const vehicle_model::VehiclePose& goal_vec) {
     // 1. frontend path plan
     LOG(INFO) << "Start to search the frontend path...";
     if (hybrid_astar_ptr_->Plan(start_vec, goal_vec)) {

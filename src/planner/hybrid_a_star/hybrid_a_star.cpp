@@ -1,5 +1,4 @@
 #include "hybrid_a_star.h"
-#include "logger.h"
 #include <cmath>
 
 
@@ -40,9 +39,10 @@ HybridAstar::HybridAstar(const params::HybridAStarParams& hybrid_params, const s
     }
 }
 
-bool HybridAstar::Plan(const Eigen::Vector3d& start_vec, const Eigen::Vector3d& goal_vec) {
-    start_vec_ = start_vec;
-    goal_vec_  = goal_vec;
+bool HybridAstar::Plan(const vehicle_model::VehiclePose& start_vec, const vehicle_model::VehiclePose& goal_vec) {
+    // 0. convert pose to the vector
+    convertPose2Vec(start_vec, start_vec_);
+    convertPose2Vec(goal_vec, goal_vec_);
     LOG(INFO) << "Hybrid A* planner is running..."
               << "Start point: "
               << "x" << start_vec_.x() << "y" << start_vec_.y() << "theta" << start_vec_.z() << "Goal point: "

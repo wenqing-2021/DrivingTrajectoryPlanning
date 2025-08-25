@@ -21,12 +21,8 @@ void Solver::LoadProblem(const problem::PlanProblem& plan_problem, const params:
     Solver::setMap(std::make_shared<map::Map>(plan_problem, solver_params.map_resolution()));
     // 2. Set start and goal state
     LOG(INFO) << "Set start and goal state...";
-    Eigen::Vector3d start_vec(
-        plan_problem.init_state().x(), plan_problem.init_state().y(), plan_problem.init_state().theta());
-    Solver::setStart(start_vec);
-    Eigen::Vector3d goal_vec(
-        plan_problem.goal_state().x(), plan_problem.goal_state().y(), plan_problem.goal_state().theta());
-    Solver::setGoal(goal_vec);
+    Solver::setPose(plan_problem.init_state(), start_vec_);
+    Solver::setPose(plan_problem.goal_state(), goal_vec_);
 
     // 3. Set plan params
     Solver::setSolverParams(solver_params);

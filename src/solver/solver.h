@@ -3,6 +3,7 @@
 #include "params.pb.h"
 #include "planner/trajectory_planner.h"
 #include "problem.pb.h"
+#include "vehicle_model/kinematic_model.h"
 #include <Eigen/Core>
 #include <memory>
 #include <utility>
@@ -31,8 +32,11 @@ class Solver {
     void setCollisionCheck(std::shared_ptr<collision_check::BaseCheck>&& collision_check_ptr) {
         collision_check_ptr_ = std::move(collision_check_ptr);
     };
-    void setStart(const Eigen::Vector3d& start_vec) { start_vec_ = start_vec; };
-    void setGoal(const Eigen::Vector3d& goal_vec) { goal_vec_ = goal_vec; };
+    void setPose(const kinematic_model::StateVar& state_var, planning::vehicle_model::VehiclePose& vechile_pose) {
+        vechile_pose.x     = state_var.x();
+        vechile_pose.y     = state_var.y();
+        vechile_pose.theta = state_var.theta();
+    };
     void setSolverParams(const params::SolverParams& solver_params) { solver_params_ = solver_params; };
     void setInitTraj(const planning::vehicle_model::opt_status&  init_states,
                      const planning::vehicle_model::opt_control& init_controls);
@@ -41,10 +45,10 @@ class Solver {
     std::shared_ptr<collision_check::BaseCheck> collision_check_ptr_;
     std::unique_ptr<planning::TrajPlanner>      traj_planner_ptr_;
 
-    Eigen::Vector3d      start_vec_;   // [x, y, theta]
-    Eigen::Vector3d      goal_vec_;
-    problem::PlanRes     plan_res_;
-    params::SolverParams solver_params_;
+    planning::vehicle_model::VehiclePose start_vec_;   // [x, y, theta]
+    planning::vehicle_model::VehiclePose goal_vec_;
+    problem::PlanRes                     plan_res_;
+    params::SolverParams                 solver_params_;
 };
 
 }   // namespace solver

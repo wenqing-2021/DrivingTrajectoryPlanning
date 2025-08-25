@@ -3,7 +3,7 @@
 #include "base_check.h"
 #include "hybrid_a_star/hybrid_a_star.h"
 #include "speed_planner/piece_wise_jerk.h"
-#include "vehicle_model/kinematic_model.h"
+
 #include <string>
 
 namespace planning {
@@ -16,8 +16,8 @@ class TrajPlanner {
                 const kinematic_model::VehicleParam&               vehicle_param);
     ~TrajPlanner() = default;
 
-    bool                Process(const Eigen::Vector3d& start_vec,
-                                const Eigen::Vector3d& goal_vec);   // main function to generate the trajectory
+    bool                Process(const vehicle_model::VehiclePose& start_vec,
+                                const vehicle_model::VehiclePose& goal_vec);   // main function to generate the trajectory
     inline const double GetInitPathLength() { return frontend_path_length_; };              // get the init path length
     inline std::vector<Eigen::Vector3d>& GetDebugNodeList() { return debug_node_list_; };   // get the debug node list
     const vehicle_model::opt_status&     GetInitStates() const { return init_states_; };    // get the init states
