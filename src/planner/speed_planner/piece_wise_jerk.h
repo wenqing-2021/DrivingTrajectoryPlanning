@@ -1,6 +1,7 @@
 #include "Eigen/Core"
 #include "params.pb.h"
 #include "qp_solver/qp_solver.h"
+#include "vehicle_model/kinematic_model.h"
 namespace planning {
 namespace backend {
 
@@ -9,7 +10,7 @@ class PiecewiseJerkSpeedOptimizer {
     PiecewiseJerkSpeedOptimizer(const params::PiecewiseJerkParams& pwj_params);
     ~PiecewiseJerkSpeedOptimizer() = default;
 
-    bool Optimize(const std::vector<Eigen::Vector3d>& path, const Eigen::Vector3d& vehicle_pose);
+    bool Optimize(const std::vector<Eigen::Vector3d>& path, const vehicle_model::VehiclePose& vehicle_pose);
     inline const std::vector<Eigen::Vector3d>* const GetResult() const { return &result_traj_; };
 
     const double      GetDt() const { return kDt; };

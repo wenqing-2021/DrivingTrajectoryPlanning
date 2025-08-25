@@ -188,3 +188,5 @@ git checkout 5d3aa62
 mkdir build
 cd build
 cmake .. && make && make install
+
+# install cppad

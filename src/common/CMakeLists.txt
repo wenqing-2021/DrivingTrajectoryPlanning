@@ -22,6 +22,7 @@ target_link_libraries(Common PUBLIC
     Eigen3::Eigen
     OsqpEigen::OsqpEigen
     ProtoLib
+    Logger
 )
 
 # Uncomment if position-independent code is needed

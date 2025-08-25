@@ -1,4 +1,8 @@
-
+#pragma once
+#include "logger.h"
+#include "map.h"
+#include "math/polygon2d.h"
+#include "vehicle_model/kinematic_model.h"
 #include <Eigen/Core>
 #include <vector>
 
@@ -12,25 +16,45 @@ class OBCASolver {
     \theta is the heading angle, and v is the velocity.
     */
   public:
-    OBCASolver();
+    OBCASolver(const kinematic_model::VehicleParam& vehicle_param, const std::shared_ptr<map::Map>& map_ptr = nullptr)
+        : map_ptr_(map_ptr) {
+        initializeParameters(vehicle_param);
+    };
     ~OBCASolver() = default;
-    bool Solve();
+    bool Solve(const vehicle_model::sdv_traj& init_trajectory, const vehicle_model::VehiclePose& start_pose,
+               const vehicle_model::VehiclePose& goal_pose);
 
     inline const std::vector<Eigen::Vector4d>& GetStatesResult() const { return states_result_; }
     inline const std::vector<Eigen::Vector2d>& GetControlsResult() const { return controls_result_; }
 
+    bool getHyperLane(const common::math::Polygon2d& obstacle, Eigen::MatrixXd* obstacle_A, Eigen::VectorXd* obstacle_b,
+                      std::size_t i);
+    bool getRotationMatrix(const double theta, Eigen::Matrix2d* R);
+
+    bool getMovementMatrix(const double x, const double y, const double theta, Eigen::Matrix<double, 2, 1>* t);
+
   private:
-    bool initializeParameters();   // Initialize the parameters for the OBCA algorithm
-    bool solveLambdaMu();
-    bool solveVelAcc();
-    bool solveTime();
-    bool solveStates();
+    bool setInitVariable();
+    bool initializeParameters(
+        const kinematic_model::VehicleParam& vehicle_param);   // Initialize the parameters for the OBCA algorithm
+    bool buildInequalConstraint();
+    bool buildEqualConstraint();
+    bool buildCostFunction(const vehicle_model::sdv_path& init_trajectory);
+    bool buildLowUpperBound();
+
+    Eigen::Matrix<double, 4, 2> G_;   // ego vehicle matrix: Gx <= g
+    Eigen::Matrix<double, 4, 1> g_;   // Control input matrix
+
+    double                  offset_;   // the distance from the rear axle to the vehicle center
+    constexpr static double kEpsilon = 1e-5;
+    std::size_t             N_;             // Number of discretized steps
+    std::size_t             state_num_;     // Number of states
+    std::size_t             control_num_;   // Number of controls
 
     std::vector<Eigen::Vector4d> states_result_;     // Resulting states after optimization
     std::vector<Eigen::Vector2d> controls_result_;   // Resulting controls after optimization
 
-    // Placeholder for the OBCA algorithm parameters and variables
-    // This should include the necessary matrices, vectors, and parameters for the OBCA algorithm
+    std::shared_ptr<map::Map> map_ptr_;
 };
 }   // namespace backend
 }   // namespace planning

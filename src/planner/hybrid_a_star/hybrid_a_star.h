@@ -6,6 +6,7 @@
 #include "math/math_utils.h"
 #include "params.pb.h"
 #include "rs_path.h"
+#include "vehicle_model/kinematic_model.h"
 #include <Eigen/Core>
 #include <iomanip>
 #include <memory>
@@ -22,8 +23,8 @@ class HybridAstar {
                 const std::shared_ptr<collision_check::BaseCheck>& collison_checker);
     ~HybridAstar() = default;
 
-    bool                                      Plan(const Eigen::Vector3d& start_vec, const Eigen::Vector3d& goal_vec);
-    inline void                               GetPathLength(double& path_length) { path_length = path_length_; };
+    bool        Plan(const vehicle_model::VehiclePose& start_vec, const vehicle_model::VehiclePose& goal_vec);
+    inline void GetPathLength(double& path_length) { path_length = path_length_; };
     const std::vector<Eigen::Vector3d>* const GetPath() { return &final_path_; };   // get the final path
     inline std::vector<Eigen::Vector3d>&      GetDebugNodeList() { return debug_node_list_; };
 
@@ -77,6 +78,9 @@ class HybridAstar {
     };
 
   private:
+    inline void convertPose2Vec(const vehicle_model::VehiclePose& pose, Eigen::Vector3d& vec) {
+        vec << pose.x, pose.y, pose.theta;
+    };
     inline void setParams(const params::HybridAStarParams& hybrid_params) { hybrid_params_ = hybrid_params; };
     inline void setMap(const std::shared_ptr<map::Map>& map_ptr) { map_ptr_ = map_ptr; };
     inline void setRSPath(std::unique_ptr<RSPath> rs_path_ptr) { rs_path_ptr_ = std::move(rs_path_ptr); };

@@ -68,3 +68,4 @@ add_executable(DEBUG_SOLVER src/solver/debug_solver.cpp)
 target_link_libraries(DEBUG_SOLVER PUBLIC Solver)
 
 add_subdirectory(src/test/collision_check)
+add_subdirectory(src/test/cpp_ad)

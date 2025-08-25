@@ -11,5 +11,5 @@ add_library(OBCASolver
 set_property(TARGET OBCASolver PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Include directories for headers
-target_include_directories(OBCASolver PUBLIC ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(OBCASolver PUBLIC ${UTILS_LIBRARIES})
+target_include_directories(OBCASolver PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(OBCASolver PUBLIC ${UTILS_LIBRARIES} Map)
