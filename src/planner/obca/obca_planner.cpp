@@ -3,10 +3,15 @@
 namespace planning {
 namespace backend {
 
-bool OBCASolver::Solve(const vehicle_model::sdv_traj& init_trajectory, const vehicle_model::VehiclePose& start_pose,
+bool OBCASolver::Solve(const vehicle_model::sdv_path& init_path, const vehicle_model::VehiclePose& start_pose,
                        const vehicle_model::VehiclePose& goal_pose) {
     // 1. get the initial variables
-    Eigen::MatrixXd init_states;
+    if (setInitVariable(init_path)) {
+        LOG(INFO) << "The initial variables are set successfully.";
+    } else {
+        LOG(WARNING) << "Failed to set the initial variables.";
+        return false;
+    }
     Eigen::MatrixXd obstacle_A;
     Eigen::VectorXd obstacle_b;
 
@@ -40,20 +45,52 @@ bool OBCASolver::Solve(const vehicle_model::sdv_traj& init_trajectory, const veh
     return true;
 };
 
-bool OBCASolver::setInitVariable() {
-    // Set the initial variables for the optimization problem
+bool OBCASolver::setInitVariable(const vehicle_model::sdv_path& init_path) {
+    // 1. Set the initial variables for the optimization problem
     states_result_.clear();
     controls_result_.clear();
+    N_ = init_path.size();
+    x0_.resize(N_ * (state_num_ + control_num_));
+    for (std::size_t i = 0; i < N_; ++i) {
+        x0_[i * (state_num_ + control_num_) + VariableIndex::X]     = init_path[i].x;
+        x0_[i * (state_num_ + control_num_) + VariableIndex::Y]     = init_path[i].y;
+        x0_[i * (state_num_ + control_num_) + VariableIndex::THETA] = init_path[i].theta;
+        x0_[i * (state_num_ + control_num_) + VariableIndex::V]     = 0.0;   //
+        x0_[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE] =
+            0.0;   // hack the initial steering angle to be zero
+        x0_[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION] =
+            0.0;   // hack the initial acceleration to be zero
+    }
+    // 2. set the dual variables
+    // 2.1 get the obstacle from map
+    if (map_ptr_ == nullptr) {
+        LOG(WARNING) << "The map pointer is null.";
+        return false;
+    }
+    const auto& obs_list         = map_ptr_->GetObsList();
+    std::size_t obstacle_num     = obs_list.size();
+    std::size_t obstacle_num_pts = 0;
+    for (const auto& obs : obs_list) { obstacle_num_pts += obs.num_points(); }
+    // 2.2 set the dual variables
+    Eigen::VectorXd mu0_(obstacle_num_pts * N_);
+    Eigen::VectorXd lambda0_(obstacle_num * N_ * kVehicleBoundaryNum);
+    mu0_.setZero();
+    lambda0_.setZero();
+    // 3. set the initial value
+    x0_.conservativeResize(x0_.size() + mu0_.size() + lambda0_.size());
+    x0_.tail(mu0_.size())     = mu0_;
+    x0_.tail(lambda0_.size()) = lambda0_;
     return true;
 };
 
 bool OBCASolver::initializeParameters(const kinematic_model::VehicleParam& vehicle_param) {
-    offset_ = vehicle_param.length() / 2 - vehicle_param.rear_overhang();
+    offset_      = vehicle_param.length() / 2 - vehicle_param.rear_overhang();
+    state_num_   = vehicle_model::KinematicModel::GetStateSize();     // 4: [x, y, theta, v]
+    control_num_ = vehicle_model::KinematicModel::GetControlSize();   // 2: [sigma, a]
     // Initialize the parameters for the OBCA algorithm
     // Set the vehicle parameters
     G_ << 1.0, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, -1.0;
     g_ << vehicle_param.length() / 2, vehicle_param.width() / 2, vehicle_param.length() / 2, vehicle_param.width() / 2;
-
     return true;
 };
 
