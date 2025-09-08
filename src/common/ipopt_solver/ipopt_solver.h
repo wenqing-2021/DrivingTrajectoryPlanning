@@ -26,8 +26,8 @@ class FG_eval {
         return;
     }
 
-    virtual ADvector getCostFunction(const ADvector& x) = 0;
-    virtual ADvector getConstraints(const ADvector& x)  = 0;
+    virtual CppAD::AD<double> getCostFunction(const ADvector& x) = 0;
+    virtual ADvector          getConstraints(const ADvector& x)  = 0;
 
   private:
     std::size_t n_vars_;   // number of variables
@@ -37,11 +37,12 @@ class FG_eval {
 class IpoptSolver {
   public:
     typedef CppAD::vector<double> Dvector;
-    IpoptSolver() { setOptions(); }
+    IpoptSolver(std::string options)
+        : options_(options) {}
     ~IpoptSolver() = default;
 
     bool solve(const Eigen::VectorXd& x0, const Eigen::VectorXd& xl, const Eigen::VectorXd& xu,
-               const Eigen::VectorXd& gl, const Eigen::VectorXd& gu) {
+               const Eigen::VectorXd& gl, const Eigen::VectorXd& gu, FG_eval* fg_eval) {
         // 1. get the objective function
         setInitialValue(x0);
 
@@ -50,11 +51,14 @@ class IpoptSolver {
 
   private:
     Dvector                             x0_;   // initial value of variables
-    std::shared_ptr<FG_eval>            fg_eval_ptr_;
     CppAD::ipopt::solve_result<Dvector> solution_;
+    std::string                         options_;
 
     bool setOptions() { return true; }
-    bool setInitialValue(const Eigen::VectorXd& x0) { return true; }
+    void setInitialValue(const Eigen::VectorXd& x0) {
+        x0_.resize(x0.size());
+        for (std::size_t i = 0; i < x0.size(); ++i) { x0_[i] = x0[i]; }
+    }
     bool setObjective() { return true; }
     bool setConstraints() { return true; }
 

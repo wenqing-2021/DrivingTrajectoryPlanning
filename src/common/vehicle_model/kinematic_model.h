@@ -33,11 +33,9 @@ using sdv_traj = std::vector<VehicleState>;
 
 class KinematicModel {
   public:
-    KinematicModel(const kinematic_model::VehicleParam& vehicle_param);
+    KinematicModel(const kinematic_model::VehicleParam& vehicle_param)
+        : vehicle_param_(vehicle_param){};
     ~KinematicModel() = default;
-
-    void InitState(const kinematic_model::StateVar& state_var);
-    void UpdateState(const kinematic_model::ControlVar& control_var, const double& delta_time);
     const kinematic_model::VehicleParam& GetVehicleParam() const { return vehicle_param_; }
 
   public:
@@ -87,6 +85,34 @@ class KinematicModel {
         }
         return true;
     }
+
+    template<typename StateType>
+    static bool getNextState(const StateType& current_state, const ControlSignal& control_signal,
+                             const kinematic_model::VehicleParam& vehicle_param, const double delta_time,
+                             StateType* next_state) {
+        if (next_state == nullptr) { return false; }
+        // 1. get the current state
+        double x         = current_state.x;
+        double y         = current_state.y;
+        double theta     = current_state.theta;
+        double velocity  = current_state.velocity;
+        double steer_ang = control_signal.steer_angle;
+        double accel     = control_signal.acceleration;
+        // 2. compute the next state using bicycle model
+        double beta          = std::atan(0.5 * std::tan(steer_ang));   // slip angle
+        next_state->x        = x + velocity * std::cos(theta + beta) * delta_time;
+        next_state->y        = y + velocity * std::sin(theta + beta) * delta_time;
+        next_state->theta    = theta + (velocity / vehicle_param.wheel_base()) * std::sin(beta) * delta_time;
+        next_state->velocity = velocity + accel * delta_time;
+        // 3. normalize the theta to [-pi, pi]
+        if (next_state->theta > M_PI) {
+            next_state->theta -= 2 * M_PI;
+        } else if (next_state->theta < -M_PI) {
+            next_state->theta += 2 * M_PI;
+        }
+        return true;
+    }
+
 
   private:
     kinematic_model::VehicleParam vehicle_param_;
