@@ -54,6 +54,14 @@ class OBCAFG_eval : public FG_eval {
   public:
     bool getObstacleBound(const std::shared_ptr<map::Map>& map_ptr);
 
+    bool setConstraintsBound(IpoptSolver::Dvector* xl, IpoptSolver::Dvector* xu, IpoptSolver::Dvector* gl,
+                             IpoptSolver::Dvector* gu);
+
+    bool setPoseConstraintsBound(IpoptSolver::Dvector* lb, IpoptSolver::Dvector* ub);
+    bool setDynamicConstraintsBound(IpoptSolver::Dvector* lb, IpoptSolver::Dvector* ub);
+    bool setControlFeasibleConstraintsBound(IpoptSolver::Dvector* lb, IpoptSolver::Dvector* ub);
+    bool setAvoidanceConstraintsBound(IpoptSolver::Dvector* lb, IpoptSolver::Dvector* ub);
+
     static bool getHyperLane(const common::math::Polygon2d& obstacle, Eigen::MatrixXd& obstacle_A,
                              Eigen::VectorXd& obstacle_b, std::size_t i);
     static bool getRotationMatrix(const CppAD::AD<double> theta, CppMatrixXd& R);
@@ -62,14 +70,10 @@ class OBCAFG_eval : public FG_eval {
                                   const double off_set, CppVecXd& t);
 
   private:
-    bool getPoseConstraints(const FG_eval::ADvector& x, ADvector* constraints, IpoptSolver::Dvector* lb,
-                            IpoptSolver::Dvector* ub);
-    bool getDynamicConstraints(const FG_eval::ADvector& x, FG_eval::ADvector* constraints, IpoptSolver::Dvector* lb,
-                               IpoptSolver::Dvector* ub);
-    bool getControlFeasibleConstraints(const FG_eval::ADvector& x, FG_eval::ADvector* constraints,
-                                       IpoptSolver::Dvector* lb, IpoptSolver::Dvector* ub);
-    bool getAvoidanceConstraints(const FG_eval::ADvector& x, FG_eval::ADvector* constraints, IpoptSolver::Dvector* lb,
-                                 IpoptSolver::Dvector* ub) const;
+    bool setPoseConstraints(const FG_eval::ADvector& x, ADvector* constraints);
+    bool setDynamicConstraints(const FG_eval::ADvector& x, FG_eval::ADvector* constraints);
+    bool setControlFeasibleConstraints(const FG_eval::ADvector& x, FG_eval::ADvector* constraints);
+    bool setAvoidanceConstraints(const FG_eval::ADvector& x, FG_eval::ADvector* constraints);
 
     std::shared_ptr<Eigen::VectorXd>               ref_X_ptr_;
     std::size_t                                    N_;             // number of discretization steps
