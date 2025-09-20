@@ -2,6 +2,7 @@
 #include "admm/admm_planner.h"
 #include "base_check.h"
 #include "hybrid_a_star/hybrid_a_star.h"
+#include "obca/obca_planner.h"
 #include "speed_planner/piece_wise_jerk.h"
 
 #include <string>
@@ -9,6 +10,7 @@
 namespace planning {
 using pwjspeed = backend::PiecewiseJerkSpeedOptimizer;
 using admmopt  = backend::ADMMSolver;
+using obcaopt  = backend::OBCASolver;
 class TrajPlanner {
   public:
     TrajPlanner(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr,
@@ -30,7 +32,8 @@ class TrajPlanner {
     std::unique_ptr<frontend::HybridAstar>         hybrid_astar_ptr_;   // pointer to the hybrid A* planner
     std::unique_ptr<pwjspeed>                      pwj_speed_ptr_;
     std::unique_ptr<admmopt>                       admm_solver_ptr_;   // pointer to the ADMM solver
-    std::shared_ptr<kinematic_model::VehicleParam> vehicle_param_ptr_;
+    std::unique_ptr<obcaopt>                       obca_solver_ptr_;   // pointer to the OBCA solver
+    std::shared_ptr<vehicle_model::KinematicModel> vehicle_model_ptr_;
     std::vector<Eigen::Vector3d>                   debug_node_list_;
     double                                         frontend_path_length_{0.0};
     vehicle_model::opt_status                      init_states_;

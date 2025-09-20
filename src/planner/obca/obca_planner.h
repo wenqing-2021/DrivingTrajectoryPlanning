@@ -16,8 +16,8 @@ enum VariableIndex
     Y,
     THETA,
     V,
-    STEER_ANGLE,
     ACCELERATION,
+    STEER_ANGLE,
     MU,       // slack variable for collision avoidance
     LAMBDA,   // slack variable for dynamic feasibility
 };
@@ -97,7 +97,7 @@ class OBCAFG_eval : public FG_eval {
 class OBCASolver : public IpoptSolver {
     /*
     Solve the optimization problem using the Optimization-Based Collision Avoidance.
-    The control u = [\sigma, a] is the control input, where \sigma is the steering angle and a is the acceleration.
+    The control u = [a, \sigma] is the control input, where \sigma is the steering angle and a is the acceleration.
     The state x = [x, y, \theta, v] is the state of the vehicle, where x and y are the position coordinates,
     \theta is the heading angle, and v is the velocity.
     */
@@ -112,7 +112,7 @@ class OBCASolver : public IpoptSolver {
         map_ptr_           = map_ptr;
         dynamic_model_ptr_ = dynamic_model_ptr;
         state_num_         = vehicle_model::KinematicModel::GetStateSize();     // 4: [x, y, theta, v]
-        control_num_       = vehicle_model::KinematicModel::GetControlSize();   // 2: [sigma, a]
+        control_num_       = vehicle_model::KinematicModel::GetControlSize();   // 2: [a, sigma]
         fg_eval_           = OBCAFG_eval();
     };
     ~OBCASolver() = default;
@@ -126,6 +126,7 @@ class OBCASolver : public IpoptSolver {
     bool setInitVariable(const vehicle_model::sdv_path& init_path, OBCAFG_eval* fg_eval, Dvector* init_variables,
                          std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
                          std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr);
+    bool setResult(const CppAD::ipopt::solve_result<Dvector>& solution);
 
 
     constexpr static double      kEpsilon            = 1e-5;

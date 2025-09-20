@@ -18,4 +18,4 @@ set_property(TARGET Planner PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Include directories for headers
 target_include_directories(Planner PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(Planner PUBLIC ${UTILS_LIBRARIES} HybridAStar PiecewiseJerkSpeedOptimizer ADMMSolver)
+target_link_libraries(Planner PUBLIC ${UTILS_LIBRARIES} HybridAStar PiecewiseJerkSpeedOptimizer ADMMSolver OBCASolver)

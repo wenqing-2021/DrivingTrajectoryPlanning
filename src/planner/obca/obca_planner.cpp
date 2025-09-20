@@ -41,16 +41,41 @@ bool OBCASolver::Process(const vehicle_model::sdv_path&               init_path,
         return false;
     }
 
+    // 5. store the result
+
+
     return true;
 };
+
+bool OBCASolver::setResult(const CppAD::ipopt::solve_result<Dvector>& solution) {
+    states_result_.clear();
+    controls_result_.clear();
+
+    std::size_t N = N_;
+    for (std::size_t i = 0; i < N; ++i) {
+        Eigen::Vector4d state;
+        state(0) = solution.x[i * (state_num_ + control_num_) + VariableIndex::X];
+        state(1) = solution.x[i * (state_num_ + control_num_) + VariableIndex::Y];
+        state(2) = solution.x[i * (state_num_ + control_num_) + VariableIndex::THETA];
+        state(3) = solution.x[i * (state_num_ + control_num_) + VariableIndex::V];
+        states_result_.emplace_back(state);
+        if (i < N - 1) {
+            Eigen::Vector2d control;
+            control(0) = solution.x[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION];
+            control(1) = solution.x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE];
+            controls_result_.emplace_back(control);
+        }
+    }
+
+
+    return true;
+}
 
 bool OBCASolver::setInitVariable(const vehicle_model::sdv_path& init_path, OBCAFG_eval* fg_eval,
                                  Dvector* init_variables, std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
                                  std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr) {
     // 1. Set the initial variables for the optimization problem.
     // NOTE: initial path including the start pose and the goal pose
-    states_result_.clear();
-    controls_result_.clear();
     N_ = init_path.size();
     x0_.resize(N_ * (state_num_ + control_num_));
     for (std::size_t i = 0; i < N_; ++i) {
@@ -165,6 +190,11 @@ CppAD::AD<double> OBCAFG_eval::getCostFunction(const ADvector& x) {
 
 bool OBCAFG_eval::setConstraintsBound(IpoptSolver::Dvector* xl, IpoptSolver::Dvector* xu, IpoptSolver::Dvector* gl,
                                       IpoptSolver::Dvector* gu) {
+    auto _build_bound = [](IpoptSolver::Dvector* target, IpoptSolver::Dvector* source) {
+        std::size_t size = source->size();
+        target->resize(size);
+        for (std::size_t i = 0; i < size; ++i) { (*target)[i] = (*source)[i]; }
+    };
     // 1. set pose constraint
     IpoptSolver::Dvector pose_gl, pose_gu;
     setPoseConstraintsBound(&pose_gl, &pose_gu);
@@ -180,6 +210,17 @@ bool OBCAFG_eval::setConstraintsBound(IpoptSolver::Dvector* xl, IpoptSolver::Dve
     // 4. avoidance constraint
     IpoptSolver::Dvector avoidanc_gl, avoidanc_gu;
     setAvoidanceConstraintsBound(&avoidanc_gl, &avoidanc_gu);
+
+    // 5. build the bound
+    pose_gl.push_vector(dynamic_gl);
+    pose_gl.push_vector(avoidanc_gl);
+    pose_gu.push_vector(dynamic_gu);
+    pose_gu.push_vector(avoidanc_gu);
+
+    _build_bound(xl, &control_xl);
+    _build_bound(xu, &control_xu);
+    _build_bound(gl, &pose_gl);
+    _build_bound(gu, &pose_gu);
 
     return true;
 }
@@ -255,6 +296,8 @@ bool OBCAFG_eval::setPoseConstraintsBound(IpoptSolver::Dvector* lb, IpoptSolver:
             (*ub)[i] = kThetaTol;
         }
     }
+
+    return true;
 }
 
 bool OBCAFG_eval::setDynamicConstraints(const FG_eval::ADvector& x, FG_eval::ADvector* constraints) {
@@ -290,6 +333,8 @@ bool OBCAFG_eval::setDynamicConstraints(const FG_eval::ADvector& x, FG_eval::ADv
         (*constraints)[i * state_num_ + VariableIndex::THETA] = f_theta;
         (*constraints)[i * state_num_ + VariableIndex::V]     = f_v;
     }
+
+    return true;
 }
 
 bool OBCAFG_eval::setDynamicConstraintsBound(IpoptSolver::Dvector* lb, IpoptSolver::Dvector* ub) {
@@ -401,9 +446,10 @@ bool OBCAFG_eval::setAvoidanceConstraints(const FG_eval::ADvector& x, FG_eval::A
             CppVecXd    mu_j             = variable_x.segment(mu_start_idx, kVehicleBoundaryNum);
             CppMatrixXd A = cpp_obstacle_A.block(obstacle_a_start, 0, obstacle_pts_num, obstacle_A_.cols());
             CppVecXd    b = cpp_obstacle_b.segment(obstacle_a_start, obstacle_pts_num);
-            (*constraints)[constraint_idx]     = (lambd_j.transpose() * (A * move_matrix - b) - mu_j.transpose() * g_);
-            (*constraints)[constraint_idx + 1] = mu_j.transpose() * G_ + lambd_j.transpose() * A * rotation_matrix;
-            (*constraints)[constraint_idx + 2] = (A.transpose() * lambd_j) * ((A.transpose() * lambd_j)).transpose();
+            (*constraints)[constraint_idx] = (lambd_j.transpose() * (A * move_matrix - b) - mu_j.transpose() * g_)(0);
+            (*constraints)[constraint_idx + 1] = (mu_j.transpose() * G_ + lambd_j.transpose() * A * rotation_matrix)(0);
+            (*constraints)[constraint_idx + 2] =
+                ((A.transpose() * lambd_j) * ((A.transpose() * lambd_j)).transpose())(0);
 
 
             constraint_idx += 1;

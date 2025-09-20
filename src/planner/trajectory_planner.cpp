@@ -8,9 +8,26 @@ TrajPlanner::TrajPlanner(const params::SolverParams& solver_params, const std::s
     // Constructor
     hybrid_astar_ptr_ =
         std::make_unique<frontend::HybridAstar>(solver_params.hybrid_a_star_param(), map_ptr, collision_checker);
-    pwj_speed_ptr_     = std::make_unique<pwjspeed>(solver_params.piesewise_jerk_params());
-    admm_solver_ptr_   = std::make_unique<admmopt>();
-    vehicle_param_ptr_ = std::make_shared<kinematic_model::VehicleParam>(vehicle_param);
+    pwj_speed_ptr_   = std::make_unique<pwjspeed>(solver_params.piesewise_jerk_params());
+    admm_solver_ptr_ = std::make_unique<admmopt>();
+    // options
+    std::string options;
+    // turn off any printing
+    options += "Integer print_level  0\n";
+    options += "String sb            yes\n";
+    // maximum iterations
+    options += "Integer max_iter     10\n";
+    // approximate accuracy in first order necessary conditions;
+    // see Mathematical Programming, Volume 106, Number 1,
+    // Pages 25-57, Equation (6)
+    options += "Numeric tol          1e-6\n";
+    // derivative tesing
+    options += "String derivative_test   second-order\n";
+    // maximum amount of random pertubation; e.g.,
+    // when evaluation finite diff
+    options += "Numeric point_perturbation_radius   0.\n";
+    vehicle_model_ptr_ = std::make_shared<vehicle_model::KinematicModel>(vehicle_param);
+    obca_solver_ptr_   = std::make_unique<obcaopt>(options, vehicle_model_ptr_, map_ptr);
 };
 
 bool TrajPlanner::Process(const vehicle_model::VehiclePose& start_vec, const vehicle_model::VehiclePose& goal_vec) {
@@ -26,7 +43,7 @@ bool TrajPlanner::Process(const vehicle_model::VehiclePose& start_vec, const veh
         return false;
     }
 
-    // 2. backend speed plan
+    // 2. backend pwj speed plan
     LOG(INFO) << "Start to optimize the speed profile...";
     const std::vector<Eigen::Vector3d>* const frontend_path = hybrid_astar_ptr_->GetPath();
     if (pwj_speed_ptr_->Optimize(*frontend_path, start_vec)) {
@@ -41,17 +58,8 @@ bool TrajPlanner::Process(const vehicle_model::VehiclePose& start_vec, const veh
     if (!setStatusControls(frontend_path, pwj_speed_ptr_->GetResult())) { return false; }
     LOG(INFO) << "The init trajectory status and controls have been set...";
 
-    // 4. solve the trajectory optimization problem with ADMM
-    LOG(INFO) << "Start to solve the trajectory optimization problem with ADMM...";
-    if (admm_solver_ptr_->Solve()) {
-        LOG(INFO) << "The trajectory optimization problem has been solved successfully...";
-    } else {
-        LOG(WARNING) << "Failed to solve the trajectory optimization problem...";
-        return false;
-    }
-    auto final_states   = admm_solver_ptr_->GetStatesResult();
-    auto final_controls = admm_solver_ptr_->GetControlsResult();
-    LOG(INFO) << "The final trajectory size is: " << final_states.size();
+    // 4. solve the trajectory optimization problem with OBCA
+    LOG(INFO) << "Start to optimize the trajectory with OBCA...";
 
     return true;
 };
@@ -78,7 +86,7 @@ bool TrajPlanner::setStatusControls(const std::vector<Eigen::Vector3d>* const in
 
     // 2. set the init controls using the forward difference
     const double dt = pwj_speed_ptr_->GetDt();
-    const double L  = vehicle_param_ptr_->length();
+    const double L  = vehicle_model_ptr_->GetVehicleParam().length();
     for (std::size_t i = 0; i < init_path_ptr->size() - 1; ++i) {
         init_controls_(i, 0) = ((*init_traj_ptr)[i + 1].z() - (*init_traj_ptr)[i].z()) / dt;   // a
         // compute steer angle

@@ -21,6 +21,7 @@ target_include_directories(Common PUBLIC
 target_link_libraries(Common PUBLIC
     Eigen3::Eigen
     OsqpEigen::OsqpEigen
+    ipopt
     ProtoLib
     Logger
 )
