@@ -69,3 +69,4 @@ target_link_libraries(DEBUG_SOLVER PUBLIC Solver)
 
 add_subdirectory(src/test/collision_check)
 add_subdirectory(src/test/cpp_ad)
+add_subdirectory(src/test/obca)

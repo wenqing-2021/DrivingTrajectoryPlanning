@@ -55,6 +55,27 @@
                     "ignoreFailures": true
                 }
             ],
+        },
+        {
+            "name": "C++: OBCA Planner Test",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/src/test/obca/test_obca_main",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build",
+            "postDebugTask": "visualize_obca_result"
         }
     ]
 }

@@ -31,17 +31,23 @@ bool OBCASolver::Process(const vehicle_model::sdv_path&               init_path,
     Dvector xl, xu, gl, gu;
     fg_eval_.setConstraintsBound(&xl, &xu, &gl, &gu);
 
+    // 4.check the variable num is aligned with the constraint num
+    if (init_variables.size() != xl.size() || init_variables.size() != xu.size()) {
+        LOG(WARNING) << "The variable size is not aligned with the constraint size.";
+        return false;
+    }
     CppAD::ipopt::solve_result<Dvector> solution;   // solution
     CppAD::ipopt::solve<Dvector, FG_eval>(
         this->getOptions(), init_variables, xl, xu, gl, gu, fg_eval_, solution);   // solve the problem
 
-    // 4. get the result
+    // 5. get the result
     if (solution.status != CppAD::ipopt::solve_result<Dvector>::success) {
         LOG(WARNING) << "The solver failed to find a solution.";
+        LOG(WARNING) << "Solver status: " << solution.status;
         return false;
     }
 
-    // 5. store the result
+    // 6. store the result
 
 
     return true;
@@ -99,8 +105,10 @@ bool OBCASolver::setInitVariable(const vehicle_model::sdv_path& init_path, OBCAF
     std::size_t obstacle_num_pts = 0;
     for (const auto& obs : obs_list) { obstacle_num_pts += obs.num_points(); }
     // 2.2 set the dual variables
-    Eigen::VectorXd lambda0_(obstacle_num_pts * N_);
-    Eigen::VectorXd mu0_(obstacle_num * N_ * kVehicleBoundaryNum);
+    std::size_t     lambda_num = obstacle_num_pts * N_;
+    std::size_t     mu_num     = obstacle_num * N_ * kVehicleBoundaryNum;
+    Eigen::VectorXd lambda0_(lambda_num);
+    Eigen::VectorXd mu0_(mu_num);
     mu0_.setOnes();
     mu0_ *= 0.1;
     lambda0_.setOnes();
@@ -110,7 +118,8 @@ bool OBCASolver::setInitVariable(const vehicle_model::sdv_path& init_path, OBCAF
     x0_.tail(lambda0_.size()) = lambda0_;
     x0_.tail(mu0_.size())     = mu0_;
     auto x0_ptr               = std::make_shared<Eigen::VectorXd>(x0_);
-    fg_eval->setInitParameters(x0_ptr, N_, state_num_, control_num_, dynamic_model_ptr_, start_pose_ptr, goal_pose_ptr);
+    fg_eval->setInitParameters(
+        x0_ptr, N_, state_num_, control_num_, lambda_num, mu_num, dynamic_model_ptr_, start_pose_ptr, goal_pose_ptr);
     for (std::size_t i = 0; i < x0_.size(); ++i) { init_variables->push_back(x0_[i]); }
 
     return true;
@@ -371,10 +380,10 @@ bool OBCAFG_eval::setControlFeasibleConstraints(const FG_eval::ADvector& x, FG_e
 }
 
 bool OBCAFG_eval::setControlFeasibleConstraintsBound(IpoptSolver::Dvector* lb, IpoptSolver::Dvector* ub) {
-    lb->resize(N_ * (state_num_ + control_num_));
-    ub->resize(N_ * (state_num_ + control_num_));
-    lb->resize(N_ * (state_num_ + control_num_));
-    ub->resize(N_ * (state_num_ + control_num_));
+    lb->resize(N_ * (state_num_ + control_num_) + lambda_num_ + mu_num_);
+    ub->resize(N_ * (state_num_ + control_num_) + lambda_num_ + mu_num_);
+    lb->resize(N_ * (state_num_ + control_num_) + lambda_num_ + mu_num_);
+    ub->resize(N_ * (state_num_ + control_num_) + lambda_num_ + mu_num_);
     auto build_ineq_bound = [&lb, &ub](std::size_t idx, double lower, double upper) {
         (*lb)[idx] = lower;
         (*ub)[idx] = upper;
@@ -399,6 +408,10 @@ bool OBCAFG_eval::setControlFeasibleConstraintsBound(IpoptSolver::Dvector* lb, I
         }
     }
 
+    for (std::size_t i = N_ * (state_num_ + control_num_); i < lb->size(); ++i) {
+        (*lb)[i] = 0.0;
+        (*ub)[i] = kMaxValue;
+    }
 
     return true;
 }

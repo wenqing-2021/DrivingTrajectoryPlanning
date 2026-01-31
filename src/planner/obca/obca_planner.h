@@ -30,6 +30,7 @@ class OBCAFG_eval : public FG_eval {
     ADvector          getConstraints(const ADvector& x) override;
     inline const void setInitParameters(std::shared_ptr<Eigen::VectorXd>& ref_X_ptr, const std::size_t N,
                                         const std::size_t state_num, const std::size_t control_num,
+                                        const std::size_t lambda_num, const std::size_t mu_num,
                                         std::shared_ptr<vehicle_model::KinematicModel>& dynamic_model_ptr,
                                         std::shared_ptr<vehicle_model::VehiclePose>&    start_pose,
                                         std::shared_ptr<vehicle_model::VehiclePose>&    goal_pose) {
@@ -37,6 +38,8 @@ class OBCAFG_eval : public FG_eval {
         N_                 = N;
         state_num_         = state_num;
         control_num_       = control_num;
+        lambda_num_        = lambda_num;
+        mu_num_            = mu_num;
         start_pose_ptr_    = start_pose;
         goal_pose_ptr_     = goal_pose;
         dynamic_model_ptr_ = dynamic_model_ptr;
@@ -79,6 +82,8 @@ class OBCAFG_eval : public FG_eval {
     std::size_t                                    N_;             // number of discretization steps
     std::size_t                                    state_num_;     // number of states
     std::size_t                                    control_num_;   // number of controls
+    std::size_t                                    lambda_num_ = 0;
+    std::size_t                                    mu_num_     = 0;
     std::vector<std::size_t>                       obstable_bound_num_vec_;
     std::shared_ptr<vehicle_model::KinematicModel> dynamic_model_ptr_;
     std::shared_ptr<vehicle_model::VehiclePose>    start_pose_ptr_;
