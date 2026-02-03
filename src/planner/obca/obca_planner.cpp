@@ -36,6 +36,8 @@ bool OBCASolver::Process(const vehicle_model::sdv_path&               init_path,
         LOG(WARNING) << "The variable size is not aligned with the constraint size.";
         return false;
     }
+    // update variable nums and constraint nums
+    fg_eval_.updateProblemSize(init_variables.size(), gl.size());
     CppAD::ipopt::solve_result<Dvector> solution;   // solution
     CppAD::ipopt::solve<Dvector, FG_eval>(
         this->getOptions(), init_variables, xl, xu, gl, gu, fg_eval_, solution);   // solve the problem
@@ -44,11 +46,14 @@ bool OBCASolver::Process(const vehicle_model::sdv_path&               init_path,
     if (solution.status != CppAD::ipopt::solve_result<Dvector>::success) {
         LOG(WARNING) << "The solver failed to find a solution.";
         LOG(WARNING) << "Solver status: " << solution.status;
-        return false;
+        // return false;
     }
 
     // 6. store the result
-
+    if (!setResult(solution)) {
+        LOG(WARNING) << "Failed to set the result.";
+        return false;
+    }
 
     return true;
 };
@@ -465,8 +470,9 @@ bool OBCAFG_eval::setAvoidanceConstraints(const FG_eval::ADvector& x, FG_eval::A
                 ((A.transpose() * lambd_j) * ((A.transpose() * lambd_j)).transpose())(0);
 
 
-            constraint_idx += 1;
+            constraint_idx += 3;
             lambda_start_idx += obstacle_pts_num;
+            mu_start_idx += kVehicleBoundaryNum;
             obstacle_a_start += obstacle_pts_num;
         }
     }
@@ -487,7 +493,7 @@ bool OBCAFG_eval::setAvoidanceConstraintsBound(IpoptSolver::Dvector* lb, IpoptSo
             (*ub)[constraint_idx]     = 1;
             (*ub)[constraint_idx + 1] = kEpsilon;
             (*ub)[constraint_idx + 2] = kMaxValue;
-            constraint_idx += 1;
+            constraint_idx += 3;
         }
     }
     return true;

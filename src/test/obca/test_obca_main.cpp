@@ -16,7 +16,7 @@
 using namespace planning;
 
 // Helper function to save vector to CSV
-void SaveVectorToCSV(const std::string& filename, const std::vector<Eigen::Vector2d>& data, const std::string& header) {
+void SaveVectorToCSV(const std::string& filename, const std::vector<Eigen::Vector3d>& data, const std::string& header) {
     std::ofstream file(filename);
     if (!file.is_open()) {
         LOG(ERROR) << "Failed to open file: " << filename;
@@ -25,7 +25,7 @@ void SaveVectorToCSV(const std::string& filename, const std::vector<Eigen::Vecto
 
     file << header << "\n";
     for (const auto& point : data) {
-        file << std::fixed << std::setprecision(6) << point(0) << "," << point(1) << "\n";
+        file << std::fixed << std::setprecision(6) << point(0) << "," << point(1) << "," << point(2) << "\n";
     }
     file.close();
     LOG(INFO) << "Saved " << data.size() << " points to " << filename;
@@ -99,8 +99,8 @@ int main() {
 
         // Create vehicle parameters
         kinematic_model::VehicleParam vehicle_param;
-        vehicle_param.set_length(2.0);            // 2.0 m
-        vehicle_param.set_width(1.0);             // 1.0 m
+        vehicle_param.set_length(5.0);            // 2.0 m
+        vehicle_param.set_width(2.0);             // 1.0 m
         vehicle_param.set_wheel_base(1.2);        // 1.2 m
         vehicle_param.set_max_steer_angle(0.5);   // 0.5 rad
         vehicle_param.set_max_acc(2.0);           // 2.0 m/s^2
@@ -126,7 +126,7 @@ int main() {
 
         // Set goal state (end at right)
         kinematic_model::StateVar* goal_state = plan_problem.mutable_goal_state();
-        goal_state->set_x(10.0);
+        goal_state->set_x(30.0);
         goal_state->set_y(0.0);
         goal_state->set_theta(0.0);
         goal_state->set_v(0.0);
@@ -137,40 +137,41 @@ int main() {
         // Set vehicle parameters
         *plan_problem.mutable_vehicle_param() = vehicle_param;
 
-        // Create a square obstacle in the middle of the path
-        // Square with corners at (4, -0.5) to (6, 0.5)
+        // Create a square obstacle above the path
+        // Square with corners at (4, 0.5) to (6, 1.5)
+        // Initial path (y=0) doesn't pass through it, but vehicle body (width=2m) will collide
         problem::Polygon* obs_polygon = plan_problem.add_obstacle_list();
         obs_polygon->set_vertex_num(4);
 
         // Bottom-left
         cost_map::Pos2D* vertex1 = obs_polygon->add_vertex_pts();
         vertex1->set_x(4.0);
-        vertex1->set_y(-0.5);
+        vertex1->set_y(0.5);
 
         // Bottom-right
         cost_map::Pos2D* vertex2 = obs_polygon->add_vertex_pts();
         vertex2->set_x(6.0);
-        vertex2->set_y(-0.5);
+        vertex2->set_y(0.5);
 
         // Top-right
         cost_map::Pos2D* vertex3 = obs_polygon->add_vertex_pts();
         vertex3->set_x(6.0);
-        vertex3->set_y(0.5);
+        vertex3->set_y(1.5);
 
         // Top-left
         cost_map::Pos2D* vertex4 = obs_polygon->add_vertex_pts();
         vertex4->set_x(4.0);
-        vertex4->set_y(0.5);
+        vertex4->set_y(1.5);
 
         plan_problem.set_obstacle_num(1);
-        LOG(INFO) << "Obstacle created: Square from (4, -0.5) to (6, 0.5)";
+        LOG(INFO) << "Obstacle created: Square from (4, 0.5) to (6, 1.5)";
 
         // Set map bounds
         problem::MapBound* map_bound = plan_problem.mutable_map_bound();
         map_bound->set_min_x(-1.0);
-        map_bound->set_max_x(11.0);
+        map_bound->set_max_x(31.0);
         map_bound->set_min_y(-2.0);
-        map_bound->set_max_y(2.0);
+        map_bound->set_max_y(3.0);
 
         // Create map
         double map_resolution = 0.1;
@@ -182,10 +183,10 @@ int main() {
             LOG(INFO) << "Saving initial problem data...";
 
             // Save start and goal positions
-            std::vector<Eigen::Vector2d> start_goal;
-            start_goal.push_back(Eigen::Vector2d(init_state->x(), init_state->y()));
-            start_goal.push_back(Eigen::Vector2d(goal_state->x(), goal_state->y()));
-            SaveVectorToCSV("/tmp/obca_test_results/start_goal.csv", start_goal, "x,y");
+            std::vector<Eigen::Vector3d> start_goal;
+            start_goal.push_back(Eigen::Vector3d(init_state->x(), init_state->y(), init_state->theta()));
+            start_goal.push_back(Eigen::Vector3d(goal_state->x(), goal_state->y(), goal_state->theta()));
+            SaveVectorToCSV("/tmp/obca_test_results/start_goal.csv", start_goal, "x,y,theta");
 
             // Save obstacles
             const auto& obs_list = map_ptr->GetObsList();
@@ -199,8 +200,8 @@ int main() {
         LOG(INFO) << "Creating initial path...";
         vehicle_model::sdv_path init_path;
 
-        // Generate initial path: 11 waypoints from (0, 0) to (10, 0)
-        for (int i = 0; i <= 10; ++i) {
+        // Generate initial path: 31 waypoints from (0, 0) to (30, 0)
+        for (int i = 0; i <= 30; ++i) {
             vehicle_model::VehiclePose pose;
             pose.x     = i * 1.0;
             pose.y     = 0.0;
@@ -211,9 +212,11 @@ int main() {
 
         // Save initial path
         {
-            std::vector<Eigen::Vector2d> init_path_points;
-            for (const auto& pose : init_path) { init_path_points.push_back(Eigen::Vector2d(pose.x, pose.y)); }
-            SaveVectorToCSV("/tmp/obca_test_results/initial_path.csv", init_path_points, "x,y");
+            std::vector<Eigen::Vector3d> init_path_points;
+            for (const auto& pose : init_path) {
+                init_path_points.push_back(Eigen::Vector3d(pose.x, pose.y, pose.theta));
+            }
+            SaveVectorToCSV("/tmp/obca_test_results/initial_path.csv", init_path_points, "x,y,theta");
         }
 
         // Create start and goal poses
@@ -223,7 +226,7 @@ int main() {
         start_pose_ptr->theta = 0.0;
 
         auto goal_pose_ptr   = std::make_shared<vehicle_model::VehiclePose>();
-        goal_pose_ptr->x     = 10.0;
+        goal_pose_ptr->x     = 30.0;
         goal_pose_ptr->y     = 0.0;
         goal_pose_ptr->theta = 0.0;
 
@@ -231,11 +234,11 @@ int main() {
         LOG(INFO) << "Configuring IPOPT solver...";
 
         std::string ipopt_options;
-        ipopt_options += "Integer print_level         0\n";
+        // ipopt_options += "Integer print_level         5\n";
         ipopt_options += "String  sb                  yes\n";
         ipopt_options += "Integer max_iter            100\n";
         ipopt_options += "Numeric tol                 1e-6\n";
-        ipopt_options += "Numeric max_cpu_time        10.0\n";
+        ipopt_options += "Numeric max_cpu_time        120.0\n";
 
         LOG(INFO) << "IPOPT configured";
 
@@ -277,7 +280,7 @@ int main() {
 
         // Check the final state is close to the goal
         const auto& final_state = states.back();
-        double      x_error     = std::abs(final_state(0) - 10.0);
+        double      x_error     = std::abs(final_state(0) - 30.0);
         double      y_error     = std::abs(final_state(1) - 0.0);
 
         LOG(INFO) << "Final position error: dx=" << x_error << "m, dy=" << y_error << "m";

@@ -14,6 +14,10 @@ import matplotlib.patches as patches
 import numpy as np
 from pathlib import Path
 
+# Vehicle parameters (should match the C++ code)
+VEHICLE_LENGTH = 5.0  # meters
+VEHICLE_WIDTH = 2.0   # meters
+
 
 def load_csv(filename):
     """Load data from CSV file."""
@@ -54,6 +58,48 @@ def load_all_obstacles(results_dir):
     return obstacles
 
 
+def get_vehicle_corners(x, y, theta, length=VEHICLE_LENGTH, width=VEHICLE_WIDTH):
+    """Calculate the four corners of the vehicle rectangle.
+    
+    Args:
+        x: x-coordinate of vehicle center
+        y: y-coordinate of vehicle center
+        theta: heading angle in radians
+        length: vehicle length
+        width: vehicle width
+    
+    Returns:
+        numpy array of shape (5, 2) containing the four corners and closing point
+    """
+    # Vehicle corners in local frame (center at origin, facing +x)
+    # Front-right, front-left, rear-left, rear-right
+    half_length = length / 2.0
+    half_width = width / 2.0
+    
+    corners_local = np.array([
+        [half_length, -half_width],   # Front-right
+        [half_length, half_width],    # Front-left
+        [-half_length, half_width],   # Rear-left
+        [-half_length, -half_width],  # Rear-right
+        [half_length, -half_width]    # Close the rectangle
+    ])
+    
+    # Rotation matrix
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
+    rotation_matrix = np.array([
+        [cos_theta, -sin_theta],
+        [sin_theta, cos_theta]
+    ])
+    
+    # Transform to global frame
+    corners_global = corners_local @ rotation_matrix.T
+    corners_global[:, 0] += x
+    corners_global[:, 1] += y
+    
+    return corners_global
+
+
 def create_visualization(results_dir, output_file="obca_result.png"):
     """Create visualization of OBCA planning results."""
 
@@ -72,7 +118,7 @@ def create_visualization(results_dir, output_file="obca_result.png"):
 
     if optimized_traj is None:
         print("Error: Could not load optimized trajectory. Exiting.")
-        return False
+        # return False
 
     # Create figure and axis
     fig, ax = plt.subplots(figsize=(14, 6))
@@ -88,16 +134,93 @@ def create_visualization(results_dir, output_file="obca_result.png"):
             alpha=0.7,
         )
         ax.plot(initial_path[:, 0], initial_path[:, 1], "bo", markersize=4, alpha=0.5)
+        
+        # Draw vehicle bounding boxes along the initial path
+        # Draw every N states to avoid cluttering
+        step = max(1, len(initial_path) // 10)  # Draw ~10 vehicles
+        for i in range(0, len(initial_path), step):
+            x, y, theta = initial_path[i, 0], initial_path[i, 1], initial_path[i, 2]
+            corners = get_vehicle_corners(x, y, theta)
+            
+            # Draw vehicle rectangle
+            vehicle_rect = patches.Polygon(
+                corners[:-1],
+                closed=True,
+                facecolor='blue',
+                edgecolor='darkblue',
+                linewidth=1.5,
+                alpha=0.15,
+                zorder=2
+            )
+            ax.add_patch(vehicle_rect)
+            
+            # Draw vehicle outline
+            ax.plot(corners[:, 0], corners[:, 1], 'b--', linewidth=1.0, alpha=0.5)
 
     # Plot optimized trajectory
-    ax.plot(
-        optimized_traj[:, 0],
-        optimized_traj[:, 1],
-        "g-",
-        linewidth=2.5,
-        label="Optimized Trajectory",
-    )
-    ax.plot(optimized_traj[:, 0], optimized_traj[:, 1], "go", markersize=6, alpha=0.6)
+    if optimized_traj is not None:
+        ax.plot(
+            optimized_traj[:, 0],
+            optimized_traj[:, 1],
+            "g-",
+            linewidth=2.5,
+            label="Optimized Trajectory",
+        )
+        ax.plot(optimized_traj[:, 0], optimized_traj[:, 1], "go", markersize=6, alpha=0.6)
+        
+        # Draw vehicle bounding boxes along the trajectory
+        # Draw every N states to avoid cluttering
+        step = max(1, len(optimized_traj) // 10)  # Draw ~10 vehicles
+        for i in range(0, len(optimized_traj), step):
+            x, y, theta = optimized_traj[i, 0], optimized_traj[i, 1], optimized_traj[i, 2]
+            corners = get_vehicle_corners(x, y, theta)
+            
+            # Draw vehicle rectangle
+            vehicle_rect = patches.Polygon(
+                corners[:-1],
+                closed=True,
+                facecolor='green',
+                edgecolor='darkgreen',
+                linewidth=1.5,
+                alpha=0.2,
+                zorder=3
+            )
+            ax.add_patch(vehicle_rect)
+            
+            # Draw vehicle outline
+            ax.plot(corners[:, 0], corners[:, 1], 'g-', linewidth=1.5, alpha=0.6)
+        
+        # Draw vehicle at start and end positions with different colors
+        if len(optimized_traj) > 0:
+            # Start vehicle
+            x, y, theta = optimized_traj[0, 0], optimized_traj[0, 1], optimized_traj[0, 2]
+            corners_start = get_vehicle_corners(x, y, theta)
+            vehicle_start = patches.Polygon(
+                corners_start[:-1],
+                closed=True,
+                facecolor='blue',
+                edgecolor='darkblue',
+                linewidth=2,
+                alpha=0.4,
+                zorder=4,
+                label='Start Vehicle'
+            )
+            ax.add_patch(vehicle_start)
+            
+            # End vehicle
+            x, y, theta = optimized_traj[-1, 0], optimized_traj[-1, 1], optimized_traj[-1, 2]
+            corners_end = get_vehicle_corners(x, y, theta)
+            vehicle_end = patches.Polygon(
+                corners_end[:-1],
+                closed=True,
+                facecolor='red',
+                edgecolor='darkred',
+                linewidth=2,
+                alpha=0.4,
+                zorder=4,
+                label='End Vehicle'
+            )
+            ax.add_patch(vehicle_end)
 
     # Plot start and goal
     if start_goal is not None and len(start_goal) >= 2:

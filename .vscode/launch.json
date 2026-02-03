@@ -75,7 +75,6 @@
                 }
             ],
             "preLaunchTask": "build",
-            "postDebugTask": "visualize_obca_result"
         }
     ]
 }

@@ -97,8 +97,6 @@ class IpoptSolver {
     }
     bool setObjective() { return true; }
     bool setConstraints() { return true; }
-
-  private:
 };
 }   // namespace backend
 }   // namespace planning
