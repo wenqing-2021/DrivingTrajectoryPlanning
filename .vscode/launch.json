@@ -19,6 +19,16 @@
             ],
         },
         {
+            "name": "Python Debugger: Current",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "--install"
+            ],
+        },
+        {
             "name": "C++ Debugger: Main",
             "type": "cppdbg",
             "request": "launch",

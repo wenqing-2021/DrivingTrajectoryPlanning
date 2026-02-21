@@ -47,7 +47,7 @@ fi
 protoc_path=$(which protoc)
 if [[ $protoc_path == "" ]]; then
     echo "start installing protobuf"
-    cd /workspace
+    cd ~/workspace
     apt-get install autoconf automake libtool -y
     git clone https://gitee.com/mirrors/protobufsource.git protobuf
     cd protobuf
@@ -64,15 +64,10 @@ else
 fi
 
 # install gtest
-cd /workspace
-if [ -d "googletest" ]; then
-    echo "googletest exists."
-else
-    git clone https://github.com/google/googletest.git && cd googletest &&
-    git checkout release-1.12.1 && mkdir build && cd build &&
-    cmake .. && make && make install
-fi
-
+cd ~/workspace
+git clone https://github.com/google/googletest.git && cd googletest &&
+git checkout release-1.12.1 && mkdir build && cd build &&
+cmake .. && make && make install
 
 # # install MPI
 mpicc_path=$(which mpicc)
@@ -107,44 +102,6 @@ else
     echo "has installed sklearn"
 fi
 
-# #install glog
-cd $ROOT_DIR
-folder_path="third-party"
-if [ -d "$folder_path" ]; then
-    echo "$folder_path exists."
-    if [ -d "$folder_path/glog" ]; then
-        echo "$folder_path/glog exists."
-    else
-        cd $folder_path &&
-        git clone https://github.com/google/glog.git && cd glog &&
-        git checkout tags/v0.6.0 -b v0.6.0
-    fi
-else
-    mkdir $folder_path 
-    echo "$folder_path has created."
-    cd $folder_path &&
-    git clone https://github.com/google/glog.git && cd glog &&
-        git checkout tags/v0.6.0 -b v0.6.0
-fi
-
-# # install pybind11
-cd $ROOT_DIR
-if [ -d "$folder_path" ]; then
-    echo "$folder_path exists."
-    if [ -d "$folder_path/pybind11" ]; then
-        echo "$folder_path/pybind11 exists."
-    else
-        cd $folder_path &&
-        git clone https://gitee.com/mirrors/pybind11.git && cd pybind11 &&
-        git checkout tags/v2.10.0 -b v2.10.0
-    fi
-else
-    mkdir $folder_path
-    echo "$folder_path has created."
-    cd $folder_path &&
-    git clone https://gitee.com/mirrors/pybind11.git && cd pybind11 &&
-    git checkout tags/v2.10.0 -b v2.10.0
-fi
 
 # install jupyternotebook
 pip_list=$(pip3 list)
@@ -159,7 +116,7 @@ else
 fi
 
 # install osqp 0.6.3
-cd /workspace
+cd ~/workspace
 git clone --recursive -b release-0.6.3 https://github.com/oxfordcontrol/osqp.git
 cd osqp
 mkdir build
@@ -168,7 +125,7 @@ cmake -G "Unix Makefiles" ..
 cmake --build . --target install
 
 # install osqp-eign
-cd /workspace
+cd ~/workspace
 git clone --recursive -b v0.10.0 https://github.com/robotology/osqp-eigen.git
 cd osqp-eigen
 mkdir build
@@ -176,17 +133,51 @@ cd build
 cmake .. && make && make install
 
 # install eigen-debug
-cd /workspace
+cd ~/workspace
 git clone https://github.com/fandesfyf/EigenGdb.git
 cd EigenGdb
 ./setup.sh
 
 # install ECOS
-cd /workspace
+cd ~/workspace
 git clone https://github.com/embotech/ecos.git
+cd ecos
 git checkout 5d3aa62
 mkdir build
 cd build
 cmake .. && make && make install
 
 # install cppad
+cd ~/workspace
+apt-get install cppad -y
+apt-get install gcc g++ gfortran git patch wget pkg-config liblapack-dev libmetis-dev libblas-dev -y
+mkdir ~/workspace/Ipopt
+cd ~/workspace/Ipopt
+git clone https://github.com/coin-or-tools/ThirdParty-ASL.git
+cd ThirdParty-ASL
+./get.ASL
+./configure
+make && make install
+cd ..
+git clone https://github.com/coin-or-tools/ThirdParty-HSL.git
+cd ThirdParty-HSL
+cp -r /root/workspace/automated_park/docker/utils/coinhsl.zip ./
+unzip coinhsl.zip
+./configure
+make && make install
+cd ..
+git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git
+cd ThirdParty-Mumps
+./get.Mumps
+./configure
+make && make install
+cd ..
+git clone https://github.com/coin-or/Ipopt.git
+cd Ipopt
+mkdir build
+cd build
+../configure
+make
+make test
+make install
+cd ..
