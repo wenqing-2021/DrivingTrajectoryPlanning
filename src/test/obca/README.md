@@ -6,23 +6,25 @@
 
 ### 测试场景配置
 
-- **起始点**: (0, 0)
-- **目标点**: (10, 0)
-- **初始路径**: 从起点到终点的直线，包含11个采样点
-- **障碍物**: 中心位置的方形障碍物，范围从 (4, -0.5) 到 (6, 0.5)
-- **车辆**: 长2.0m，宽1.0m，轴距1.2m
+- **起始点**: (0.0, 0.0)
+- **目标点**: (30.0, 0.0)
+- **初始路径**: 从起点到终点的直线，包含31个采样点（间距1.0m）
+- **障碍物**: 方形障碍物，范围从 (11, 0.7) 到 (13, 1.7)，高度为1.0m，宽度为2.0m
+- **车辆**: 长5.0m，宽2.0m，轴距2.5m
 
 ### 车辆参数
 
 ```
-length: 2.0 m                  # 车身长度
-width: 1.0 m                   # 车身宽度
-wheel_base: 1.2 m              # 轴距
-max_steer_angle: 0.5 rad       # 最大转向角
+length: 5.0 m                  # 车身长度
+width: 2.0 m                   # 车身宽度
+wheel_base: 2.5 m              # 轴距（前后轴中心距離）
+max_steer_angle: 0.5 rad       # 最大转向角（约28.6度）
 max_acc: 2.0 m/s²              # 最大加速度
 max_velocity: 5.0 m/s          # 最大速度
-front_overhang: 0.5 m          # 前悬
-rear_overhang: 0.3 m           # 后悬
+front_overhang: 1.25 m         # 前悬（后轴中心到前保险杠）
+rear_overhang: 1.25 m          # 后悬（后轴中心到后保险杠）
+
+注：前悬+轴距+后悬 = 1.25 + 2.5 + 1.25 = 5.0 m（车身总长）
 ```
 
 ## 📁 文件说明
@@ -53,30 +55,12 @@ pip install matplotlib numpy
 
 ### 运行测试
 
-#### 方法1: 直接运行编译后的可执行文件
 ```bash
-# 构建后的可执行文件位置
+# 运行OBCA测试程序（生成结果CSV和结果到 /tmp/obca_test_results/）
 ./build/src/test/obca/test_obca_main
 
-# 查看结果
+# 运行Python可视化脚本（生成 obca_result.png）
 python3 src/test/obca/visualize_obca_result.py
-```
-
-#### 方法2: 通过CMake/CTest运行
-```bash
-cd /root/workspace/AutomatedPark/build
-
-# 运行OBCA测试
-ctest -R test_obca_main -VV
-
-# 运行可视化
-ctest -R visualize_obca -VV
-```
-
-#### 方法3: 使用自定义结果目录
-```bash
-# 指定结果目录运行可视化
-python3 src/test/obca/visualize_obca_result.py /tmp/obca_test_results
 ```
 
 ## 📊 输出说明
@@ -122,13 +106,28 @@ Results saved to: /tmp/obca_test_results/
 
 ### 可视化输出
 
-`visualize_obca_result.py` 脚本会生成一个PNG图像 `obca_result.png`，包含：
+`visualize_obca_result.py` 脚本会生成一个PNG图像 `obca_result.png`，包含3个子图：
 
-- **蓝色虚线**: 初始路径
-- **绿色实线**: OBCA优化后的轨迹
-- **绿色三角形**: 起始点
-- **红色星标**: 目标点
-- **红色填充区域**: 障碍物
+**1. 轨迹图（上方，占2行）**
+- 蓝色虚线：初始路径的后轴中心轨迹
+- 绿色实线：OBCA优化后的后轴中心轨迹
+- 蓝色/绿色车体：沿轨迹绘制的车身包络（每3个采样点一个）
+- 蓝色车体方块：起始位置车体（透明度40%）
+- 红色车体方块：终止位置车体（透明度40%）
+- 绿色三角形：起始点
+- 红色星标：目标点
+- 红色填充区域：障碍物范围
+
+**2. 速度曲线图（左下）**
+- 蓝色曲线：沿路径距离的速度变化
+- 红色虚线：最大速度限制（5.0 m/s）
+- x轴：沿路径的累计距离（米）
+- y轴：速度（m/s）
+
+**3. 控制输入图（右下，双y轴）**
+- 绿色曲线：加速度序列，左y轴，单位m/s²
+- 橙色曲线：转向角序列，右y轴，单位度
+- 绿色/橙色虚线：对应的上下限
 
 ## 🔍 代码结构
 
@@ -166,72 +165,145 @@ Results saved to: /tmp/obca_test_results/
 ✓ 程序返回0（成功）  
 ✓ 输出中显示 "✓ OBCA solver succeeded!"  
 ✓ 生成所有CSV文件  
-✓ 生成可视化PNG图像  
+✓ 生成可视化PNG图像（包含3个子图）  
 ✓ 最终位置接近目标 (dx < 0.2m, dy < 0.2m)  
 
 ### 典型输出
 
 ```
+========== OBCA Planner Test ==========
+Setting up problem...
+Vehicle created: length=5.0m, width=2.0m
+Start position: (0, 0)
+Goal position: (30, 0)
+Obstacle created: Square from (11, 0.7) to (13, 1.7)
+Map created with resolution 0.1m
+Configuring IPOPT solver...
+IPOPT configured
+Creating OBCA solver...
+Running OBCA optimization...
+✓ OBCA solver succeeded!
+Extracting results...
+Number of states: 31
+Number of controls: 30
 First state: x=0.000000 y=0.000000 theta=0.000000 v=0.000000
-Last state: x=9.950000 y=-0.050000 theta=-0.050000 v=0.000000
-Final position error: dx=0.050000m, dy=0.050000m
+Last state: x=29.950000 y=-0.165000 theta=-0.050000 v=0.000000
+Final position error: dx=0.050000m, dy=0.165000m
 ✓ Test PASSED: Final position close to goal
+========== Test Complete ==========
+Results saved to: /tmp/obca_test_results/
 ```
 
 ## 🛠️ 自定义测试
 
 ### 修改初始路径
 
-编辑 `test_obca_main.cpp` 中的初始路径生成部分：
+编辑 `test_obca_main.cpp` 中的初始路径生成部分（当前：31个点，从(0,0)到(30,0)）：
 
 ```cpp
 // Generate initial path: modify this section
-for (int i = 0; i <= 10; ++i) {
+for (int i = 0; i <= 30; ++i) {  // 改数字改变采样点数
     vehicle_model::VehiclePose pose;
-    pose.x     = i * 1.0;      // 修改x坐标
-    pose.y     = 0.0;          // 修改y坐标（例如：sin(i)*0.5）
-    pose.theta = 0.0;
+    pose.x     = i * 1.0;       // 改间距或乘数改变路径长度
+    pose.y     = 0.0;           // 改y坐标，例如：sin(i*0.2)*0.5 制造蛇形
+    pose.theta = 0.0;           // 初始朝向
     init_path.push_back(pose);
 }
 ```
 
+**重要**：目标点也要修改为与最后一个路径点一致
+```cpp
+goal_pose_ptr->x     = 30.0;    // 改为最后一个点的x坐标
+goal_pose_ptr->y     = 0.0;     // 改为最后一个点的y坐标
+```
+
 ### 添加新的障碍物
 
-在问题设置部分添加：
+在问题设置部分添加（当前障碍物：x∈[11,13], y∈[0.7,1.7]）：
 
 ```cpp
-// Add another obstacle
+// Add obstacle 2
 problem::Polygon* obs_polygon2 = plan_problem.add_obstacle_list();
 obs_polygon2->set_vertex_num(4);
 
+// Bottom-left
 cost_map::Pos2D* v1 = obs_polygon2->add_vertex_pts();
-v1->set_x(2.0);
-v1->set_y(1.0);
-// ... 添加其他顶点
+v1->set_x(20.0);
+v1->set_y(-1.0);
 
-plan_problem.set_obstacle_num(2);
+// Bottom-right
+cost_map::Pos2D* v2 = obs_polygon2->add_vertex_pts();
+v2->set_x(22.0);
+v2->set_y(-1.0);
+
+// Top-right
+cost_map::Pos2D* v3 = obs_polygon2->add_vertex_pts();
+v3->set_x(22.0);
+v3->set_y(0.0);
+
+// Top-left
+cost_map::Pos2D* v4 = obs_polygon2->add_vertex_pts();
+v4->set_x(20.0);
+v4->set_y(0.0);
+
+plan_problem.set_obstacle_num(2);  // 更新障碍物总数
+LOG(INFO) << "Obstacle 2 created: Rectangle from (20, -1) to (22, 0)";
 ```
 
 ### 修改车辆参数
 
-在车辆参数设置部分修改：
+在车辆参数设置部分修改（当前值：长5.0m, 宽2.0m, 轴距2.5m）：
 
 ```cpp
-vehicle_param.set_length(3.0);           // 改变长度
-vehicle_param.set_width(1.5);            // 改变宽度
-vehicle_param.set_wheel_base(1.5);       // 改变轴距
+vehicle_param.set_length(6.0);           // 车身长度
+vehicle_param.set_width(2.5);            // 车身宽度
+vehicle_param.set_wheel_base(3.0);       // 轴距
+vehicle_param.set_front_overhang(1.5);   // 前悬
+vehicle_param.set_rear_overhang(1.5);    // 后悬
+vehicle_param.set_max_steer_angle(0.6);  // 最大转向角（弧度）
+vehicle_param.set_max_acc(3.0);          // 最大加速度
+vehicle_param.set_max_velocity(6.0);     // 最大速度
+```
+
+**重要**：修改车辆参数后，同时更新 `visualize_obca_result.py` 中的对应参数：
+```python
+VEHICLE_LENGTH = 6.0      # 同 set_length
+VEHICLE_WIDTH = 2.5       # 同 set_width
+REAR_OVERHANG = 1.5       # 同 set_rear_overhang
 ```
 
 ### 修改求解器参数
 
-在IPOPT选项部分修改：
+在IPOPT选项部分修改（当前配置基于目标函数变化收敛）：
 
 ```cpp
 std::string ipopt_options;
-ipopt_options += "Integer print_level         2\n";    // 增加输出等级
-ipopt_options += "Integer max_iter            200\n";   // 增加迭代次数
-ipopt_options += "Numeric tol                 1e-4\n";  // 放宽容差
+ipopt_options += "String  sb                  yes\n";          // 启用IPOPT抓不哈法则
+ipopt_options += "Integer max_iter            50\n";           // 最大迭代次数
+ipopt_options += "Numeric tol                 1e-3\n";         // 一阶最优性容差
+// 核心收敛参数：基于目标函数变化
+ipopt_options += "Numeric obj_tol             1e-5\n";         // ⭐ 目标函数相对变化容差
+ipopt_options += "Numeric acceptable_tol      1e-2\n";         // 可接受解的容差
+ipopt_options += "Integer acceptable_iter     5\n";            // 满足可接受条件5次后停止
+ipopt_options += "Numeric max_cpu_time        120.0\n";        // 最大求解时间
 ```
+
+**IPOPT收敛参数说明：**
+
+| 参数 | 当前值 | 含义 |
+|------|--------|------|
+| `tol` | 1e-3 | 一阶最优性条件容差（影响最终精度） |
+| **`obj_tol`** | **1e-5** | **⭐ 目标函数相对变化容差（核心参数）**<br>连续迭代间目标函数变化 < 1e-5 时停止 |
+| `acceptable_tol` | 1e-2 | "可接受"解的容差（更松散的条件） |
+| `acceptable_iter` | 5 | 满足可接受条件5次后允许提前终止 |
+| `max_iter` | 50 | 最多迭代50次 |
+| `max_cpu_time` | 120s | 最大求解时间（秒） |
+
+**调参建议：**
+- 目标函数变化缓慢 → 增大 `obj_tol` (如 1e-4)
+- 需要更高精度 → 减小 `obj_tol` (如 1e-6)  
+- 求解速度过慢 → 增大 `acceptable_tol` 或减少 `acceptable_iter`
+- 提高整体精度 → 减小 `tol` (如 1e-4)
 
 ## 🐛 故障排查
 
@@ -281,38 +353,16 @@ pip install matplotlib numpy
 - 车辆模型: `src/common/vehicle_model/kinematic_model.h`
 - 数学库: `src/common/math/polygon2d.h`
 
-## 💡 进阶用法
+##  坐标系约定
 
-### 批量测试多个场景
-
-创建shell脚本 `run_multiple_tests.sh`:
-
-```bash
-#!/bin/bash
-
-# 运行基本测试
-./build/src/test/obca/test_obca_main
-
-# 可视化
-python3 src/test/obca/visualize_obca_result.py
-
-# 备份结果
-cp -r /tmp/obca_test_results ./results_$(date +%Y%m%d_%H%M%S)
-```
-
-### 性能分析
-
-在C++程序中添加计时代码：
-
-```cpp
-#include <chrono>
-
-auto start = std::chrono::high_resolution_clock::now();
-bool success = obca_solver.Process(init_path, start_pose_ptr, goal_pose_ptr);
-auto end = std::chrono::high_resolution_clock::now();
-auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-LOG(INFO) << "Solve time: " << duration.count() << " ms";
-```
+所有坐标均基于以下约定：
+- **原点**: (0, 0) 在地图左下角
+- **x轴**: 指向右方（正方向）
+- **y轴**: 指向上方（正方向）
+- **车辆状态向量**: (x, y, theta, v)
+  - **(x, y)**: 后轴中心在世界坐标系中的位置
+  - **theta**: 车体朝向角（弧度），0表示沿+x方向
+  - **v**: 后轴中心的速度（m/s）
 
 ## ✨ 总结
 

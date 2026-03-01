@@ -181,21 +181,23 @@ bool OBCAFG_eval::getMovementMatrix(const CppAD::AD<double> x, const CppAD::AD<d
 }
 
 CppAD::AD<double> OBCAFG_eval::getCostFunction(const ADvector& x) {
-    CppAD::AD<double> cost = 0.0;
+    CppAD::AD<double> cost          = 0.0;
+    double            ref_weight    = 10.0;
+    double            smooth_weight = 0.1;
     for (std::size_t i = 0; i < N_; ++i) {
         // 1. cost for ref_X
         CppAD::AD<double> x_pos = x[i * (state_num_ + control_num_) + VariableIndex::X];
         CppAD::AD<double> y_pos = x[i * (state_num_ + control_num_) + VariableIndex::Y];
-        cost += (x_pos - (*ref_X_ptr_)[i * 2]) * (x_pos - (*ref_X_ptr_)[i * 2]);
-        cost += (y_pos - (*ref_X_ptr_)[i * 2 + 1]) * (y_pos - (*ref_X_ptr_)[i * 2 + 1]);
+        cost += ref_weight * (x_pos - (*ref_X_ptr_)[i * 2]) * (x_pos - (*ref_X_ptr_)[i * 2]);
+        cost += ref_weight * (y_pos - (*ref_X_ptr_)[i * 2 + 1]) * (y_pos - (*ref_X_ptr_)[i * 2 + 1]);
         // 2. cost for control delta
         if (i < N_ - 1) {
             CppAD::AD<double> steer_angle1  = x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE];
             CppAD::AD<double> steer_angle2  = x[(i + 1) * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE];
             CppAD::AD<double> acceleration1 = x[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION];
             CppAD::AD<double> acceleration2 = x[(i + 1) * (state_num_ + control_num_) + VariableIndex::ACCELERATION];
-            cost += (steer_angle2 - steer_angle1) * (steer_angle2 - steer_angle1);
-            cost += (acceleration2 - acceleration1) * (acceleration2 - acceleration1);
+            cost += smooth_weight * (steer_angle2 - steer_angle1) * (steer_angle2 - steer_angle1);
+            cost += smooth_weight * (acceleration2 - acceleration1) * (acceleration2 - acceleration1);
         }
     }
 
@@ -210,6 +212,7 @@ bool OBCAFG_eval::setConstraintsBound(IpoptSolver::Dvector* xl, IpoptSolver::Dve
         for (std::size_t i = 0; i < size; ++i) { (*target)[i] = (*source)[i]; }
     };
     // 1. set pose constraint
+    pose_constraints_num_ = 8;
     IpoptSolver::Dvector pose_gl, pose_gu;
     setPoseConstraintsBound(&pose_gl, &pose_gu);
 
@@ -280,14 +283,15 @@ bool OBCAFG_eval::setPoseConstraints(const FG_eval::ADvector& x, FG_eval::ADvect
 
     std::vector<double> start_pose = {start_pose_ptr_->x, start_pose_ptr_->y, start_pose_ptr_->theta};
     // 1. initial pose constraint
-    constraints->resize(6);
+    constraints->resize(pose_constraints_num_);
     (*constraints)[0] = start_pose_ptr_->x - x[VariableIndex::X];
     (*constraints)[1] = start_pose_ptr_->y - x[VariableIndex::Y];
     (*constraints)[2] = goal_pose_ptr_->x - x[(N_ - 1) * (state_num_ + control_num_) + VariableIndex::X];
     (*constraints)[3] = goal_pose_ptr_->y - x[(N_ - 1) * (state_num_ + control_num_) + VariableIndex::Y];
     (*constraints)[4] = start_pose_ptr_->theta - x[VariableIndex::THETA];
     (*constraints)[5] = goal_pose_ptr_->theta - x[(N_ - 1) * (state_num_ + control_num_) + VariableIndex::THETA];
-
+    (*constraints)[6] = x[VariableIndex::V];
+    (*constraints)[7] = x[(N_ - 1) * (state_num_ + control_num_) + VariableIndex::V];
     return true;
 }
 
@@ -299,15 +303,18 @@ bool OBCAFG_eval::setPoseConstraintsBound(IpoptSolver::Dvector* lb, IpoptSolver:
     // 2. set the lower and upper bounds
     double kPositionTol = 0.05;   // m
     double kThetaTol    = 0.01;   // rad
-    lb->resize(6);
-    ub->resize(6);
-    for (std::size_t i = 0; i < 6; ++i) {
+    lb->resize(pose_constraints_num_);
+    ub->resize(pose_constraints_num_);
+    for (std::size_t i = 0; i < pose_constraints_num_; ++i) {
         if (i < 4) {
             (*lb)[i] = -kPositionTol;
             (*ub)[i] = kPositionTol;
-        } else {
+        } else if (i >= 4 && i <= 5) {
             (*lb)[i] = -kThetaTol;
             (*ub)[i] = kThetaTol;
+        } else {
+            (*lb)[i] = -kEpsilon;
+            (*ub)[i] = kEpsilon;
         }
     }
 
@@ -397,7 +404,9 @@ bool OBCAFG_eval::setControlFeasibleConstraintsBound(IpoptSolver::Dvector* lb, I
     for (std::size_t i = 0; i < N_; ++i) {
         build_ineq_bound(i * (state_num_ + control_num_) + VariableIndex::X, -kMaxValue, kMaxValue);
         build_ineq_bound(i * (state_num_ + control_num_) + VariableIndex::Y, -kMaxValue, kMaxValue);
-        build_ineq_bound(i * (state_num_ + control_num_) + VariableIndex::V, -kMaxValue, kMaxValue);
+        build_ineq_bound(i * (state_num_ + control_num_) + VariableIndex::V,
+                         -vehicle_param.max_velocity(),
+                         vehicle_param.max_velocity());
         build_ineq_bound(i * (state_num_ + control_num_) + VariableIndex::THETA, -kMaxValue, kMaxValue);
         if (i < N_ - 1) {
             build_ineq_bound(i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE,
@@ -460,14 +469,15 @@ bool OBCAFG_eval::setAvoidanceConstraints(const FG_eval::ADvector& x, FG_eval::A
                                        move_matrix);
         for (std::size_t j = 0; j < obstable_bound_num_vec_.size(); ++j) {
             std::size_t obstacle_pts_num = obstable_bound_num_vec_[j];
-            CppVecXd    lambd_j          = variable_x.segment(lambda_start_idx, obstacle_pts_num);
+            CppVecXd    lambda_j         = variable_x.segment(lambda_start_idx, obstacle_pts_num);
             CppVecXd    mu_j             = variable_x.segment(mu_start_idx, kVehicleBoundaryNum);
             CppMatrixXd A = cpp_obstacle_A.block(obstacle_a_start, 0, obstacle_pts_num, obstacle_A_.cols());
             CppVecXd    b = cpp_obstacle_b.segment(obstacle_a_start, obstacle_pts_num);
-            (*constraints)[constraint_idx] = (lambd_j.transpose() * (A * move_matrix - b) - mu_j.transpose() * g_)(0);
-            (*constraints)[constraint_idx + 1] = (mu_j.transpose() * G_ + lambd_j.transpose() * A * rotation_matrix)(0);
+            (*constraints)[constraint_idx] = (lambda_j.transpose() * (A * move_matrix - b) - mu_j.transpose() * g_)(0);
+            (*constraints)[constraint_idx + 1] =
+                (mu_j.transpose() * G_ + lambda_j.transpose() * A * rotation_matrix)(0);
             (*constraints)[constraint_idx + 2] =
-                ((A.transpose() * lambd_j) * ((A.transpose() * lambd_j)).transpose())(0);
+                ((A.transpose() * lambda_j) * ((A.transpose() * lambda_j)).transpose())(0);
 
 
             constraint_idx += 3;
@@ -487,12 +497,12 @@ bool OBCAFG_eval::setAvoidanceConstraintsBound(IpoptSolver::Dvector* lb, IpoptSo
     std::size_t constraint_idx = 0;
     for (std::size_t i = 0; i < N_; ++i) {
         for (std::size_t j = 0; j < obstable_bound_num_vec_.size(); ++j) {
-            (*lb)[constraint_idx]     = kEpsilon;
+            (*lb)[constraint_idx]     = -kEpsilon;
             (*lb)[constraint_idx + 1] = -kEpsilon;
-            (*lb)[constraint_idx + 2] = kEpsilon;
-            (*ub)[constraint_idx]     = 1;
+            (*lb)[constraint_idx + 2] = 1.0 - kEpsilon;
+            (*ub)[constraint_idx]     = kMaxValue;
             (*ub)[constraint_idx + 1] = kEpsilon;
-            (*ub)[constraint_idx + 2] = kMaxValue;
+            (*ub)[constraint_idx + 2] = 1.0 + kEpsilon;
             constraint_idx += 3;
         }
     }

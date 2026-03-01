@@ -101,12 +101,12 @@ int main() {
         kinematic_model::VehicleParam vehicle_param;
         vehicle_param.set_length(5.0);            // 2.0 m
         vehicle_param.set_width(2.0);             // 1.0 m
-        vehicle_param.set_wheel_base(1.2);        // 1.2 m
+        vehicle_param.set_wheel_base(2.5);        // 2.5 m
         vehicle_param.set_max_steer_angle(0.5);   // 0.5 rad
         vehicle_param.set_max_acc(2.0);           // 2.0 m/s^2
         vehicle_param.set_max_velocity(5.0);      // 5.0 m/s
-        vehicle_param.set_front_overhang(0.5);    // 0.5 m
-        vehicle_param.set_rear_overhang(0.3);     // 0.3 m
+        vehicle_param.set_front_overhang(1.25);   // 1.25 m
+        vehicle_param.set_rear_overhang(1.25);    // 1.25 m
         vehicle_param.set_vehicle_type("car");
 
         // Create kinematic model
@@ -145,26 +145,26 @@ int main() {
 
         // Bottom-left
         cost_map::Pos2D* vertex1 = obs_polygon->add_vertex_pts();
-        vertex1->set_x(4.0);
-        vertex1->set_y(0.5);
+        vertex1->set_x(11.0);
+        vertex1->set_y(0.7);
 
         // Bottom-right
         cost_map::Pos2D* vertex2 = obs_polygon->add_vertex_pts();
-        vertex2->set_x(6.0);
-        vertex2->set_y(0.5);
+        vertex2->set_x(13.0);
+        vertex2->set_y(0.7);
 
         // Top-right
         cost_map::Pos2D* vertex3 = obs_polygon->add_vertex_pts();
-        vertex3->set_x(6.0);
-        vertex3->set_y(1.5);
+        vertex3->set_x(13.0);
+        vertex3->set_y(1.7);
 
         // Top-left
         cost_map::Pos2D* vertex4 = obs_polygon->add_vertex_pts();
-        vertex4->set_x(4.0);
-        vertex4->set_y(1.5);
+        vertex4->set_x(11.0);
+        vertex4->set_y(1.7);
 
         plan_problem.set_obstacle_num(1);
-        LOG(INFO) << "Obstacle created: Square from (4, 0.5) to (6, 1.5)";
+        LOG(INFO) << "Obstacle created: Square from (11, 0.7) to (13, 1.7)";
 
         // Set map bounds
         problem::MapBound* map_bound = plan_problem.mutable_map_bound();
@@ -236,9 +236,14 @@ int main() {
         std::string ipopt_options;
         // ipopt_options += "Integer print_level         5\n";
         ipopt_options += "String  sb                  yes\n";
-        ipopt_options += "Integer max_iter            100\n";
-        ipopt_options += "Numeric tol                 1e-6\n";
+        ipopt_options += "Integer max_iter            50\n";
+        ipopt_options += "Numeric tol                 1e-3\n";
+        // Convergence based on objective function change
+        ipopt_options += "Numeric obj_tol             1e-5\n";   // Stop when obj change < 1e-5
+        ipopt_options += "Numeric acceptable_tol      1e-2\n";   // Accept solution with tol=1e-2
+        ipopt_options += "Integer acceptable_iter     5\n";      // Accept after 5 iters at acceptable_tol
         ipopt_options += "Numeric max_cpu_time        120.0\n";
+        // ipopt_options += "String derivative_test   second-order\n";
 
         LOG(INFO) << "IPOPT configured";
 

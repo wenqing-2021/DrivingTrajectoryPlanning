@@ -82,8 +82,9 @@ class OBCAFG_eval : public FG_eval {
     std::size_t                                    N_;             // number of discretization steps
     std::size_t                                    state_num_;     // number of states
     std::size_t                                    control_num_;   // number of controls
-    std::size_t                                    lambda_num_ = 0;
-    std::size_t                                    mu_num_     = 0;
+    std::size_t                                    lambda_num_           = 0;
+    std::size_t                                    mu_num_               = 0;
+    std::size_t                                    pose_constraints_num_ = 0;
     std::vector<std::size_t>                       obstable_bound_num_vec_;
     std::shared_ptr<vehicle_model::KinematicModel> dynamic_model_ptr_;
     std::shared_ptr<vehicle_model::VehiclePose>    start_pose_ptr_;

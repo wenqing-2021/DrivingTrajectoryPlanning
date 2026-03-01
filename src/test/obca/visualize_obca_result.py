@@ -15,8 +15,9 @@ import numpy as np
 from pathlib import Path
 
 # Vehicle parameters (should match the C++ code)
-VEHICLE_LENGTH = 5.0  # meters
-VEHICLE_WIDTH = 2.0   # meters
+VEHICLE_LENGTH = 5.0   # meters
+VEHICLE_WIDTH = 2.0    # meters
+REAR_OVERHANG = 1.25   # meters
 
 
 def load_csv(filename):
@@ -58,30 +59,39 @@ def load_all_obstacles(results_dir):
     return obstacles
 
 
-def get_vehicle_corners(x, y, theta, length=VEHICLE_LENGTH, width=VEHICLE_WIDTH):
+def get_vehicle_corners(
+    x,
+    y,
+    theta,
+    length=VEHICLE_LENGTH,
+    width=VEHICLE_WIDTH,
+    rear_overhang=REAR_OVERHANG,
+):
     """Calculate the four corners of the vehicle rectangle.
     
     Args:
-        x: x-coordinate of vehicle center
-        y: y-coordinate of vehicle center
+        x: x-coordinate of rear axle center
+        y: y-coordinate of rear axle center
         theta: heading angle in radians
         length: vehicle length
         width: vehicle width
+        rear_overhang: rear axle center to rear bumper distance
     
     Returns:
         numpy array of shape (5, 2) containing the four corners and closing point
     """
-    # Vehicle corners in local frame (center at origin, facing +x)
-    # Front-right, front-left, rear-left, rear-right
-    half_length = length / 2.0
+    # Vehicle corners in local frame (rear axle center at origin, facing +x)
+    # Longitudinal range: [-rear_overhang, length - rear_overhang]
+    front_x = length - rear_overhang
+    rear_x = -rear_overhang
     half_width = width / 2.0
     
     corners_local = np.array([
-        [half_length, -half_width],   # Front-right
-        [half_length, half_width],    # Front-left
-        [-half_length, half_width],   # Rear-left
-        [-half_length, -half_width],  # Rear-right
-        [half_length, -half_width]    # Close the rectangle
+        [front_x, -half_width],  # Front-right
+        [front_x, half_width],   # Front-left
+        [rear_x, half_width],    # Rear-left
+        [rear_x, -half_width],   # Rear-right
+        [front_x, -half_width],  # Close the rectangle
     ])
     
     # Rotation matrix
@@ -120,8 +130,15 @@ def create_visualization(results_dir, output_file="obca_result.png"):
         print("Error: Could not load optimized trajectory. Exiting.")
         # return False
 
-    # Create figure and axis
-    fig, ax = plt.subplots(figsize=(14, 6))
+    # Create figure with subplots: trajectory plot, velocity plot, and control plots
+    fig = plt.figure(figsize=(16, 10))
+    gs = fig.add_gridspec(3, 2, hspace=0.3, wspace=0.3)
+    ax_traj = fig.add_subplot(gs[0:2, :])  # Top: trajectory (spans 2 rows and all columns)
+    ax_vel = fig.add_subplot(gs[2, 0])      # Bottom left: velocity
+    ax_control = fig.add_subplot(gs[2, 1])  # Bottom right: controls
+    
+    # ========== Plot 1: Trajectory ==========
+    ax = ax_traj  # Use ax for trajectory plot for compatibility with existing code
 
     # Plot initial path
     if initial_path is not None:
@@ -130,7 +147,7 @@ def create_visualization(results_dir, output_file="obca_result.png"):
             initial_path[:, 1],
             "b--",
             linewidth=2,
-            label="Initial Path",
+            label="Initial Path (Rear Axle)",
             alpha=0.7,
         )
         ax.plot(initial_path[:, 0], initial_path[:, 1], "bo", markersize=4, alpha=0.5)
@@ -164,7 +181,7 @@ def create_visualization(results_dir, output_file="obca_result.png"):
             optimized_traj[:, 1],
             "g-",
             linewidth=2.5,
-            label="Optimized Trajectory",
+            label="Optimized Trajectory (Rear Axle)",
         )
         ax.plot(optimized_traj[:, 0], optimized_traj[:, 1], "go", markersize=6, alpha=0.6)
         
@@ -258,16 +275,83 @@ def create_visualization(results_dir, output_file="obca_result.png"):
         if len(obstacle) > 0:
             ax.plot(obstacle[:, 0], obstacle[:, 1], "r--", linewidth=2, alpha=0.8)
 
-    # Set labels and title
+    # Set labels and title for trajectory plot
     ax.set_xlabel("X (m)", fontsize=12)
     ax.set_ylabel("Y (m)", fontsize=12)
     ax.set_title("OBCA Path Planning Result", fontsize=14, fontweight="bold")
     ax.grid(True, alpha=0.3)
-    ax.legend(fontsize=11, loc="upper left")
+    ax.legend(fontsize=10, loc="upper left", ncol=2)
     ax.set_aspect("equal", adjustable="box")
-
-    # Add some padding to the plot
     ax.margins(0.1)
+
+    # ========== Plot 2: Velocity Profile ==========
+    if optimized_traj is not None:
+        # Calculate path distance
+        x_pos = optimized_traj[:, 0]
+        y_pos = optimized_traj[:, 1]
+        velocity = optimized_traj[:, 3]
+        
+        # Calculate cumulative distance
+        distances = np.zeros(len(x_pos))
+        for i in range(1, len(x_pos)):
+            distances[i] = distances[i-1] + np.sqrt(
+                (x_pos[i] - x_pos[i-1])**2 + (y_pos[i] - y_pos[i-1])**2
+            )
+        
+        # Plot velocity vs distance
+        ax_vel.plot(distances, velocity, 'b-', linewidth=2.5, label='Velocity')
+        ax_vel.fill_between(distances, 0, velocity, alpha=0.3, color='blue')
+        ax_vel.set_xlabel("Distance along path (m)", fontsize=11)
+        ax_vel.set_ylabel("Velocity (m/s)", fontsize=11)
+        ax_vel.set_title("Velocity Profile", fontsize=12, fontweight="bold")
+        ax_vel.grid(True, alpha=0.3)
+        ax_vel.legend(fontsize=10)
+        
+        # Add max velocity line
+        max_v = VEHICLE_LENGTH if 'VEHICLE_LENGTH' in dir() else 5.0
+        max_velocity_limit = 5.0  # From C++ code
+        ax_vel.axhline(y=max_velocity_limit, color='r', linestyle='--', 
+                       linewidth=1.5, alpha=0.7, label=f'Max Velocity ({max_velocity_limit} m/s)')
+        ax_vel.legend(fontsize=10)
+
+    # ========== Plot 3: Control Inputs ==========
+    if optimized_controls is not None and len(optimized_controls) > 0:
+        acceleration = optimized_controls[:, 0]
+        steer_angle = optimized_controls[:, 1]
+        control_indices = np.arange(len(acceleration))
+        
+        # Create twin axis for steering angle
+        ax_control_twin = ax_control.twinx()
+        
+        # Plot acceleration
+        line1 = ax_control.plot(control_indices, acceleration, 'g-', 
+                               linewidth=2.5, label='Acceleration', alpha=0.8)
+        ax_control.fill_between(control_indices, 0, acceleration, alpha=0.2, color='green')
+        ax_control.set_xlabel("Control Step", fontsize=11)
+        ax_control.set_ylabel("Acceleration (m/s²)", fontsize=11, color='g')
+        ax_control.tick_params(axis='y', labelcolor='g')
+        ax_control.grid(True, alpha=0.3)
+        
+        # Plot steering angle on twin axis
+        line2 = ax_control_twin.plot(control_indices, np.degrees(steer_angle), 'orange', 
+                                     linewidth=2.5, label='Steering Angle', alpha=0.8)
+        ax_control_twin.set_ylabel("Steering Angle (degrees)", fontsize=11, color='orange')
+        ax_control_twin.tick_params(axis='y', labelcolor='orange')
+        
+        # Add limits
+        max_acc = 2.0  # From C++ code
+        max_steer = np.degrees(0.5)  # From C++ code
+        ax_control.axhline(y=max_acc, color='darkgreen', linestyle='--', linewidth=1.5, alpha=0.5)
+        ax_control.axhline(y=-max_acc, color='darkgreen', linestyle='--', linewidth=1.5, alpha=0.5)
+        ax_control_twin.axhline(y=max_steer, color='darkorange', linestyle='--', linewidth=1.5, alpha=0.5)
+        ax_control_twin.axhline(y=-max_steer, color='darkorange', linestyle='--', linewidth=1.5, alpha=0.5)
+        
+        ax_control.set_title("Control Inputs", fontsize=12, fontweight="bold")
+        
+        # Combined legend
+        lines = line1 + line2
+        labels = [l.get_label() for l in lines]
+        ax_control.legend(lines, labels, fontsize=10, loc='upper right')
 
     # Save figure
     plt.tight_layout()
