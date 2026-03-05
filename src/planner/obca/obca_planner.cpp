@@ -185,13 +185,15 @@ CppAD::AD<double> OBCAFG_eval::getCostFunction(const ADvector& x) {
     CppAD::AD<double> cost           = 0.0;
     double            ref_weight     = 5.0;
     double            smooth_weight  = 0.5;
-    double            control_weigth = 100.0;
+    double            control_weight = 100.0;
     for (std::size_t i = 0; i < N_; ++i) {
         // 1. cost for ref_X
         CppAD::AD<double> x_pos = x[i * (state_num_ + control_num_) + VariableIndex::X];
         CppAD::AD<double> y_pos = x[i * (state_num_ + control_num_) + VariableIndex::Y];
-        cost += ref_weight * (x_pos - (*ref_X_ptr_)[i * 2]) * (x_pos - (*ref_X_ptr_)[i * 2]);
-        cost += ref_weight * (y_pos - (*ref_X_ptr_)[i * 2 + 1]) * (y_pos - (*ref_X_ptr_)[i * 2 + 1]);
+        cost += ref_weight * (x_pos - (*ref_X_ptr_)[i * (state_num_ + control_num_) + VariableIndex::X]) *
+                (x_pos - (*ref_X_ptr_)[i * (state_num_ + control_num_) + VariableIndex::X]);
+        cost += ref_weight * (y_pos - (*ref_X_ptr_)[i * (state_num_ + control_num_) + VariableIndex::Y]) *
+                (y_pos - (*ref_X_ptr_)[i * (state_num_ + control_num_) + VariableIndex::Y]);
         // 2. cost for control delta
         if (i < N_ - 1) {
             CppAD::AD<double> steer_angle1  = x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE];
@@ -200,12 +202,12 @@ CppAD::AD<double> OBCAFG_eval::getCostFunction(const ADvector& x) {
             CppAD::AD<double> acceleration2 = x[(i + 1) * (state_num_ + control_num_) + VariableIndex::ACCELERATION];
             cost += smooth_weight * (steer_angle2 - steer_angle1) * (steer_angle2 - steer_angle1);
             cost += smooth_weight * (acceleration2 - acceleration1) * (acceleration2 - acceleration1);
+            // 3. control effort
+            cost += control_weight * x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE] *
+                    x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE];
+            cost += control_weight * x[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION] *
+                    x[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION];
         }
-        // 3. control effort
-        cost += control_weigth * x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE] *
-                x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE];
-        cost += control_weigth * x[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION] *
-                x[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION];
     }
 
     return cost;

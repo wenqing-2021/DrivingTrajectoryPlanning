@@ -146,22 +146,22 @@ int main() {
         // Bottom-left
         cost_map::Pos2D* vertex1 = obs_polygon->add_vertex_pts();
         vertex1->set_x(11.0);
-        vertex1->set_y(0.7);
+        vertex1->set_y(2.7);
 
         // Bottom-right
         cost_map::Pos2D* vertex2 = obs_polygon->add_vertex_pts();
         vertex2->set_x(13.0);
-        vertex2->set_y(0.7);
+        vertex2->set_y(2.7);
 
         // Top-right
         cost_map::Pos2D* vertex3 = obs_polygon->add_vertex_pts();
         vertex3->set_x(13.0);
-        vertex3->set_y(1.7);
+        vertex3->set_y(3.7);
 
         // Top-left
         cost_map::Pos2D* vertex4 = obs_polygon->add_vertex_pts();
         vertex4->set_x(11.0);
-        vertex4->set_y(1.7);
+        vertex4->set_y(3.7);
 
         plan_problem.set_obstacle_num(1);
         LOG(INFO) << "Obstacle created: Square from (11, 0.7) to (13, 1.7)";
@@ -200,10 +200,10 @@ int main() {
         LOG(INFO) << "Creating initial path...";
         vehicle_model::sdv_path init_path;
 
-        // Generate initial path: 31 waypoints from (0, 0) to (30, 0)
-        for (int i = 0; i <= 30; ++i) {
+        // Generate initial path: 60 waypoints from (0, 0) to (30, 0)
+        for (int i = 0; i < 60; ++i) {
             vehicle_model::VehiclePose pose;
-            pose.x     = i * 1.0;
+            pose.x     = i * (30.0 / 59.0);
             pose.y     = 0.0;
             pose.theta = 0.0;
             init_path.push_back(pose);
@@ -236,13 +236,9 @@ int main() {
         std::string ipopt_options;
         // ipopt_options += "Integer print_level         5\n";
         ipopt_options += "String  sb                  yes\n";
-        ipopt_options += "Integer max_iter            50\n";
+        ipopt_options += "Integer max_iter            20\n";
         ipopt_options += "Numeric tol                 1e-3\n";
         // Convergence based on objective function change
-        ipopt_options += "Numeric obj_tol             1e-5\n";   // Stop when obj change < 1e-5
-        ipopt_options += "Numeric acceptable_tol      1e-2\n";   // Accept solution with tol=1e-2
-        ipopt_options += "Integer acceptable_iter     5\n";      // Accept after 5 iters at acceptable_tol
-        ipopt_options += "Numeric max_cpu_time        120.0\n";
         // ipopt_options += "String derivative_test   second-order\n";
 
         LOG(INFO) << "IPOPT configured";
@@ -285,8 +281,8 @@ int main() {
 
         // Check the final state is close to the goal
         const auto& final_state = states.back();
-        double      x_error     = std::abs(final_state(0) - 30.0);
-        double      y_error     = std::abs(final_state(1) - 0.0);
+        double      x_error     = std::abs(final_state(0) - goal_pose_ptr->x);
+        double      y_error     = std::abs(final_state(1) - goal_pose_ptr->y);
 
         LOG(INFO) << "Final position error: dx=" << x_error << "m, dy=" << y_error << "m";
 
