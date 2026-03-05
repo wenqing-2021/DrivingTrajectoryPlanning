@@ -120,9 +120,10 @@ bool OBCASolver::setInitVariable(const vehicle_model::sdv_path& init_path, OBCAF
     lambda0_ *= 0.1;
     // 3. set the initial value
     x0_.conservativeResize(x0_.size() + lambda0_.size() + mu0_.size());
-    x0_.tail(lambda0_.size()) = lambda0_;
-    x0_.tail(mu0_.size())     = mu0_;
-    auto x0_ptr               = std::make_shared<Eigen::VectorXd>(x0_);
+    std::size_t offset                                 = x0_.size() - lambda0_.size() - mu0_.size();
+    x0_.segment(offset, lambda0_.size())               = lambda0_;   // [offset, offset+lambda_size)
+    x0_.segment(offset + lambda0_.size(), mu0_.size()) = mu0_;       // [offset+lambda_size, end)
+    auto x0_ptr                                        = std::make_shared<Eigen::VectorXd>(x0_);
     fg_eval->setInitParameters(
         x0_ptr, N_, state_num_, control_num_, lambda_num, mu_num, dynamic_model_ptr_, start_pose_ptr, goal_pose_ptr);
     for (std::size_t i = 0; i < x0_.size(); ++i) { init_variables->push_back(x0_[i]); }
@@ -181,9 +182,10 @@ bool OBCAFG_eval::getMovementMatrix(const CppAD::AD<double> x, const CppAD::AD<d
 }
 
 CppAD::AD<double> OBCAFG_eval::getCostFunction(const ADvector& x) {
-    CppAD::AD<double> cost          = 0.0;
-    double            ref_weight    = 10.0;
-    double            smooth_weight = 0.1;
+    CppAD::AD<double> cost           = 0.0;
+    double            ref_weight     = 5.0;
+    double            smooth_weight  = 0.5;
+    double            control_weigth = 100.0;
     for (std::size_t i = 0; i < N_; ++i) {
         // 1. cost for ref_X
         CppAD::AD<double> x_pos = x[i * (state_num_ + control_num_) + VariableIndex::X];
@@ -199,6 +201,11 @@ CppAD::AD<double> OBCAFG_eval::getCostFunction(const ADvector& x) {
             cost += smooth_weight * (steer_angle2 - steer_angle1) * (steer_angle2 - steer_angle1);
             cost += smooth_weight * (acceleration2 - acceleration1) * (acceleration2 - acceleration1);
         }
+        // 3. control effort
+        cost += control_weigth * x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE] *
+                x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE];
+        cost += control_weigth * x[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION] *
+                x[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION];
     }
 
     return cost;
@@ -206,7 +213,7 @@ CppAD::AD<double> OBCAFG_eval::getCostFunction(const ADvector& x) {
 
 bool OBCAFG_eval::setConstraintsBound(IpoptSolver::Dvector* xl, IpoptSolver::Dvector* xu, IpoptSolver::Dvector* gl,
                                       IpoptSolver::Dvector* gu) {
-    auto _build_bound = [](IpoptSolver::Dvector* target, IpoptSolver::Dvector* source) {
+    auto _build_bound = [](IpoptSolver::Dvector* target, const IpoptSolver::Dvector* const source) {
         std::size_t size = source->size();
         target->resize(size);
         for (std::size_t i = 0; i < size; ++i) { (*target)[i] = (*source)[i]; }
@@ -392,14 +399,14 @@ bool OBCAFG_eval::setControlFeasibleConstraints(const FG_eval::ADvector& x, FG_e
 }
 
 bool OBCAFG_eval::setControlFeasibleConstraintsBound(IpoptSolver::Dvector* lb, IpoptSolver::Dvector* ub) {
-    lb->resize(N_ * (state_num_ + control_num_) + lambda_num_ + mu_num_);
-    ub->resize(N_ * (state_num_ + control_num_) + lambda_num_ + mu_num_);
-    lb->resize(N_ * (state_num_ + control_num_) + lambda_num_ + mu_num_);
-    ub->resize(N_ * (state_num_ + control_num_) + lambda_num_ + mu_num_);
+    std::size_t total_size = N_ * (state_num_ + control_num_) + lambda_num_ + mu_num_;
+    lb->resize(total_size);
+    ub->resize(total_size);
     auto build_ineq_bound = [&lb, &ub](std::size_t idx, double lower, double upper) {
         (*lb)[idx] = lower;
         (*ub)[idx] = upper;
     };
+    // 1. set the bound for primal variables
     kinematic_model::VehicleParam vehicle_param(dynamic_model_ptr_->GetVehicleParam());
     for (std::size_t i = 0; i < N_; ++i) {
         build_ineq_bound(i * (state_num_ + control_num_) + VariableIndex::X, -kMaxValue, kMaxValue);
@@ -422,6 +429,7 @@ bool OBCAFG_eval::setControlFeasibleConstraintsBound(IpoptSolver::Dvector* lb, I
         }
     }
 
+    // 2. set the bound for dual variables
     for (std::size_t i = N_ * (state_num_ + control_num_); i < lb->size(); ++i) {
         (*lb)[i] = 0.0;
         (*ub)[i] = kMaxValue;
@@ -442,11 +450,11 @@ bool OBCAFG_eval::setAvoidanceConstraints(const FG_eval::ADvector& x, FG_eval::A
     // ub->setZero(obstacle_bound_num * N_ * kVehicleBoundaryNum);
     double off_set =
         dynamic_model_ptr_->GetVehicleParam().length() / 2 - dynamic_model_ptr_->GetVehicleParam().rear_overhang();
-    std::size_t start_idx        = N_ * (state_num_ + control_num_);
-    std::size_t lambda_start_idx = start_idx;
-    std::size_t mu_start_idx     = start_idx + N_ * obstacle_A_.rows();
-    std::size_t constraint_idx   = 0;
-    std::size_t obstacle_num     = obstable_bound_num_vec_.size();
+    std::size_t dual_vari_start_idx = N_ * (state_num_ + control_num_);
+    std::size_t lambda_start_idx    = dual_vari_start_idx;
+    std::size_t mu_start_idx        = dual_vari_start_idx + N_ * obstacle_A_.rows();
+    std::size_t constraint_idx      = 0;
+    std::size_t obstacle_num        = obstable_bound_num_vec_.size();
 
     constraints->resize(3 * N_ * obstacle_num);
 
@@ -456,6 +464,13 @@ bool OBCAFG_eval::setAvoidanceConstraints(const FG_eval::ADvector& x, FG_eval::A
     auto     cpp_obstacle_b = obstacle_b_.cast<CppAD::AD<double>>();
     for (std::size_t i = 0; i < x.size(); ++i) { variable_x[i] = x[i]; }
     for (std::size_t i = 0; i < N_; ++i) {
+        // Note: For each time step i, indices are:
+        // - primal variables: [i * (state_num_ + control_num_), (i+1) * (state_num_ + control_num_))
+        // - lambda: [start_idx + i * total_obstacle_pts, ...)
+        // - mu: [start_idx + N_ * total_obstacle_pts + i * kVehicleBoundaryNum * num_obstacles, ...)
+        // For time step i, accumulate indices across previous time steps
+        std::size_t lambda_idx       = lambda_start_idx + i * obstacle_A_.rows();
+        std::size_t mu_idx           = mu_start_idx + i * obstacle_num * kVehicleBoundaryNum;
         std::size_t obstacle_a_start = 0;
         CppMatrixXd rotation_matrix;
         rotation_matrix.resize(2, 2);
@@ -467,10 +482,10 @@ bool OBCAFG_eval::setAvoidanceConstraints(const FG_eval::ADvector& x, FG_eval::A
                                        x[i * (state_num_ + control_num_) + VariableIndex::THETA],
                                        off_set,
                                        move_matrix);
-        for (std::size_t j = 0; j < obstable_bound_num_vec_.size(); ++j) {
+        for (std::size_t j = 0; j < obstacle_num; ++j) {
             std::size_t obstacle_pts_num = obstable_bound_num_vec_[j];
-            CppVecXd    lambda_j         = variable_x.segment(lambda_start_idx, obstacle_pts_num);
-            CppVecXd    mu_j             = variable_x.segment(mu_start_idx, kVehicleBoundaryNum);
+            CppVecXd    lambda_j         = variable_x.segment(lambda_idx + obstacle_a_start, obstacle_pts_num);
+            CppVecXd    mu_j             = variable_x.segment(mu_idx + j * kVehicleBoundaryNum, kVehicleBoundaryNum);
             CppMatrixXd A = cpp_obstacle_A.block(obstacle_a_start, 0, obstacle_pts_num, obstacle_A_.cols());
             CppVecXd    b = cpp_obstacle_b.segment(obstacle_a_start, obstacle_pts_num);
             (*constraints)[constraint_idx] = (lambda_j.transpose() * (A * move_matrix - b) - mu_j.transpose() * g_)(0);
@@ -481,8 +496,6 @@ bool OBCAFG_eval::setAvoidanceConstraints(const FG_eval::ADvector& x, FG_eval::A
 
 
             constraint_idx += 3;
-            lambda_start_idx += obstacle_pts_num;
-            mu_start_idx += kVehicleBoundaryNum;
             obstacle_a_start += obstacle_pts_num;
         }
     }
@@ -492,17 +505,22 @@ bool OBCAFG_eval::setAvoidanceConstraints(const FG_eval::ADvector& x, FG_eval::A
 
 bool OBCAFG_eval::setAvoidanceConstraintsBound(IpoptSolver::Dvector* lb, IpoptSolver::Dvector* ub) {
     std::size_t obstacle_num = obstable_bound_num_vec_.size();
+    // Safe distance to maintain from obstacles (meters)
+    double safe_dist = kSafeDist;   // Use the predefined safe distance (0.05m)
     lb->resize(3 * N_ * obstacle_num);
     ub->resize(3 * N_ * obstacle_num);
     std::size_t constraint_idx = 0;
     for (std::size_t i = 0; i < N_; ++i) {
         for (std::size_t j = 0; j < obstable_bound_num_vec_.size(); ++j) {
-            (*lb)[constraint_idx]     = -kEpsilon;
+            // Constraint 0: lambda^T * (A*c - b) - mu^T * g >= safe_dist (collision avoidance)
+            (*lb)[constraint_idx] = safe_dist;
+            (*ub)[constraint_idx] = kMaxValue;
+            // Constraint 1: mu^T * G + lambda^T * A * R = 0 (stationarity)
             (*lb)[constraint_idx + 1] = -kEpsilon;
-            (*lb)[constraint_idx + 2] = 1.0 - kEpsilon;
-            (*ub)[constraint_idx]     = kMaxValue;
             (*ub)[constraint_idx + 1] = kEpsilon;
-            (*ub)[constraint_idx + 2] = 1.0 + kEpsilon;
+            // Constraint 2: 0 <= ||A^T * lambda||^2 <= 1 (dual variable norm constraint)
+            (*lb)[constraint_idx + 2] = 0.0;
+            (*ub)[constraint_idx + 2] = 1.0;
             constraint_idx += 3;
         }
     }
