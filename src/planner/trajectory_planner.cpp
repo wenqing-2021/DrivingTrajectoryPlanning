@@ -6,29 +6,36 @@ TrajPlanner::TrajPlanner(const params::SolverParams& solver_params, const std::s
                          const std::shared_ptr<collision_check::BaseCheck>& collision_checker,
                          const kinematic_model::VehicleParam&               vehicle_param) {
     // Constructor
+    backend_solver_ = solver_params.backend_solver().empty() ? "obca" : solver_params.backend_solver();
     hybrid_astar_ptr_ =
         std::make_unique<frontend::HybridAstar>(solver_params.hybrid_a_star_param(), map_ptr, collision_checker);
-    pwj_speed_ptr_   = std::make_unique<pwjspeed>(solver_params.piesewise_jerk_params());
-    admm_solver_ptr_ = std::make_unique<admmopt>();
-    // options
+    pwj_speed_ptr_     = std::make_unique<pwjspeed>(solver_params.piesewise_jerk_params());
+    admm_solver_ptr_   = std::make_unique<admmopt>();
+    vehicle_model_ptr_ = std::make_shared<vehicle_model::KinematicModel>(vehicle_param);
+    initObcaSolver(solver_params, map_ptr);
+};
+
+void TrajPlanner::initObcaSolver(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr) {
+    // Keep OBCA-specific setup out of the constructor body.
     std::string options;
-    // turn off any printing
     options += "Integer print_level  0\n";
     options += "String sb            yes\n";
-    // maximum iterations
     options += "Integer max_iter     10\n";
-    // approximate accuracy in first order necessary conditions;
-    // see Mathematical Programming, Volume 106, Number 1,
-    // Pages 25-57, Equation (6)
     options += "Numeric tol          1e-6\n";
-    // derivative tesing
     options += "String derivative_test   second-order\n";
-    // maximum amount of random pertubation; e.g.,
-    // when evaluation finite diff
     options += "Numeric point_perturbation_radius   0.\n";
-    vehicle_model_ptr_ = std::make_shared<vehicle_model::KinematicModel>(vehicle_param);
-    obca_solver_ptr_   = std::make_unique<obcaopt>(options, vehicle_model_ptr_, map_ptr);
-};
+
+    params::OBCAParams obca_params;
+    if (solver_params.has_obca_params()) {
+        obca_params = solver_params.obca_params();
+    } else {
+        obca_params.set_ref_weight(5.0);
+        obca_params.set_smooth_weight(0.5);
+        obca_params.set_control_weight(100.0);
+    }
+
+    obca_solver_ptr_ = std::make_unique<obcaopt>(options, vehicle_model_ptr_, map_ptr, obca_params);
+}
 
 bool TrajPlanner::Process(const vehicle_model::VehiclePose& start_vec, const vehicle_model::VehiclePose& goal_vec) {
     // 1. frontend path plan
@@ -43,23 +50,32 @@ bool TrajPlanner::Process(const vehicle_model::VehiclePose& start_vec, const veh
         return false;
     }
 
-    // 2. backend pwj speed plan
-    LOG(INFO) << "Start to optimize the speed profile...";
+    // 2. generate the trajectory with TrajOptimizer
     const std::vector<Eigen::Vector3d>* const frontend_path = hybrid_astar_ptr_->GetPath();
-    if (pwj_speed_ptr_->Optimize(*frontend_path, start_vec)) {
-        LOG(INFO) << "The speed profile has been optimized...";
-    } else {
-        LOG(WARNING) << "Failed to optimize the speed profile...";
+    LOG(INFO) << "Start to optimize the trajectory with backend solver: " << backend_solver_;
+    if (!runBackendOpt(frontend_path, start_vec, goal_vec)) {
+        LOG(WARNING) << "Failed to optimize the trajectory with backend solver: " << backend_solver_;
         return false;
     }
 
-    // 3. generate the trajectory with TrajOptimizer
-    LOG(INFO) << "Start to generate the init trajectory status and controls...";
-    if (!setStatusControls(frontend_path, pwj_speed_ptr_->GetResult())) { return false; }
-    LOG(INFO) << "The init trajectory status and controls have been set...";
+    return true;
+};
 
-    // 4. solve the trajectory optimization problem with OBCA
-    LOG(INFO) << "Start to optimize the trajectory with OBCA...";
+bool TrajPlanner::runBackendOpt(const std::vector<Eigen::Vector3d>* const frontend_path,
+                                const vehicle_model::VehiclePose&         start_vec,
+                                const vehicle_model::VehiclePose&         goal_vec) {
+    if (backend_solver_ == "obca" && obca_solver_ptr_ != nullptr) {
+        auto sdv_path      = obcaopt::Vec3dToSdvPath(*frontend_path);
+        auto start_vec_ptr = std::make_shared<vehicle_model::VehiclePose>(start_vec);
+        auto goal_vec_ptr  = std::make_shared<vehicle_model::VehiclePose>(goal_vec);
+        obca_solver_ptr_->Process(sdv_path, start_vec_ptr, goal_vec_ptr);
+    } else if (backend_solver_ == "pwj" && pwj_speed_ptr_ != nullptr) {
+        pwj_speed_ptr_->Optimize(*frontend_path, start_vec);
+        setStatusControls(frontend_path, pwj_speed_ptr_->GetResult());
+    } else {
+        LOG(ERROR) << "The backend solver " << backend_solver_ << " is not supported or not initialized.";
+        return false;
+    }
 
     return true;
 };

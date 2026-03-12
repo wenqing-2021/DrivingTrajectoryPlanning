@@ -245,7 +245,11 @@ int main() {
 
         // ==================== Run OBCA Solver ====================
         LOG(INFO) << "Creating OBCA solver...";
-        backend::OBCASolver obca_solver(ipopt_options, dynamic_model_ptr, map_ptr);
+        params::OBCAParams obca_params;
+        obca_params.set_ref_weight(5.0);
+        obca_params.set_smooth_weight(0.5);
+        obca_params.set_control_weight(100.0);
+        backend::OBCASolver obca_solver(ipopt_options, dynamic_model_ptr, map_ptr, obca_params);
         LOG(INFO) << "OBCA solver created";
 
         LOG(INFO) << "Running OBCA optimization...";

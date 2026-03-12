@@ -38,9 +38,17 @@ message PiecewiseJerkParams {
     double w_a_end = 12;
 }
 
+message OBCAParams {
+    double ref_weight = 1;
+    double smooth_weight = 2;
+    double control_weight = 3;
+}
+
 message SolverParams {
     double max_iter = 1;
     double map_resolution = 2;
     HybridAStarParams hybrid_a_star_param = 3;
     PiecewiseJerkParams piesewise_jerk_params = 4;
+    OBCAParams obca_params = 5;
+    string backend_solver = 6;
 }

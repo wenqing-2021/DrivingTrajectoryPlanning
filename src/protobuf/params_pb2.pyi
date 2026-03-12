@@ -115,55 +115,6 @@ class HybridAStarParams(google.protobuf.message.Message):
 
 global___HybridAStarParams = HybridAStarParams
 
-class MPCSolverParams(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
-    MAX_ACC_FIELD_NUMBER: builtins.int
-    MIN_ACC_FIELD_NUMBER: builtins.int
-    MAX_V_FIELD_NUMBER: builtins.int
-    MIN_V_FIELD_NUMBER: builtins.int
-    W_U_FIELD_NUMBER: builtins.int
-    W_DELTA_U_FIELD_NUMBER: builtins.int
-    W_REF_FIELD_NUMBER: builtins.int
-    max_acc: builtins.float = ...
-    min_acc: builtins.float = ...
-    max_v: builtins.float = ...
-    min_v: builtins.float = ...
-    w_u: builtins.float = ...
-    w_delta_u: builtins.float = ...
-    w_ref: builtins.float = ...
-    def __init__(
-        self,
-        *,
-        max_acc: builtins.float = ...,
-        min_acc: builtins.float = ...,
-        max_v: builtins.float = ...,
-        min_v: builtins.float = ...,
-        w_u: builtins.float = ...,
-        w_delta_u: builtins.float = ...,
-        w_ref: builtins.float = ...,
-    ) -> None: ...
-    def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "max_acc",
-            b"max_acc",
-            "max_v",
-            b"max_v",
-            "min_acc",
-            b"min_acc",
-            "min_v",
-            b"min_v",
-            "w_delta_u",
-            b"w_delta_u",
-            "w_ref",
-            b"w_ref",
-            "w_u",
-            b"w_u",
-        ],
-    ) -> None: ...
-
-global___MPCSolverParams = MPCSolverParams
-
 class PiecewiseJerkParams(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
     MAX_ITER_FIELD_NUMBER: builtins.int
@@ -238,37 +189,69 @@ class PiecewiseJerkParams(google.protobuf.message.Message):
 
 global___PiecewiseJerkParams = PiecewiseJerkParams
 
+class OBCAParams(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    REF_WEIGHT_FIELD_NUMBER: builtins.int
+    SMOOTH_WEIGHT_FIELD_NUMBER: builtins.int
+    CONTROL_WEIGHT_FIELD_NUMBER: builtins.int
+    ref_weight: builtins.float = ...
+    smooth_weight: builtins.float = ...
+    control_weight: builtins.float = ...
+    def __init__(
+        self,
+        *,
+        ref_weight: builtins.float = ...,
+        smooth_weight: builtins.float = ...,
+        control_weight: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "control_weight",
+            b"control_weight",
+            "ref_weight",
+            b"ref_weight",
+            "smooth_weight",
+            b"smooth_weight",
+        ],
+    ) -> None: ...
+
+global___OBCAParams = OBCAParams
+
 class SolverParams(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
     MAX_ITER_FIELD_NUMBER: builtins.int
     MAP_RESOLUTION_FIELD_NUMBER: builtins.int
     HYBRID_A_STAR_PARAM_FIELD_NUMBER: builtins.int
-    MPC_SOLVER_PARAM_FIELD_NUMBER: builtins.int
     PIESEWISE_JERK_PARAMS_FIELD_NUMBER: builtins.int
+    OBCA_PARAMS_FIELD_NUMBER: builtins.int
+    BACKEND_SOLVER_FIELD_NUMBER: builtins.int
     max_iter: builtins.float = ...
     map_resolution: builtins.float = ...
     @property
     def hybrid_a_star_param(self) -> global___HybridAStarParams: ...
     @property
-    def mpc_solver_param(self) -> global___MPCSolverParams: ...
-    @property
     def piesewise_jerk_params(self) -> global___PiecewiseJerkParams: ...
+    @property
+    def obca_params(self) -> global___OBCAParams: ...
+    backend_solver: typing.Text = ...
     def __init__(
         self,
         *,
         max_iter: builtins.float = ...,
         map_resolution: builtins.float = ...,
         hybrid_a_star_param: typing.Optional[global___HybridAStarParams] = ...,
-        mpc_solver_param: typing.Optional[global___MPCSolverParams] = ...,
         piesewise_jerk_params: typing.Optional[global___PiecewiseJerkParams] = ...,
+        obca_params: typing.Optional[global___OBCAParams] = ...,
+        backend_solver: typing.Text = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "hybrid_a_star_param",
             b"hybrid_a_star_param",
-            "mpc_solver_param",
-            b"mpc_solver_param",
+            "obca_params",
+            b"obca_params",
             "piesewise_jerk_params",
             b"piesewise_jerk_params",
         ],
@@ -276,14 +259,16 @@ class SolverParams(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "backend_solver",
+            b"backend_solver",
             "hybrid_a_star_param",
             b"hybrid_a_star_param",
             "map_resolution",
             b"map_resolution",
             "max_iter",
             b"max_iter",
-            "mpc_solver_param",
-            b"mpc_solver_param",
+            "obca_params",
+            b"obca_params",
             "piesewise_jerk_params",
             b"piesewise_jerk_params",
         ],

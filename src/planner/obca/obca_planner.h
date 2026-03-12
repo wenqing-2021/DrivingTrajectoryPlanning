@@ -3,6 +3,7 @@
 #include "logger.h"
 #include "map.h"
 #include "math/polygon2d.h"
+#include "params.pb.h"
 #include "vehicle_model/kinematic_model.h"
 #include <Eigen/Core>
 #include <vector>
@@ -28,6 +29,7 @@ class OBCAFG_eval : public FG_eval {
     typedef Eigen::Matrix<CppAD::AD<double>, Eigen::Dynamic, 1>              CppVecXd;
     CppAD::AD<double> getCostFunction(const ADvector& x) override;
     ADvector          getConstraints(const ADvector& x) override;
+    inline void       setCostWeights(const params::OBCAParams& obca_params) { obca_params_ = obca_params; }
     inline const void setInitParameters(std::shared_ptr<Eigen::VectorXd>& ref_X_ptr, const std::size_t N,
                                         const std::size_t state_num, const std::size_t control_num,
                                         const std::size_t lambda_num, const std::size_t mu_num,
@@ -111,6 +113,7 @@ class OBCAFG_eval : public FG_eval {
     constexpr static double                        kSafeDist           = 0.001;   // m
     constexpr static double                        kEpsilon            = 1e-4;    // Must match OBCAFG_eval::kEpsilon
     constexpr static double                        kMaxValue           = 1e4;
+    params::OBCAParams                             obca_params_;
     Eigen::Matrix<CppAD::AD<double>, kVehicleBoundaryNum, 2> G_;   // ego vehicle matrix: Gx <= g
     Eigen::Matrix<CppAD::AD<double>, kVehicleBoundaryNum, 1> g_;   // Control input matrix
 };
@@ -124,7 +127,7 @@ class OBCASolver : public IpoptSolver {
     */
   public:
     OBCASolver(std::string& options, const std::shared_ptr<vehicle_model::KinematicModel>& dynamic_model_ptr,
-               const std::shared_ptr<map::Map>& map_ptr)
+               const std::shared_ptr<map::Map>& map_ptr, const params::OBCAParams& obca_params)
         : IpoptSolver(options) {
         if (map_ptr == nullptr || dynamic_model_ptr == nullptr) {
             LOG(WARNING) << "The map ptr or dynamic model ptr is null.";
@@ -135,11 +138,22 @@ class OBCASolver : public IpoptSolver {
         state_num_         = vehicle_model::KinematicModel::GetStateSize();     // 4: [x, y, theta, v]
         control_num_       = vehicle_model::KinematicModel::GetControlSize();   // 2: [a, sigma]
         fg_eval_           = OBCAFG_eval();
+        fg_eval_.setCostWeights(obca_params);
     };
     ~OBCASolver() = default;
     bool Process(const vehicle_model::sdv_path& init_path, std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
                  std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr);
-
+    inline static vehicle_model::sdv_path Vec3dToSdvPath(const std::vector<Eigen::Vector3d>& path) {
+        vehicle_model::sdv_path sdv_path;
+        for (const auto& point : path) {
+            vehicle_model::VehiclePose pose;
+            pose.x     = point.x();
+            pose.y     = point.y();
+            pose.theta = point.z();
+            sdv_path.push_back(pose);
+        }
+        return sdv_path;
+    }
     inline const std::vector<Eigen::Vector4d>& GetStatesResult() const { return states_result_; }
     inline const std::vector<Eigen::Vector2d>& GetControlsResult() const { return controls_result_; }
 

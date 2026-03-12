@@ -183,9 +183,9 @@ bool OBCAFG_eval::getMovementMatrix(const CppAD::AD<double> x, const CppAD::AD<d
 
 CppAD::AD<double> OBCAFG_eval::getCostFunction(const ADvector& x) {
     CppAD::AD<double> cost           = 0.0;
-    double            ref_weight     = 5.0;
-    double            smooth_weight  = 0.5;
-    double            control_weight = 100.0;
+    double            ref_weight     = obca_params_.ref_weight();
+    double            smooth_weight  = obca_params_.smooth_weight();
+    double            control_weight = obca_params_.control_weight();
     for (std::size_t i = 0; i < N_; ++i) {
         // 1. cost for ref_X
         CppAD::AD<double> x_pos = x[i * (state_num_ + control_num_) + VariableIndex::X];

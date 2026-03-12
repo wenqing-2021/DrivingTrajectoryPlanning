@@ -15,9 +15,9 @@ import numpy as np
 from pathlib import Path
 
 # Vehicle parameters (should match the C++ code)
-VEHICLE_LENGTH = 5.0   # meters
-VEHICLE_WIDTH = 2.0    # meters
-REAR_OVERHANG = 1.25   # meters
+VEHICLE_LENGTH = 5.0  # meters
+VEHICLE_WIDTH = 2.0  # meters
+REAR_OVERHANG = 1.25  # meters
 
 
 def load_csv(filename):
@@ -68,7 +68,7 @@ def get_vehicle_corners(
     rear_overhang=REAR_OVERHANG,
 ):
     """Calculate the four corners of the vehicle rectangle.
-    
+
     Args:
         x: x-coordinate of rear axle center
         y: y-coordinate of rear axle center
@@ -76,7 +76,7 @@ def get_vehicle_corners(
         length: vehicle length
         width: vehicle width
         rear_overhang: rear axle center to rear bumper distance
-    
+
     Returns:
         numpy array of shape (5, 2) containing the four corners and closing point
     """
@@ -85,28 +85,27 @@ def get_vehicle_corners(
     front_x = length - rear_overhang
     rear_x = -rear_overhang
     half_width = width / 2.0
-    
-    corners_local = np.array([
-        [front_x, -half_width],  # Front-right
-        [front_x, half_width],   # Front-left
-        [rear_x, half_width],    # Rear-left
-        [rear_x, -half_width],   # Rear-right
-        [front_x, -half_width],  # Close the rectangle
-    ])
-    
+
+    corners_local = np.array(
+        [
+            [front_x, -half_width],  # Front-right
+            [front_x, half_width],  # Front-left
+            [rear_x, half_width],  # Rear-left
+            [rear_x, -half_width],  # Rear-right
+            [front_x, -half_width],  # Close the rectangle
+        ]
+    )
+
     # Rotation matrix
     cos_theta = np.cos(theta)
     sin_theta = np.sin(theta)
-    rotation_matrix = np.array([
-        [cos_theta, -sin_theta],
-        [sin_theta, cos_theta]
-    ])
-    
+    rotation_matrix = np.array([[cos_theta, -sin_theta], [sin_theta, cos_theta]])
+
     # Transform to global frame
     corners_global = corners_local @ rotation_matrix.T
     corners_global[:, 0] += x
     corners_global[:, 1] += y
-    
+
     return corners_global
 
 
@@ -133,10 +132,12 @@ def create_visualization(results_dir, output_file="obca_result.png"):
     # Create figure with subplots: trajectory plot, velocity plot, and control plots
     fig = plt.figure(figsize=(16, 10))
     gs = fig.add_gridspec(3, 2, hspace=0.3, wspace=0.3)
-    ax_traj = fig.add_subplot(gs[0:2, :])  # Top: trajectory (spans 2 rows and all columns)
-    ax_vel = fig.add_subplot(gs[2, 0])      # Bottom left: velocity
+    ax_traj = fig.add_subplot(
+        gs[0:2, :]
+    )  # Top: trajectory (spans 2 rows and all columns)
+    ax_vel = fig.add_subplot(gs[2, 0])  # Bottom left: velocity
     ax_control = fig.add_subplot(gs[2, 1])  # Bottom right: controls
-    
+
     # ========== Plot 1: Trajectory ==========
     ax = ax_traj  # Use ax for trajectory plot for compatibility with existing code
 
@@ -151,28 +152,28 @@ def create_visualization(results_dir, output_file="obca_result.png"):
             alpha=0.7,
         )
         ax.plot(initial_path[:, 0], initial_path[:, 1], "bo", markersize=4, alpha=0.5)
-        
+
         # Draw vehicle bounding boxes along the initial path
         # Draw every N states to avoid cluttering
         step = max(1, len(initial_path) // 10)  # Draw ~10 vehicles
         for i in range(0, len(initial_path), step):
             x, y, theta = initial_path[i, 0], initial_path[i, 1], initial_path[i, 2]
             corners = get_vehicle_corners(x, y, theta)
-            
+
             # Draw vehicle rectangle
             vehicle_rect = patches.Polygon(
                 corners[:-1],
                 closed=True,
-                facecolor='blue',
-                edgecolor='darkblue',
+                facecolor="blue",
+                edgecolor="darkblue",
                 linewidth=1.5,
                 alpha=0.15,
-                zorder=2
+                zorder=2,
             )
             ax.add_patch(vehicle_rect)
-            
+
             # Draw vehicle outline
-            ax.plot(corners[:, 0], corners[:, 1], 'b--', linewidth=1.0, alpha=0.5)
+            ax.plot(corners[:, 0], corners[:, 1], "b--", linewidth=1.0, alpha=0.5)
 
     # Plot optimized trajectory
     if optimized_traj is not None:
@@ -183,59 +184,73 @@ def create_visualization(results_dir, output_file="obca_result.png"):
             linewidth=2.5,
             label="Optimized Trajectory (Rear Axle)",
         )
-        ax.plot(optimized_traj[:, 0], optimized_traj[:, 1], "go", markersize=6, alpha=0.6)
-        
+        ax.plot(
+            optimized_traj[:, 0], optimized_traj[:, 1], "go", markersize=6, alpha=0.6
+        )
+
         # Draw vehicle bounding boxes along the trajectory
         # Draw every N states to avoid cluttering
         step = max(1, len(optimized_traj) // 10)  # Draw ~10 vehicles
         for i in range(0, len(optimized_traj), step):
-            x, y, theta = optimized_traj[i, 0], optimized_traj[i, 1], optimized_traj[i, 2]
+            x, y, theta = (
+                optimized_traj[i, 0],
+                optimized_traj[i, 1],
+                optimized_traj[i, 2],
+            )
             corners = get_vehicle_corners(x, y, theta)
-            
+
             # Draw vehicle rectangle
             vehicle_rect = patches.Polygon(
                 corners[:-1],
                 closed=True,
-                facecolor='green',
-                edgecolor='darkgreen',
+                facecolor="green",
+                edgecolor="darkgreen",
                 linewidth=1.5,
                 alpha=0.2,
-                zorder=3
+                zorder=3,
             )
             ax.add_patch(vehicle_rect)
-            
+
             # Draw vehicle outline
-            ax.plot(corners[:, 0], corners[:, 1], 'g-', linewidth=1.5, alpha=0.6)
-        
+            ax.plot(corners[:, 0], corners[:, 1], "g-", linewidth=1.5, alpha=0.6)
+
         # Draw vehicle at start and end positions with different colors
         if len(optimized_traj) > 0:
             # Start vehicle
-            x, y, theta = optimized_traj[0, 0], optimized_traj[0, 1], optimized_traj[0, 2]
+            x, y, theta = (
+                optimized_traj[0, 0],
+                optimized_traj[0, 1],
+                optimized_traj[0, 2],
+            )
             corners_start = get_vehicle_corners(x, y, theta)
             vehicle_start = patches.Polygon(
                 corners_start[:-1],
                 closed=True,
-                facecolor='blue',
-                edgecolor='darkblue',
+                facecolor="blue",
+                edgecolor="darkblue",
                 linewidth=2,
                 alpha=0.4,
                 zorder=4,
-                label='Start Vehicle'
+                label="Start Vehicle",
             )
             ax.add_patch(vehicle_start)
-            
+
             # End vehicle
-            x, y, theta = optimized_traj[-1, 0], optimized_traj[-1, 1], optimized_traj[-1, 2]
+            x, y, theta = (
+                optimized_traj[-1, 0],
+                optimized_traj[-1, 1],
+                optimized_traj[-1, 2],
+            )
             corners_end = get_vehicle_corners(x, y, theta)
             vehicle_end = patches.Polygon(
                 corners_end[:-1],
                 closed=True,
-                facecolor='red',
-                edgecolor='darkred',
+                facecolor="red",
+                edgecolor="darkred",
                 linewidth=2,
                 alpha=0.4,
                 zorder=4,
-                label='End Vehicle'
+                label="End Vehicle",
             )
             ax.add_patch(vehicle_end)
 
@@ -290,28 +305,34 @@ def create_visualization(results_dir, output_file="obca_result.png"):
         x_pos = optimized_traj[:, 0]
         y_pos = optimized_traj[:, 1]
         velocity = optimized_traj[:, 3]
-        
+
         # Calculate cumulative distance
         distances = np.zeros(len(x_pos))
         for i in range(1, len(x_pos)):
-            distances[i] = distances[i-1] + np.sqrt(
-                (x_pos[i] - x_pos[i-1])**2 + (y_pos[i] - y_pos[i-1])**2
+            distances[i] = distances[i - 1] + np.sqrt(
+                (x_pos[i] - x_pos[i - 1]) ** 2 + (y_pos[i] - y_pos[i - 1]) ** 2
             )
-        
+
         # Plot velocity vs distance
-        ax_vel.plot(distances, velocity, 'b-', linewidth=2.5, label='Velocity')
-        ax_vel.fill_between(distances, 0, velocity, alpha=0.3, color='blue')
+        ax_vel.plot(distances, velocity, "b-", linewidth=2.5, label="Velocity")
+        ax_vel.fill_between(distances, 0, velocity, alpha=0.3, color="blue")
         ax_vel.set_xlabel("Distance along path (m)", fontsize=11)
         ax_vel.set_ylabel("Velocity (m/s)", fontsize=11)
         ax_vel.set_title("Velocity Profile", fontsize=12, fontweight="bold")
         ax_vel.grid(True, alpha=0.3)
         ax_vel.legend(fontsize=10)
-        
+
         # Add max velocity line
-        max_v = VEHICLE_LENGTH if 'VEHICLE_LENGTH' in dir() else 5.0
+        max_v = VEHICLE_LENGTH if "VEHICLE_LENGTH" in dir() else 5.0
         max_velocity_limit = 5.0  # From C++ code
-        ax_vel.axhline(y=max_velocity_limit, color='r', linestyle='--', 
-                       linewidth=1.5, alpha=0.7, label=f'Max Velocity ({max_velocity_limit} m/s)')
+        ax_vel.axhline(
+            y=max_velocity_limit,
+            color="r",
+            linestyle="--",
+            linewidth=1.5,
+            alpha=0.7,
+            label=f"Max Velocity ({max_velocity_limit} m/s)",
+        )
         ax_vel.legend(fontsize=10)
 
     # ========== Plot 3: Control Inputs ==========
@@ -319,39 +340,63 @@ def create_visualization(results_dir, output_file="obca_result.png"):
         acceleration = optimized_controls[:, 0]
         steer_angle = optimized_controls[:, 1]
         control_indices = np.arange(len(acceleration))
-        
+
         # Create twin axis for steering angle
         ax_control_twin = ax_control.twinx()
-        
+
         # Plot acceleration
-        line1 = ax_control.plot(control_indices, acceleration, 'g-', 
-                               linewidth=2.5, label='Acceleration', alpha=0.8)
-        ax_control.fill_between(control_indices, 0, acceleration, alpha=0.2, color='green')
+        line1 = ax_control.plot(
+            control_indices,
+            acceleration,
+            "g-",
+            linewidth=2.5,
+            label="Acceleration",
+            alpha=0.8,
+        )
+        ax_control.fill_between(
+            control_indices, 0, acceleration, alpha=0.2, color="green"
+        )
         ax_control.set_xlabel("Control Step", fontsize=11)
-        ax_control.set_ylabel("Acceleration (m/s²)", fontsize=11, color='g')
-        ax_control.tick_params(axis='y', labelcolor='g')
+        ax_control.set_ylabel("Acceleration (m/s²)", fontsize=11, color="g")
+        ax_control.tick_params(axis="y", labelcolor="g")
         ax_control.grid(True, alpha=0.3)
-        
+
         # Plot steering angle on twin axis
-        line2 = ax_control_twin.plot(control_indices, np.degrees(steer_angle), 'orange', 
-                                     linewidth=2.5, label='Steering Angle', alpha=0.8)
-        ax_control_twin.set_ylabel("Steering Angle (degrees)", fontsize=11, color='orange')
-        ax_control_twin.tick_params(axis='y', labelcolor='orange')
-        
+        line2 = ax_control_twin.plot(
+            control_indices,
+            np.degrees(steer_angle),
+            "orange",
+            linewidth=2.5,
+            label="Steering Angle",
+            alpha=0.8,
+        )
+        ax_control_twin.set_ylabel(
+            "Steering Angle (degrees)", fontsize=11, color="orange"
+        )
+        ax_control_twin.tick_params(axis="y", labelcolor="orange")
+
         # Add limits
         max_acc = 2.0  # From C++ code
         max_steer = np.degrees(0.5)  # From C++ code
-        ax_control.axhline(y=max_acc, color='darkgreen', linestyle='--', linewidth=1.5, alpha=0.5)
-        ax_control.axhline(y=-max_acc, color='darkgreen', linestyle='--', linewidth=1.5, alpha=0.5)
-        ax_control_twin.axhline(y=max_steer, color='darkorange', linestyle='--', linewidth=1.5, alpha=0.5)
-        ax_control_twin.axhline(y=-max_steer, color='darkorange', linestyle='--', linewidth=1.5, alpha=0.5)
-        
+        ax_control.axhline(
+            y=max_acc, color="darkgreen", linestyle="--", linewidth=1.5, alpha=0.5
+        )
+        ax_control.axhline(
+            y=-max_acc, color="darkgreen", linestyle="--", linewidth=1.5, alpha=0.5
+        )
+        ax_control_twin.axhline(
+            y=max_steer, color="darkorange", linestyle="--", linewidth=1.5, alpha=0.5
+        )
+        ax_control_twin.axhline(
+            y=-max_steer, color="darkorange", linestyle="--", linewidth=1.5, alpha=0.5
+        )
+
         ax_control.set_title("Control Inputs", fontsize=12, fontweight="bold")
-        
+
         # Combined legend
         lines = line1 + line2
         labels = [l.get_label() for l in lines]
-        ax_control.legend(lines, labels, fontsize=10, loc='upper right')
+        ax_control.legend(lines, labels, fontsize=10, loc="upper right")
 
     # Save figure
     plt.tight_layout()

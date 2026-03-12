@@ -1,3 +1,12 @@
+/*
+ * @Author: wenqing-2021 yuansj@hnu.edu.cn
+ * @Date: 2026-01-31 12:14:24
+ * @LastEditors: wenqing-2021 yuansj@hnu.edu.cn
+ * @LastEditTime: 2026-03-12 14:50:54
+ * @FilePath: /AutomatedPark/src/planner/trajectory_planner.h
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置:
+ * https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 #pragma once
 #include "admm/admm_planner.h"
 #include "base_check.h"
@@ -26,6 +35,9 @@ class TrajPlanner {
     const vehicle_model::opt_control&    GetInitControls() const { return init_controls_; };   // get the init controls
 
   private:
+    void initObcaSolver(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr);
+    bool runBackendOpt(const std::vector<Eigen::Vector3d>* const frontend_path,
+                       const vehicle_model::VehiclePose& start_vec, const vehicle_model::VehiclePose& goal_vec);
     bool setStatusControls(const std::vector<Eigen::Vector3d>* const init_path_ptr,
                            const std::vector<Eigen::Vector3d>* const init_traj_ptr);
 
@@ -35,6 +47,7 @@ class TrajPlanner {
     std::unique_ptr<obcaopt>                       obca_solver_ptr_;   // pointer to the OBCA solver
     std::shared_ptr<vehicle_model::KinematicModel> vehicle_model_ptr_;
     std::vector<Eigen::Vector3d>                   debug_node_list_;
+    std::string                                    backend_solver_;
     double                                         frontend_path_length_{0.0};
     vehicle_model::opt_status                      init_states_;
     vehicle_model::opt_control                     init_controls_;

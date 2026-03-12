@@ -76,12 +76,10 @@ class StateVar(google.protobuf.message.Message):
     Y_FIELD_NUMBER: builtins.int
     THETA_FIELD_NUMBER: builtins.int
     V_FIELD_NUMBER: builtins.int
-    NELEMENT_FIELD_NUMBER: builtins.int
     x: builtins.float = ...
     y: builtins.float = ...
     theta: builtins.float = ...
     v: builtins.float = ...
-    nelement: builtins.int = ...
     def __init__(
         self,
         *,
@@ -89,12 +87,11 @@ class StateVar(google.protobuf.message.Message):
         y: builtins.float = ...,
         theta: builtins.float = ...,
         v: builtins.float = ...,
-        nelement: builtins.int = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "nelement", b"nelement", "theta", b"theta", "v", b"v", "x", b"x", "y", b"y"
+            "theta", b"theta", "v", b"v", "x", b"x", "y", b"y"
         ],
     ) -> None: ...
 
@@ -104,26 +101,18 @@ class ControlVar(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
     ACCELERATE_FIELD_NUMBER: builtins.int
     STEER_ANGLE_FIELD_NUMBER: builtins.int
-    NELEMENT_FIELD_NUMBER: builtins.int
     accelerate: builtins.float = ...
     steer_angle: builtins.float = ...
-    nelement: builtins.int = ...
     def __init__(
         self,
         *,
         accelerate: builtins.float = ...,
         steer_angle: builtins.float = ...,
-        nelement: builtins.int = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "accelerate",
-            b"accelerate",
-            "nelement",
-            b"nelement",
-            "steer_angle",
-            b"steer_angle",
+            "accelerate", b"accelerate", "steer_angle", b"steer_angle"
         ],
     ) -> None: ...
 
