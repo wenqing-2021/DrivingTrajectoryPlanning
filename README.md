@@ -5,7 +5,13 @@ We use different optimization-based trajectory planning methods to label traject
 
 # 2. Run
 
+# 3. Optimization planner
 
-## 2. collision check [1.5]
+## 3.1 frontend-search
 
-## 3. ADMM planner [1.28]
+## 3.2 backend-opt
+
+# 4. TODO
+[] check obca running settings
+[] dev ADMM method
+[] add commonroad interface
