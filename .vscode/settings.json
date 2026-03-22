@@ -11,5 +11,10 @@
     "clangd.path": "/usr/bin/clangd-12",
     "clangd.arguments": [
         "--header-insertion=never"
-    ]
+    ],
+    "fileheader.configObj": {
+        "autoAdd": true,
+        "supportAutoLanguage": ["c", "cpp", "python", "javascript", "typescript"],
+        "prohibitAutoAdd": ["md"]
+    },
 }

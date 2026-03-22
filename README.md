@@ -1,5 +1,5 @@
-# automated_park
-using ADMM to generate optimal trajectory for automated park scenario. NO controller.
+# SuperTrajectoryLabel
+We use different optimization-based trajectory planning methods to label trajectory in park & urban senarios
 
 # 1. Installation
 
