@@ -46,15 +46,16 @@ const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {
     LOG(INFO) << "Load problem from protobuf...";
     Solver::LoadProblem(plan_problem, solver_params);
     plan_res_.set_solve_success(false);
+
     // 2. process
     LOG(INFO) << "Process...";
     if (traj_planner_ptr_->Process(start_vec_, goal_vec_)) {
-        setInitTraj(traj_planner_ptr_->GetInitStates(),
-                    traj_planner_ptr_->GetInitControls());   // set the init traj
-        LOG(INFO) << "The init traj has been set...";
+        setOptTraj(traj_planner_ptr_->GetOptStates(),
+                   traj_planner_ptr_->GetOptControls());   // set the opt traj
+        LOG(INFO) << "The opt traj has been set...";
         plan_res_.set_solve_success(true);
     } else {
-        LOG(WARNING) << "Failed to find the init path...";
+        LOG(WARNING) << "Failed to find the opt path...";
         const auto& debug_node_list = traj_planner_ptr_->GetDebugNodeList();
         plan_res_.clear_init_traj();
         for (const auto& point : debug_node_list) {
@@ -71,41 +72,40 @@ const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {
     return plan_res_;
 };
 
-void Solver::setInitTraj(const planning::vehicle_model::opt_status&  init_states,
-                         const planning::vehicle_model::opt_control& init_controls) {
-    // 1. check the init_states and init_controls
-    LOG(INFO) << "Set init traj...";
-    if (init_states.rows() < 2) {
-        LOG(WARNING) << "The init states size is less than 2";
+void Solver::setOptTraj(const planning::vehicle_model::opt_status&  opt_states,
+                        const planning::vehicle_model::opt_control& opt_controls) {
+    // 1. check the opt_states and opt_controls
+    LOG(INFO) << "Set opt traj...";
+    if (opt_states.rows() < 2) {
+        LOG(WARNING) << "The opt states size is less than 2";
         return;
-    } else if (init_states.rows() != init_controls.rows() + 1) {
-        LOG(WARNING) << "The init states size is not equal to the init controls size + 1";
+    } else if (opt_states.rows() != opt_controls.rows() + 1) {
+        LOG(WARNING) << "The opt states size is not equal to the opt controls size + 1";
         return;
     }
     plan_res_.clear_init_traj();
-    for (int i = 0; i < init_states.rows(); ++i) {
-        kinematic_model::StateVar   init_traj_state;
-        kinematic_model::ControlVar init_traj_control;
+    for (int i = 0; i < opt_states.rows(); ++i) {
+        kinematic_model::StateVar   opt_traj_state;
+        kinematic_model::ControlVar opt_traj_control;
 
-        const double x     = init_states(i, 0);
-        const double y     = init_states(i, 1);
-        const double theta = init_states(i, 2);
-        const double v     = init_states(i, 3);
-        init_traj_state.set_x(x);
-        init_traj_state.set_y(y);
-        init_traj_state.set_theta(theta);
-        init_traj_state.set_v(v);
-        plan_res_.add_init_traj()->CopyFrom(init_traj_state);
+        const double x     = opt_states(i, 0);
+        const double y     = opt_states(i, 1);
+        const double theta = opt_states(i, 2);
+        const double v     = opt_states(i, 3);
+        opt_traj_state.set_x(x);
+        opt_traj_state.set_y(y);
+        opt_traj_state.set_theta(theta);
+        opt_traj_state.set_v(v);
+        plan_res_.add_init_traj()->CopyFrom(opt_traj_state);
 
-        if (i < init_controls.rows()) {
-            const double a     = init_controls(i, 0);
-            const double delta = init_controls(i, 1);
-            init_traj_control.set_accelerate(a);
-            init_traj_control.set_steer_angle(delta);
-            plan_res_.add_init_controls()->CopyFrom(init_traj_control);
+        if (i < opt_controls.rows()) {
+            const double a     = opt_controls(i, 0);
+            const double delta = opt_controls(i, 1);
+            opt_traj_control.set_accelerate(a);
+            opt_traj_control.set_steer_angle(delta);
+            plan_res_.add_init_controls()->CopyFrom(opt_traj_control);
         }
     }
-    LOG(INFO) << "Have set init traj...";
 };
 
 }   // namespace solver

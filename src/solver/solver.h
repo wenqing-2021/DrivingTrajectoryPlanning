@@ -25,7 +25,7 @@ class Solver {
 
     void                     LoadProblem(const problem::PlanProblem& plan_problem,
                                          const params::SolverParams& solver_params);   // Load problem from protobuf
-    const cost_map::CostMap& getCostMap() const { return map_ptr_->GetCostMap(); };
+    const cost_map::CostMap& GetCostMap() const { return map_ptr_->GetCostMap(); };
 
   private:
     void setMap(std::shared_ptr<map::Map>&& map_ptr) { map_ptr_ = std::move(map_ptr); }
@@ -38,8 +38,8 @@ class Solver {
         vechile_pose.theta = state_var.theta();
     };
     void setSolverParams(const params::SolverParams& solver_params) { solver_params_ = solver_params; };
-    void setInitTraj(const planning::vehicle_model::opt_status&  init_states,
-                     const planning::vehicle_model::opt_control& init_controls);
+    void setOptTraj(const planning::vehicle_model::opt_status&  opt_states,
+                    const planning::vehicle_model::opt_control& opt_controls);
     // define pointer to the submodule
     std::shared_ptr<map::Map>                   map_ptr_;
     std::shared_ptr<collision_check::BaseCheck> collision_check_ptr_;

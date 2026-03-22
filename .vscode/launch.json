@@ -8,14 +8,15 @@
             "name": "Python Debugger: Main",
             "type": "debugpy",
             "request": "launch",
-            "program": "build/install/main.py",
+            "cwd": "${workspaceFolder}/build/install/src",
+            "program": "main.py",
             "console": "integratedTerminal",
             "args": [
                 "--debug",
                 "--params",
-                "src/config/solver_params.yaml",
+                "config/solver_params.yaml",
                 "--file",
-                "data/BenchmarkCases/Case1.csv",
+                "/root/workspace/AutomatedPark/data/BenchmarkCases/Case1.csv",
             ],
         },
         {

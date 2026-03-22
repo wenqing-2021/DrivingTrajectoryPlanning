@@ -11,6 +11,8 @@ from bokeh.models import (
     ColumnDataSource,
     TabPanel,
     Tabs,
+    Range1d,
+    LinearAxis,
 )
 from bokeh.plotting import figure, show
 from utils.visualization.vis_config import FIG_VIS, COLOR_MAP, RENDER_VIS
@@ -44,6 +46,7 @@ class BokehVis:
         self.init_controls_dict = {}
         self.doc = curdoc()
         self.debug = debug
+        self._velocity_right_axis_added = False
 
         # build the tabs
         self._build_tabs()
@@ -53,6 +56,25 @@ class BokehVis:
 
         # parse the plan result
         self._parse_plan_result()
+
+    @staticmethod
+    def _calc_axis_bounds(values: np.ndarray, padding_ratio: float = 0.1):
+        values = np.asarray(values)
+        if values.size == 0:
+            return -1.0, 1.0
+
+        finite_values = values[np.isfinite(values)]
+        if finite_values.size == 0:
+            return -1.0, 1.0
+
+        min_v = float(np.min(finite_values))
+        max_v = float(np.max(finite_values))
+        span = max_v - min_v
+        padding = max(span * padding_ratio, 1e-3)
+        if span < 1e-9:
+            padding = max(abs(max_v) * padding_ratio, 1e-2)
+
+        return min_v - padding, max_v + padding
 
     def _build_tabs(self):
         layout_dict = self._build_layout()
@@ -283,8 +305,38 @@ class BokehVis:
 
     def render_init_traj(self):
         if hasattr(self, "init_traj"):
+            speed_min, speed_max = self._calc_axis_bounds(self.init_traj_dict["v"])
+            self.velocity_plotter.y_range = Range1d(start=speed_min, end=speed_max)
+
+        if hasattr(self, "init_controls"):
+            acc_min, acc_max = self._calc_axis_bounds(self.init_controls_dict["acc"])
+            self.velocity_plotter.extra_y_ranges = {
+                "acc": Range1d(start=acc_min, end=acc_max)
+            }
+            if not self._velocity_right_axis_added:
+                self.velocity_plotter.add_layout(
+                    LinearAxis(y_range_name="acc", axis_label="acceleration (m/s^2)"),
+                    "right",
+                )
+                self._velocity_right_axis_added = True
+
+        x_candidates = []
+        if hasattr(self, "init_traj"):
+            x_candidates.append(self.init_traj_dict["t"])
+        if hasattr(self, "init_controls"):
+            x_candidates.append(self.init_controls_dict["t"])
+        if x_candidates:
+            all_x = np.concatenate([np.asarray(x) for x in x_candidates])
+            x_min, x_max = self._calc_axis_bounds(all_x, padding_ratio=0.03)
+            self.velocity_plotter.x_range = Range1d(start=x_min, end=x_max)
+
+        if hasattr(self, "init_traj"):
             self.velocity_plotter.line(
-                x="t", y="v", source=self.init_traj, **RENDER_VIS["init_traj"]
+                x="t",
+                y="v",
+                source=self.init_traj,
+                legend_label="speed (m/s)",
+                **RENDER_VIS["init_traj"]
             )
             self.velocity_plotter.scatter(
                 x="t", y="v", source=self.init_traj, **RENDER_VIS["init_traj_scatter"]
@@ -295,21 +347,43 @@ class BokehVis:
                 x="t",
                 y="acc",
                 source=self.init_controls,
+                y_range_name="acc",
+                legend_label="acceleration (m/s^2)",
                 **RENDER_VIS["init_control_acc"]
             )
             self.velocity_plotter.scatter(
                 x="t",
                 y="acc",
                 source=self.init_controls,
+                y_range_name="acc",
                 **RENDER_VIS["init_control_acc_scatter"]
             )
 
+        self.velocity_plotter.xaxis.axis_label = "time index"
+        if self.velocity_plotter.left:
+            self.velocity_plotter.left[0].axis_label = "speed (m/s)"
+        if self.velocity_plotter.right:
+            self.velocity_plotter.right[0].axis_label = "acceleration (m/s^2)"
+        self.velocity_plotter.legend.location = "top_left"
+        self.velocity_plotter.legend.click_policy = "hide"
+
     def render_init_controls(self):
+        if hasattr(self, "init_controls"):
+            x_min, x_max = self._calc_axis_bounds(
+                self.init_controls_dict["t"], padding_ratio=0.03
+            )
+            steer_min, steer_max = self._calc_axis_bounds(
+                self.init_controls_dict["steer"]
+            )
+            self.control_plotter.x_range = Range1d(start=x_min, end=x_max)
+            self.control_plotter.y_range = Range1d(start=steer_min, end=steer_max)
+
         if hasattr(self, "init_controls"):
             self.control_plotter.line(
                 x="t",
                 y="steer",
                 source=self.init_controls,
+                legend_label="steer (rad)",
                 **RENDER_VIS["init_control_steer"]
             )
             self.control_plotter.scatter(
@@ -318,6 +392,11 @@ class BokehVis:
                 source=self.init_controls,
                 **RENDER_VIS["init_control_steer_scatter"]
             )
+
+        self.control_plotter.xaxis.axis_label = "time index"
+        self.control_plotter.yaxis.axis_label = "steering"
+        self.control_plotter.legend.location = "top_left"
+        self.control_plotter.legend.click_policy = "hide"
 
     def render(self):
         self._render_plan_problem()

@@ -9,7 +9,7 @@ TrajPlanner::TrajPlanner(const params::SolverParams& solver_params, const std::s
     backend_solver_ = solver_params.backend_solver().empty() ? "obca" : solver_params.backend_solver();
     hybrid_astar_ptr_ =
         std::make_unique<frontend::HybridAstar>(solver_params.hybrid_a_star_param(), map_ptr, collision_checker);
-    pwj_speed_ptr_     = std::make_unique<pwjspeed>(solver_params.piesewise_jerk_params());
+    pwj_speed_ptr_     = std::make_unique<pwjspeed>(solver_params.piesewise_jerk_params(), solver_params.dt());
     admm_solver_ptr_   = std::make_unique<admmopt>();
     vehicle_model_ptr_ = std::make_shared<vehicle_model::KinematicModel>(vehicle_param);
     initObcaSolver(solver_params, map_ptr);
@@ -22,8 +22,6 @@ void TrajPlanner::initObcaSolver(const params::SolverParams& solver_params, cons
     options += "String sb            yes\n";
     options += "Integer max_iter     10\n";
     options += "Numeric tol          1e-6\n";
-    options += "String derivative_test   second-order\n";
-    options += "Numeric point_perturbation_radius   0.\n";
 
     params::OBCAParams obca_params;
     if (solver_params.has_obca_params()) {
@@ -69,9 +67,10 @@ bool TrajPlanner::runBackendOpt(const std::vector<Eigen::Vector3d>* const fronte
         auto start_vec_ptr = std::make_shared<vehicle_model::VehiclePose>(start_vec);
         auto goal_vec_ptr  = std::make_shared<vehicle_model::VehiclePose>(goal_vec);
         obca_solver_ptr_->Process(sdv_path, start_vec_ptr, goal_vec_ptr);
+        setStatusControls(obca_solver_ptr_->GetStatesResult());
     } else if (backend_solver_ == "pwj" && pwj_speed_ptr_ != nullptr) {
         pwj_speed_ptr_->Optimize(*frontend_path, start_vec);
-        setStatusControls(frontend_path, pwj_speed_ptr_->GetResult());
+        setStatusControls(pwj_speed_ptr_->GetResult());
     } else {
         LOG(ERROR) << "The backend solver " << backend_solver_ << " is not supported or not initialized.";
         return false;
@@ -80,41 +79,36 @@ bool TrajPlanner::runBackendOpt(const std::vector<Eigen::Vector3d>* const fronte
     return true;
 };
 
-bool TrajPlanner::setStatusControls(const std::vector<Eigen::Vector3d>* const init_path_ptr,
-                                    const std::vector<Eigen::Vector3d>* const init_traj_ptr) {
+bool TrajPlanner::setStatusControls(const std::vector<Eigen::Vector4d>& opt_traj) {
     // 1. set the init status
-    if (init_path_ptr->size() < 2) {
-        LOG(WARNING) << "The init path size is less than 2";
-        return false;
-    } else if (init_path_ptr->size() != init_traj_ptr->size()) {
-        LOG(WARNING) << "The init path size is not equal to the init traj size"
-                     << "| path size is" << init_path_ptr->size() << " | traj size is " << init_traj_ptr->size();
+    if (opt_traj.size() < 2) {
+        LOG(WARNING) << "The opt traj size is less than 2";
         return false;
     }
-    init_states_.resize(init_path_ptr->size(), vehicle_model::KinematicModel::GetStateSize());
-    init_controls_.resize(init_path_ptr->size() - 1, vehicle_model::KinematicModel::GetControlSize());
-    for (std::size_t i = 0; i < init_path_ptr->size(); ++i) {
-        init_states_(i, 0) = (*init_path_ptr)[i].x();   // x
-        init_states_(i, 1) = (*init_path_ptr)[i].y();   // y
-        init_states_(i, 2) = (*init_path_ptr)[i].z();   // theta
-        init_states_(i, 3) = (*init_traj_ptr)[i].z();   // v
+    opt_status_.resize(opt_traj.size(), vehicle_model::KinematicModel::GetStateSize());
+    opt_controls_.resize(opt_traj.size() - 1, vehicle_model::KinematicModel::GetControlSize());
+    for (std::size_t i = 0; i < opt_traj.size(); ++i) {
+        opt_status_(i, 0) = opt_traj[i].x();   // x
+        opt_status_(i, 1) = opt_traj[i].y();   // y
+        opt_status_(i, 2) = opt_traj[i].z();   // theta
+        opt_status_(i, 3) = opt_traj[i].w();   // v
     }
 
     // 2. set the init controls using the forward difference
     const double dt = pwj_speed_ptr_->GetDt();
     const double L  = vehicle_model_ptr_->GetVehicleParam().length();
-    for (std::size_t i = 0; i < init_path_ptr->size() - 1; ++i) {
-        init_controls_(i, 0) = ((*init_traj_ptr)[i + 1].z() - (*init_traj_ptr)[i].z()) / dt;   // a
+    for (std::size_t i = 0; i < opt_traj.size() - 1; ++i) {
+        opt_controls_(i, 0) = (opt_traj[i + 1].w() - opt_traj[i].w()) / dt;   // a
         // compute steer angle
-        double delta_theta = common::math::NormalizeAngle((*init_path_ptr)[i + 1].z() - (*init_path_ptr)[i].z());
-        double delta_x     = (*init_path_ptr)[i + 1].x() - (*init_path_ptr)[i].x();
-        double delta_y     = (*init_path_ptr)[i + 1].y() - (*init_path_ptr)[i].y();
+        double delta_theta = common::math::NormalizeAngle(opt_traj[i + 1].z() - opt_traj[i].z());
+        double delta_x     = opt_traj[i + 1].x() - opt_traj[i].x();
+        double delta_y     = opt_traj[i + 1].y() - opt_traj[i].y();
         double delta_s     = std::sqrt(delta_x * delta_x + delta_y * delta_y);
         if (std::abs(delta_s) < kEpsilon) {
-            init_controls_(i, 1) = 0.0;
+            opt_controls_(i, 1) = 0.0;
         } else {
-            init_controls_(i, 1) = std::atan2(L * delta_theta, delta_s);
-            init_controls_(i, 1) = common::math::NormalizeAngle(init_controls_(i, 1));
+            opt_controls_(i, 1) = std::atan2(L * delta_theta, delta_s);
+            opt_controls_(i, 1) = common::math::NormalizeAngle(opt_controls_(i, 1));
         }
     }
 

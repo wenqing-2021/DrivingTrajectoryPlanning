@@ -7,11 +7,11 @@ namespace backend {
 
 class PiecewiseJerkSpeedOptimizer {
   public:
-    PiecewiseJerkSpeedOptimizer(const params::PiecewiseJerkParams& pwj_params);
+    PiecewiseJerkSpeedOptimizer(const params::PiecewiseJerkParams& pwj_params, double dt = 0.1);
     ~PiecewiseJerkSpeedOptimizer() = default;
 
     bool Optimize(const std::vector<Eigen::Vector3d>& path, const vehicle_model::VehiclePose& vehicle_pose);
-    inline const std::vector<Eigen::Vector3d>* const GetResult() const { return &result_traj_; };
+    inline const std::vector<Eigen::Vector4d>& GetResult() const { return result_traj_; };
 
     const double      GetDt() const { return kDt; };
     const std::size_t GetSegmentNum() const { return segment_num_; };
@@ -34,11 +34,11 @@ class PiecewiseJerkSpeedOptimizer {
     Eigen::MatrixXd hessian_matrix_;
     Eigen::MatrixXd linear_matrix_;
 
-    std::vector<Eigen::Vector3d> result_traj_;
+    std::vector<Eigen::Vector4d> result_traj_;
     params::PiecewiseJerkParams  pwj_params_;
     std::size_t                  segment_num_ = 0;   // the number of segments
-    constexpr static double      kDt          = 0.1;
-    constexpr static double      kDt2         = kDt * kDt;
+    double                       kDt          = 0.1;
+    double                       kDt2         = kDt * kDt;
     constexpr static double      kEpsilon     = 1e-3;
 };
 

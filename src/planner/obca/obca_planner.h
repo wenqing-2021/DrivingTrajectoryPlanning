@@ -127,7 +127,7 @@ class OBCASolver : public IpoptSolver {
     */
   public:
     OBCASolver(std::string& options, const std::shared_ptr<vehicle_model::KinematicModel>& dynamic_model_ptr,
-               const std::shared_ptr<map::Map>& map_ptr, const params::OBCAParams& obca_params)
+               const std::shared_ptr<map::Map>& map_ptr, const params::OBCAParams& obca_params, double dt = 0.1)
         : IpoptSolver(options) {
         if (map_ptr == nullptr || dynamic_model_ptr == nullptr) {
             LOG(WARNING) << "The map ptr or dynamic model ptr is null.";
@@ -139,6 +139,7 @@ class OBCASolver : public IpoptSolver {
         control_num_       = vehicle_model::KinematicModel::GetControlSize();   // 2: [a, sigma]
         fg_eval_           = OBCAFG_eval();
         fg_eval_.setCostWeights(obca_params);
+        kDt = dt;
     };
     ~OBCASolver() = default;
     bool Process(const vehicle_model::sdv_path& init_path, std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
@@ -165,7 +166,7 @@ class OBCASolver : public IpoptSolver {
 
 
     constexpr static double      kEpsilon            = 1e-5;
-    constexpr static double      kDt                 = 0.1;   // s
+    double                       kDt                 = 0.1;   // s
     constexpr static std::size_t kVehicleBoundaryNum = 4;
     // initial variables, including: [x_i, y_i, theta_i, v_i, sigma_i, a_i, mu_i, lambda_i], i = 0, ..., N-1
     Eigen::VectorXd x0_;

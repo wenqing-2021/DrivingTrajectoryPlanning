@@ -1,7 +1,7 @@
 max_iter: 50
 map_resolution: 0.3 # meters
-backend_solver: "obca" # optional: "obca" or "pwj"
-
+backend_solver: "pwj" # optional: "obca" or "pwj"
+dt: 0.1 # seconds (time step for optimization)
 
 hybrid_a_star_param: # NOTE: the following key's name MUST be the same as those in protobuf/params.proto
   max_iter: 20 # iterations

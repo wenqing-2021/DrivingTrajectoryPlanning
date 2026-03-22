@@ -5,32 +5,36 @@
 namespace planning {
 namespace backend {
 
-PiecewiseJerkSpeedOptimizer::PiecewiseJerkSpeedOptimizer(const params::PiecewiseJerkParams& pwj_params)
+PiecewiseJerkSpeedOptimizer::PiecewiseJerkSpeedOptimizer(const params::PiecewiseJerkParams& pwj_params, double dt)
     : pwj_params_(pwj_params) {
     // 1. set the piecewise jerk speed optimizer config
     // setParams(config);
     // 2. set the piecewise jerk speed optimizer solver
     qp_solver_ptr_ = std::make_unique<QPSolver>();
+    // 3. set the time step
+    kDt  = dt;
+    kDt2 = kDt * kDt;
 };
 
 bool PiecewiseJerkSpeedOptimizer::Optimize(const std::vector<Eigen::Vector3d>& path,
                                            const vehicle_model::VehiclePose&   vehicle_pose) {
     result_traj_.clear();
-    std::vector<std::vector<Eigen::Vector3d>> shift_seg_trajs;   // [x, y, v]
+    std::vector<std::vector<Eigen::Vector3d>> shift_seg_paths;   // [x, y, v]
     // 1. get the shift segment paths
-    if (!getShiftSegPaths(path, &shift_seg_trajs)) {
+    if (!getShiftSegPaths(path, &shift_seg_paths)) {
         LOG(WARNING) << "Failed to get the shift segment paths";
         return false;
     }
-    LOG(INFO) << "The shift segment trajs size is: " << shift_seg_trajs.size();
-    segment_num_ = shift_seg_trajs.size();
+    LOG(INFO) << "The shift segment paths size is: " << shift_seg_paths.size();
+    segment_num_ = shift_seg_paths.size();
     // 2. optimize the speed for each segment and fill the result path
     double init_path_head =
         common::math::NormalizeAngle(std::atan2(path[1].y() - path[0].y(), path[1].x() - path[0].x()));
     double speed_direct = getSpeedDirect(init_path_head, vehicle_pose.theta);
-    for (std::size_t i = 0; i < shift_seg_trajs.size(); ++i) {
+    for (std::size_t i = 0; i < shift_seg_paths.size(); ++i) {
         // 2.1 optimize the speed
-        if (!optimizeSpeed(shift_seg_trajs[i])) {
+        std::vector<Eigen::Vector3d> shift_seg_traj = shift_seg_paths[i];
+        if (!optimizeSpeed(shift_seg_traj)) {
             // 2.2 if optimize failed, return
             LOG(WARNING) << "Failed to optimize the speed for segment " << i;
             return false;
@@ -42,10 +46,15 @@ bool PiecewiseJerkSpeedOptimizer::Optimize(const std::vector<Eigen::Vector3d>& p
             if (i > 0) {
                 start_j = 1;   // skip the first point of the segment if it is not the first segment
             }
-            for (std::size_t j = start_j; j < shift_seg_trajs[i].size(); ++j) {
-                shift_seg_trajs[i][j].z() = speed_direct * (*res)(j + shift_seg_trajs[i].size());
-                // insert x, y, v into the result path
-                result_traj_.push_back(shift_seg_trajs[i][j]);
+            for (std::size_t j = start_j; j < shift_seg_traj.size(); ++j) {
+                shift_seg_traj[j].z() = speed_direct * (*res)(j + shift_seg_traj.size());
+                // insert x, y, theta v into the result traj
+                Eigen::Vector4d traj_point;
+                traj_point.x() = shift_seg_paths[i][j].x();
+                traj_point.y() = shift_seg_paths[i][j].y();
+                traj_point.z() = shift_seg_paths[i][j].z();   // set theta
+                traj_point.w() = shift_seg_traj[j].z();       // set v
+                result_traj_.push_back(traj_point);
             }
             speed_direct = -speed_direct;
         }

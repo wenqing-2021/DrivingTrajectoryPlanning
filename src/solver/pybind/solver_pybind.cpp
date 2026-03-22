@@ -1,3 +1,11 @@
+/*
+ * @Author: wenqing-2021 yuansj@hnu.edu.cn
+ * @Date: 2025-05-17 00:28:52
+ * @LastEditors: wenqing-2021 yuansj@hnu.edu.cn
+ * @LastEditTime: 2026-03-22 03:27:03
+ * @FilePath: /AutomatedPark/src/solver/pybind/solver_pybind.cpp
+ * @Description: pybind for c++ and python interface
+ */
 #include "collision_check/gjk_check.h"
 #include "solver/solver.h"
 #include <filesystem>
@@ -74,7 +82,7 @@ PYBIND11_MODULE(solver_pybind, m) {
              })
         .def("get_cost_map", [](Solver& solver) -> py::bytes {
             // process
-            const cost_map::CostMap& cost_map = solver.getCostMap();
+            const cost_map::CostMap& cost_map = solver.GetCostMap();
             std::string              cost_map_str;
             cost_map.SerializeToString(&cost_map_str);
 

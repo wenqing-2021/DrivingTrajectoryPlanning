@@ -51,4 +51,5 @@ message SolverParams {
     PiecewiseJerkParams piesewise_jerk_params = 4;
     OBCAParams obca_params = 5;
     string backend_solver = 6;
+    double dt = 7;
 }
