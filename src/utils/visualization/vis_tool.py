@@ -38,15 +38,17 @@ class BokehVis:
         self.main_plotter = figure(**FIG_VIS["main_figure"])
         self.esdf_plotter = figure(**FIG_VIS["esdf_figure"])
         self.velocity_plotter = figure(**FIG_VIS["velocity_figure"])
+        self.acceleration_plotter = figure(**FIG_VIS["acceleration_figure"])
         self.control_plotter = figure(**FIG_VIS["control_figure"])
         self.plan_problem = plan_problem
         self.solver_params = solver_params
         self.plan_res = plan_res
         self.init_traj_dict = {}
         self.init_controls_dict = {}
+        self.pre_opt_traj_dict = {}
+        self.pre_opt_controls_dict = {}
         self.doc = curdoc()
         self.debug = debug
-        self._velocity_right_axis_added = False
 
         # build the tabs
         self._build_tabs()
@@ -93,12 +95,9 @@ class BokehVis:
                 self.main_plotter,
                 Spacer(width=FIG_VIS["row_margin_width"]),
                 column(
-                    row(
-                        self.velocity_plotter,
-                    ),
-                    row(
-                        self.control_plotter,
-                    ),
+                    row(self.velocity_plotter),
+                    row(self.acceleration_plotter),
+                    row(self.control_plotter),
                 ),
             ),
         )
@@ -211,21 +210,53 @@ class BokehVis:
         }
         self.update_attr(self.init_traj_dict, "init_traj")
 
-        # 3. parse init controls
+        # 3. parse opt controls
         if is_success:
             init_controls = self.plan_res.init_controls
             control_num = len(ControlVar.DESCRIPTOR.fields)
-            init_traj_stamp = np.arange(len(init_controls))
+            ctrl_stamp = np.arange(len(init_controls))
             init_controls_parse = np.zeros((len(init_controls), control_num))
             for idx, control in enumerate(init_controls):
                 init_controls_parse[idx] = [control.accelerate, control.steer_angle]
 
             self.init_controls_dict = {
-                "t": init_traj_stamp,
+                "t": ctrl_stamp,
                 "acc": init_controls_parse[:, 0],
                 "steer": init_controls_parse[:, 1],
             }
             self.update_attr(self.init_controls_dict, "init_controls")
+
+        # 4. parse pre-opt traj (hybrid A* states before optimization)
+        if is_success:
+            pre_opt_traj = self.plan_res.pre_opt_traj
+            pre_traj_stamp = np.arange(len(pre_opt_traj))
+            pre_traj_parse = np.zeros((len(pre_opt_traj), state_num))
+            for idx, state in enumerate(pre_opt_traj):
+                pre_traj_parse[idx] = [state.x, state.y, state.theta, state.v]
+
+            self.pre_opt_traj_dict = {
+                "t": pre_traj_stamp,
+                "x": pre_traj_parse[:, 0],
+                "y": pre_traj_parse[:, 1],
+                "head": pre_traj_parse[:, 2],
+                "v": pre_traj_parse[:, 3],
+            }
+            self.update_attr(self.pre_opt_traj_dict, "pre_opt_traj")
+
+        # 5. parse pre-opt controls (hybrid A* controls before optimization)
+        if is_success:
+            pre_opt_controls = self.plan_res.pre_opt_controls
+            pre_ctrl_stamp = np.arange(len(pre_opt_controls))
+            pre_ctrl_parse = np.zeros((len(pre_opt_controls), control_num))
+            for idx, control in enumerate(pre_opt_controls):
+                pre_ctrl_parse[idx] = [control.accelerate, control.steer_angle]
+
+            self.pre_opt_controls_dict = {
+                "t": pre_ctrl_stamp,
+                "acc": pre_ctrl_parse[:, 0],
+                "steer": pre_ctrl_parse[:, 1],
+            }
+            self.update_attr(self.pre_opt_controls_dict, "pre_opt_controls")
 
     def _render_plan_problem(self):
         # render the obstacles
@@ -274,6 +305,31 @@ class BokehVis:
         )
 
     def render_init_path(self):
+        # Draw pre-opt path (dashed cyan) first so opt path renders on top
+        if hasattr(self, "pre_opt_traj"):
+            self.main_plotter.line(
+                x="x", y="y", source=self.pre_opt_traj, **RENDER_VIS["pre_opt_path"]
+            )
+            self.main_plotter.scatter(
+                x="x", y="y", source=self.pre_opt_traj, **RENDER_VIS["pre_opt_path_scatter"]
+            )
+            pre_x = self.pre_opt_traj_dict["x"]
+            pre_y = self.pre_opt_traj_dict["y"]
+            pre_head = self.pre_opt_traj_dict["head"]
+            for idx in range(len(pre_x)):
+                mid = convert_rear_to_mid(
+                    [pre_x[idx], pre_y[idx]],
+                    self.plan_problem.vehicle_param.rear_overhang,
+                    self.plan_problem.vehicle_param.length,
+                    pre_head[idx],
+                )
+                self.main_plotter.rect(
+                    x=mid[0], y=mid[1], angle=pre_head[idx],
+                    width=self.plan_problem.vehicle_param.length,
+                    height=self.plan_problem.vehicle_param.width,
+                    **RENDER_VIS["pre_opt_path_rect"]
+                )
+
         if hasattr(self, "init_traj"):
             self.main_plotter.line(
                 x="x", y="y", source=self.init_traj, **RENDER_VIS["init_path"]
@@ -287,7 +343,6 @@ class BokehVis:
             init_path_y = self.init_traj_dict["y"]
             init_path_head = self.init_traj_dict["head"]
             for idx in range(len(init_path_x)):
-                # print(f"start to render rectangle{idx}")
                 init_path_mid_pts = convert_rear_to_mid(
                     [init_path_x[idx], init_path_y[idx]],
                     self.plan_problem.vehicle_param.rear_overhang,
@@ -303,98 +358,148 @@ class BokehVis:
                     **RENDER_VIS["init_path_rect"]
                 )
 
-    def render_init_traj(self):
-        if hasattr(self, "init_traj"):
-            speed_min, speed_max = self._calc_axis_bounds(self.init_traj_dict["v"])
-            self.velocity_plotter.y_range = Range1d(start=speed_min, end=speed_max)
+        if hasattr(self, "pre_opt_traj") or hasattr(self, "init_traj"):
+            self.main_plotter.legend.location = "top_left"
+            self.main_plotter.legend.click_policy = "hide"
 
-        if hasattr(self, "init_controls"):
-            acc_min, acc_max = self._calc_axis_bounds(self.init_controls_dict["acc"])
-            self.velocity_plotter.extra_y_ranges = {
-                "acc": Range1d(start=acc_min, end=acc_max)
-            }
-            if not self._velocity_right_axis_added:
-                self.velocity_plotter.add_layout(
-                    LinearAxis(y_range_name="acc", axis_label="acceleration (m/s^2)"),
-                    "right",
-                )
-                self._velocity_right_axis_added = True
+    def render_init_traj(self):
+        """Speed plot: pre-opt (dashed orange) and opt (solid red) on the same axes."""
+        speed_values = []
+        if hasattr(self, "pre_opt_traj"):
+            speed_values.append(self.pre_opt_traj_dict["v"])
+        if hasattr(self, "init_traj"):
+            speed_values.append(self.init_traj_dict["v"])
+        if speed_values:
+            all_v = np.concatenate([np.asarray(v) for v in speed_values])
+            v_min, v_max = self._calc_axis_bounds(all_v)
+            self.velocity_plotter.y_range = Range1d(start=v_min, end=v_max)
 
         x_candidates = []
-        if hasattr(self, "init_traj"):
-            x_candidates.append(self.init_traj_dict["t"])
-        if hasattr(self, "init_controls"):
-            x_candidates.append(self.init_controls_dict["t"])
+        if hasattr(self, "pre_opt_traj"):   x_candidates.append(self.pre_opt_traj_dict["t"])
+        if hasattr(self, "init_traj"):       x_candidates.append(self.init_traj_dict["t"])
         if x_candidates:
             all_x = np.concatenate([np.asarray(x) for x in x_candidates])
             x_min, x_max = self._calc_axis_bounds(all_x, padding_ratio=0.03)
             self.velocity_plotter.x_range = Range1d(start=x_min, end=x_max)
 
+        if hasattr(self, "pre_opt_traj"):
+            self.velocity_plotter.line(
+                x="t", y="v", source=self.pre_opt_traj,
+                legend_label="speed pre-opt (m/s)",
+                **RENDER_VIS["pre_opt_speed"]
+            )
+            self.velocity_plotter.scatter(
+                x="t", y="v", source=self.pre_opt_traj,
+                **RENDER_VIS["pre_opt_speed_scatter"]
+            )
+
         if hasattr(self, "init_traj"):
             self.velocity_plotter.line(
-                x="t",
-                y="v",
-                source=self.init_traj,
-                legend_label="speed (m/s)",
+                x="t", y="v", source=self.init_traj,
+                legend_label="speed opt (m/s)",
                 **RENDER_VIS["init_traj"]
             )
             self.velocity_plotter.scatter(
-                x="t", y="v", source=self.init_traj, **RENDER_VIS["init_traj_scatter"]
-            )
-
-        if hasattr(self, "init_controls"):
-            self.velocity_plotter.line(
-                x="t",
-                y="acc",
-                source=self.init_controls,
-                y_range_name="acc",
-                legend_label="acceleration (m/s^2)",
-                **RENDER_VIS["init_control_acc"]
-            )
-            self.velocity_plotter.scatter(
-                x="t",
-                y="acc",
-                source=self.init_controls,
-                y_range_name="acc",
-                **RENDER_VIS["init_control_acc_scatter"]
+                x="t", y="v", source=self.init_traj,
+                **RENDER_VIS["init_traj_scatter"]
             )
 
         self.velocity_plotter.xaxis.axis_label = "time index"
-        if self.velocity_plotter.left:
-            self.velocity_plotter.left[0].axis_label = "speed (m/s)"
-        if self.velocity_plotter.right:
-            self.velocity_plotter.right[0].axis_label = "acceleration (m/s^2)"
+        self.velocity_plotter.yaxis.axis_label = "speed (m/s)"
         self.velocity_plotter.legend.location = "top_left"
         self.velocity_plotter.legend.click_policy = "hide"
 
-    def render_init_controls(self):
+    def render_acceleration(self):
+        """Acceleration plot: pre-opt (dashed cyan) and opt (solid green) on the same axes."""
+        acc_values = []
+        if hasattr(self, "pre_opt_controls"):
+            acc_values.append(self.pre_opt_controls_dict["acc"])
         if hasattr(self, "init_controls"):
-            x_min, x_max = self._calc_axis_bounds(
-                self.init_controls_dict["t"], padding_ratio=0.03
+            acc_values.append(self.init_controls_dict["acc"])
+        if acc_values:
+            all_acc = np.concatenate([np.asarray(a) for a in acc_values])
+            acc_min, acc_max = self._calc_axis_bounds(all_acc)
+            self.acceleration_plotter.y_range = Range1d(start=acc_min, end=acc_max)
+
+        x_candidates = []
+        if hasattr(self, "pre_opt_controls"): x_candidates.append(self.pre_opt_controls_dict["t"])
+        if hasattr(self, "init_controls"):    x_candidates.append(self.init_controls_dict["t"])
+        if x_candidates:
+            all_x = np.concatenate([np.asarray(x) for x in x_candidates])
+            x_min, x_max = self._calc_axis_bounds(all_x, padding_ratio=0.03)
+            self.acceleration_plotter.x_range = Range1d(start=x_min, end=x_max)
+
+        if hasattr(self, "pre_opt_controls"):
+            self.acceleration_plotter.line(
+                x="t", y="acc", source=self.pre_opt_controls,
+                legend_label="acc pre-opt (m/s²)",
+                **RENDER_VIS["pre_opt_acc"]
             )
-            steer_min, steer_max = self._calc_axis_bounds(
-                self.init_controls_dict["steer"]
+            self.acceleration_plotter.scatter(
+                x="t", y="acc", source=self.pre_opt_controls,
+                **RENDER_VIS["pre_opt_acc_scatter"]
             )
+
+        if hasattr(self, "init_controls"):
+            self.acceleration_plotter.line(
+                x="t", y="acc", source=self.init_controls,
+                legend_label="acc opt (m/s²)",
+                **RENDER_VIS["init_control_acc"]
+            )
+            self.acceleration_plotter.scatter(
+                x="t", y="acc", source=self.init_controls,
+                **RENDER_VIS["init_control_acc_scatter"]
+            )
+
+        self.acceleration_plotter.xaxis.axis_label = "time index"
+        self.acceleration_plotter.yaxis.axis_label = "acceleration (m/s²)"
+        self.acceleration_plotter.legend.location = "top_left"
+        self.acceleration_plotter.legend.click_policy = "hide"
+
+    def render_init_controls(self):
+        """Steering plot: pre-opt (dashed magenta) and opt (solid blue) on the same axes."""
+        steer_values = []
+        if hasattr(self, "pre_opt_controls"):
+            steer_values.append(self.pre_opt_controls_dict["steer"])
+        if hasattr(self, "init_controls"):
+            steer_values.append(self.init_controls_dict["steer"])
+        if steer_values:
+            all_steer = np.concatenate([np.asarray(s) for s in steer_values])
+            s_min, s_max = self._calc_axis_bounds(all_steer)
+            self.control_plotter.y_range = Range1d(start=s_min, end=s_max)
+
+        x_candidates = []
+        if hasattr(self, "pre_opt_controls"): x_candidates.append(self.pre_opt_controls_dict["t"])
+        if hasattr(self, "init_controls"):    x_candidates.append(self.init_controls_dict["t"])
+        if x_candidates:
+            all_x = np.concatenate([np.asarray(x) for x in x_candidates])
+            x_min, x_max = self._calc_axis_bounds(all_x, padding_ratio=0.03)
             self.control_plotter.x_range = Range1d(start=x_min, end=x_max)
-            self.control_plotter.y_range = Range1d(start=steer_min, end=steer_max)
+
+        if hasattr(self, "pre_opt_controls"):
+            self.control_plotter.line(
+                x="t", y="steer", source=self.pre_opt_controls,
+                legend_label="steer pre-opt (rad)",
+                **RENDER_VIS["pre_opt_steer"]
+            )
+            self.control_plotter.scatter(
+                x="t", y="steer", source=self.pre_opt_controls,
+                **RENDER_VIS["pre_opt_steer_scatter"]
+            )
 
         if hasattr(self, "init_controls"):
             self.control_plotter.line(
-                x="t",
-                y="steer",
-                source=self.init_controls,
-                legend_label="steer (rad)",
+                x="t", y="steer", source=self.init_controls,
+                legend_label="steer opt (rad)",
                 **RENDER_VIS["init_control_steer"]
             )
             self.control_plotter.scatter(
-                x="t",
-                y="steer",
-                source=self.init_controls,
+                x="t", y="steer", source=self.init_controls,
                 **RENDER_VIS["init_control_steer_scatter"]
             )
 
         self.control_plotter.xaxis.axis_label = "time index"
-        self.control_plotter.yaxis.axis_label = "steering"
+        self.control_plotter.yaxis.axis_label = "steering (rad)"
         self.control_plotter.legend.location = "top_left"
         self.control_plotter.legend.click_policy = "hide"
 
@@ -404,6 +509,7 @@ class BokehVis:
         self.render_esdf_map()
         self.render_init_path()
         self.render_init_traj()
+        self.render_acceleration()
         self.render_init_controls()
 
     def update_attr(self, data_dict: dict, attr_str: str):

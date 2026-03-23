@@ -24,6 +24,11 @@ FIG_VIS = {
         "height": 360,
         "match_aspect": True,
     },
+    "acceleration_figure": {
+        "width": 720,
+        "height": 360,
+        "match_aspect": True,
+    },
     "control_figure": {
         "width": 720,
         "height": 360,
@@ -67,6 +72,7 @@ RENDER_VIS = {
     "init_path": {
         "color": COLOR_MAP["magenta"],
         "line_width": 2,
+        "legend_label": "opt path",
     },
     "init_traj": {
         "color": COLOR_MAP["red"],
@@ -80,6 +86,22 @@ RENDER_VIS = {
     "init_path_scatter": {
         "color": COLOR_MAP["magenta"],
         "size": 9,
+    },
+    "pre_opt_path": {
+        "color": COLOR_MAP["cyan"],
+        "line_width": 2,
+        "line_dash": "dashed",
+        "legend_label": "pre-opt path",
+    },
+    "pre_opt_path_rect": {
+        "fill_alpha": 0.0,
+        "line_width": 1,
+        "line_dash": "dashed",
+        "color": COLOR_MAP["cyan"],
+    },
+    "pre_opt_path_scatter": {
+        "color": COLOR_MAP["cyan"],
+        "size": 7,
     },
     "init_traj_scatter": {
         "color": COLOR_MAP["red"],
@@ -100,5 +122,33 @@ RENDER_VIS = {
     "init_control_steer_scatter": {
         "color": COLOR_MAP["blue"],
         "size": 9,
+    },
+    # pre-opt (init) trajectory styles — dashed lines
+    "pre_opt_speed": {
+        "color": COLOR_MAP["orange"],
+        "line_width": 2,
+        "line_dash": "dashed",
+    },
+    "pre_opt_speed_scatter": {
+        "color": COLOR_MAP["orange"],
+        "size": 7,
+    },
+    "pre_opt_acc": {
+        "color": COLOR_MAP["cyan"],
+        "line_width": 2,
+        "line_dash": "dashed",
+    },
+    "pre_opt_acc_scatter": {
+        "color": COLOR_MAP["cyan"],
+        "size": 7,
+    },
+    "pre_opt_steer": {
+        "color": COLOR_MAP["magenta"],
+        "line_width": 2,
+        "line_dash": "dashed",
+    },
+    "pre_opt_steer_scatter": {
+        "color": COLOR_MAP["magenta"],
+        "size": 7,
     },
 }

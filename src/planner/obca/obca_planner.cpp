@@ -89,15 +89,70 @@ bool OBCASolver::setInitVariable(const vehicle_model::sdv_path& init_path, OBCAF
     // NOTE: initial path including the start pose and the goal pose
     N_ = init_path.size();
     x0_.resize(N_ * (state_num_ + control_num_));
+    const auto   vehicle_param = dynamic_model_ptr_->GetVehicleParam();
+    const double wheel_base    = vehicle_param.wheel_base();
+    const double max_v         = vehicle_param.max_velocity();
+    const double max_acc       = vehicle_param.max_acc();
+    const double max_steer     = vehicle_param.max_steer_angle();
+
+    auto clamp_value = [](double val, double lower, double upper) { return std::max(lower, std::min(val, upper)); };
+
+    // First pass: estimate velocities accounting for gear changes (forward/reverse transitions).
+    // Velocity is a vector here: positive=forward, negative=reverse.
+    std::vector<double> v_estimates(N_, 0.0);
+    for (std::size_t i = 1; i < N_ - 1; ++i) {
+        double dx   = init_path[i + 1].x - init_path[i].x;
+        double dy   = init_path[i + 1].y - init_path[i].y;
+        double dist = std::sqrt(dx * dx + dy * dy);
+
+        // Velocity direction: positive if motion aligns with heading, negative if opposite.
+        double sign    = (dx * std::cos(init_path[i].theta) + dy * std::sin(init_path[i].theta)) >= 0.0 ? 1.0 : -1.0;
+        v_estimates[i] = clamp_value(sign * dist / kDt, -max_v, max_v);
+    }
+    // Start and end velocities are fixed to 0.
+    v_estimates[0]      = 0.0;
+    v_estimates[N_ - 1] = 0.0;
+
+    // Detect gear change points: where velocity changes sign.
+    for (std::size_t i = 1; i < N_ - 1; ++i) {
+        if (v_estimates[i - 1] * v_estimates[i + 1] < 0.0) {
+            // Sign change detected between neighbors: this is a gear transition.
+            v_estimates[i] = 0.0;
+        }
+    }
+
+    // Second pass: set all variables using estimated velocities and accelerations
+    initial_states_.clear();
     for (std::size_t i = 0; i < N_; ++i) {
         x0_[i * (state_num_ + control_num_) + VariableIndex::X]     = init_path[i].x;
         x0_[i * (state_num_ + control_num_) + VariableIndex::Y]     = init_path[i].y;
         x0_[i * (state_num_ + control_num_) + VariableIndex::THETA] = init_path[i].theta;
-        x0_[i * (state_num_ + control_num_) + VariableIndex::V]     = 0.0;   //
-        x0_[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE] =
-            0.0;   // hack the initial steering angle to be zero
-        x0_[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION] =
-            0.0;   // hack the initial acceleration to be zero
+        x0_[i * (state_num_ + control_num_) + VariableIndex::V]     = v_estimates[i];
+
+        // set the initial states
+        initial_states_.emplace_back(
+            Eigen::Vector4d(init_path[i].x, init_path[i].y, init_path[i].theta, v_estimates[i]));
+
+        // Estimate initial steering angle from heading change: steer = atan(L * dθ/ds).
+        double steer_init = 0.0;
+        if (i < N_ - 1 && std::abs(v_estimates[i]) > 1e-3) {
+            double d_theta = init_path[i + 1].theta - init_path[i].theta;
+            // Normalize angle difference to [-pi, pi] to handle wrap-around.
+            while (d_theta > M_PI) d_theta -= 2.0 * M_PI;
+            while (d_theta < -M_PI) d_theta += 2.0 * M_PI;
+            steer_init = std::atan(wheel_base * d_theta / (v_estimates[i] * kDt));
+            steer_init = clamp_value(steer_init, -max_steer, max_steer);
+        }
+        x0_[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE] = steer_init;
+
+        // Estimate initial acceleration from velocity change: a = (v_{i+1} - v_i) / dt
+        // Start and end accelerations are fixed to 0
+        double acc_init = 0.0;
+        if (i < N_ - 1) {
+            acc_init = (v_estimates[i + 1] - v_estimates[i]) / kDt;
+            acc_init = clamp_value(acc_init, -max_acc, max_acc);
+        }
+        x0_[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION] = acc_init;
     }
     // 2. set the dual variables
     // 2.1 get the obstacle from map
@@ -146,6 +201,9 @@ bool OBCAFG_eval::getHyperLane(const common::math::Polygon2d& obstacle, Eigen::M
     const auto line_segments = obstacle.line_segments();
     const auto center_pts    = obstacle.center();
     for (std::size_t j = 0; j < obstacle_num_pts; ++j) {
+        LOG(INFO) << "Processing obstacle_" << i << ", edge_" << j << ": start(" << line_segments[j].start().x() << ", "
+                  << line_segments[j].start().y() << "), end(" << line_segments[j].end().x() << ", "
+                  << line_segments[j].end().y() << ")";
         const auto edge_vector = line_segments[j].unit_direction();
         // get the direction of the vector
         common::math::Vec2d normal_vector(-edge_vector.y(), edge_vector.x());
@@ -184,30 +242,24 @@ bool OBCAFG_eval::getMovementMatrix(const CppAD::AD<double> x, const CppAD::AD<d
 CppAD::AD<double> OBCAFG_eval::getCostFunction(const ADvector& x) {
     CppAD::AD<double> cost           = 0.0;
     double            ref_weight     = obca_params_.ref_weight();
-    double            smooth_weight  = obca_params_.smooth_weight();
     double            control_weight = obca_params_.control_weight();
-    for (std::size_t i = 0; i < N_; ++i) {
-        // 1. cost for ref_X
+    for (std::size_t i = 0; i < N_ - 1; ++i) {
+        // Match Python OBCA objective: state tracking + control effort, no control smoothness term.
         CppAD::AD<double> x_pos = x[i * (state_num_ + control_num_) + VariableIndex::X];
         CppAD::AD<double> y_pos = x[i * (state_num_ + control_num_) + VariableIndex::Y];
+        CppAD::AD<double> theta = x[i * (state_num_ + control_num_) + VariableIndex::THETA];
+
         cost += ref_weight * (x_pos - (*ref_X_ptr_)[i * (state_num_ + control_num_) + VariableIndex::X]) *
                 (x_pos - (*ref_X_ptr_)[i * (state_num_ + control_num_) + VariableIndex::X]);
         cost += ref_weight * (y_pos - (*ref_X_ptr_)[i * (state_num_ + control_num_) + VariableIndex::Y]) *
                 (y_pos - (*ref_X_ptr_)[i * (state_num_ + control_num_) + VariableIndex::Y]);
-        // 2. cost for control delta
-        if (i < N_ - 1) {
-            CppAD::AD<double> steer_angle1  = x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE];
-            CppAD::AD<double> steer_angle2  = x[(i + 1) * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE];
-            CppAD::AD<double> acceleration1 = x[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION];
-            CppAD::AD<double> acceleration2 = x[(i + 1) * (state_num_ + control_num_) + VariableIndex::ACCELERATION];
-            cost += smooth_weight * (steer_angle2 - steer_angle1) * (steer_angle2 - steer_angle1);
-            cost += smooth_weight * (acceleration2 - acceleration1) * (acceleration2 - acceleration1);
-            // 3. control effort
-            cost += control_weight * x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE] *
-                    x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE];
-            cost += control_weight * x[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION] *
-                    x[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION];
-        }
+        cost += ref_weight * (theta - (*ref_X_ptr_)[i * (state_num_ + control_num_) + VariableIndex::THETA]) *
+                (theta - (*ref_X_ptr_)[i * (state_num_ + control_num_) + VariableIndex::THETA]);
+
+        cost += control_weight * x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE] *
+                x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE];
+        cost += control_weight * x[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION] *
+                x[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION];
     }
 
     return cost;
@@ -309,22 +361,12 @@ bool OBCAFG_eval::setPoseConstraintsBound(IpoptSolver::Dvector* lb, IpoptSolver:
         LOG(WARNING) << "The lb or ub pointer is null.";
         return false;
     }
-    // 2. set the lower and upper bounds
-    double kPositionTol = 0.05;   // m
-    double kThetaTol    = 0.01;   // rad
+    // Keep a small tolerance for better numerical robustness in NLP solve.
     lb->resize(pose_constraints_num_);
     ub->resize(pose_constraints_num_);
     for (std::size_t i = 0; i < pose_constraints_num_; ++i) {
-        if (i < 4) {
-            (*lb)[i] = -kPositionTol;
-            (*ub)[i] = kPositionTol;
-        } else if (i >= 4 && i <= 5) {
-            (*lb)[i] = -kThetaTol;
-            (*ub)[i] = kThetaTol;
-        } else {
-            (*lb)[i] = -kEpsilon;
-            (*ub)[i] = kEpsilon;
-        }
+        (*lb)[i] = -0.0;
+        (*ub)[i] = 0.0;
     }
 
     return true;
@@ -368,9 +410,9 @@ bool OBCAFG_eval::setDynamicConstraints(const FG_eval::ADvector& x, FG_eval::ADv
 }
 
 bool OBCAFG_eval::setDynamicConstraintsBound(IpoptSolver::Dvector* lb, IpoptSolver::Dvector* ub) {
-    auto build_eq_bound = [&lb, &ub](std::size_t idx, double epsilon = 1e-3) {
-        (*lb)[idx] = 0.0 - epsilon;
-        (*ub)[idx] = 0.0 + epsilon;
+    auto build_eq_bound = [&lb, &ub](std::size_t idx, double epsilon = 0.0) {
+        (*lb)[idx] = -epsilon;
+        (*ub)[idx] = epsilon;
     };
     lb->resize((N_ - 1) * state_num_);
     ub->resize((N_ - 1) * state_num_);
@@ -458,7 +500,7 @@ bool OBCAFG_eval::setAvoidanceConstraints(const FG_eval::ADvector& x, FG_eval::A
     std::size_t constraint_idx      = 0;
     std::size_t obstacle_num        = obstable_bound_num_vec_.size();
 
-    constraints->resize(3 * N_ * obstacle_num);
+    constraints->resize(4 * N_ * obstacle_num);
 
     // build variable vetor
     CppVecXd variable_x(x.size());
@@ -488,16 +530,16 @@ bool OBCAFG_eval::setAvoidanceConstraints(const FG_eval::ADvector& x, FG_eval::A
             std::size_t obstacle_pts_num = obstable_bound_num_vec_[j];
             CppVecXd    lambda_j         = variable_x.segment(lambda_idx + obstacle_a_start, obstacle_pts_num);
             CppVecXd    mu_j             = variable_x.segment(mu_idx + j * kVehicleBoundaryNum, kVehicleBoundaryNum);
-            CppMatrixXd A = cpp_obstacle_A.block(obstacle_a_start, 0, obstacle_pts_num, obstacle_A_.cols());
-            CppVecXd    b = cpp_obstacle_b.segment(obstacle_a_start, obstacle_pts_num);
-            (*constraints)[constraint_idx] = (lambda_j.transpose() * (A * move_matrix - b) - mu_j.transpose() * g_)(0);
-            (*constraints)[constraint_idx + 1] =
-                (mu_j.transpose() * G_ + lambda_j.transpose() * A * rotation_matrix)(0);
-            (*constraints)[constraint_idx + 2] =
-                ((A.transpose() * lambda_j) * ((A.transpose() * lambda_j)).transpose())(0);
-
-
-            constraint_idx += 3;
+            CppMatrixXd A            = cpp_obstacle_A.block(obstacle_a_start, 0, obstacle_pts_num, obstacle_A_.cols());
+            CppVecXd    b            = cpp_obstacle_b.segment(obstacle_a_start, obstacle_pts_num);
+            CppVecXd    A_t_lambda   = A.transpose() * lambda_j;
+            CppVecXd    stationarity = G_.transpose() * mu_j + rotation_matrix.transpose() * A_t_lambda;
+            (*constraints)[constraint_idx]     = (A_t_lambda.transpose() * A_t_lambda)(0);
+            (*constraints)[constraint_idx + 1] = stationarity(0);
+            (*constraints)[constraint_idx + 2] = stationarity(1);
+            (*constraints)[constraint_idx + 3] =
+                (lambda_j.transpose() * (A * move_matrix - b) - mu_j.transpose() * g_)(0);
+            constraint_idx += 4;
             obstacle_a_start += obstacle_pts_num;
         }
     }
@@ -509,27 +551,32 @@ bool OBCAFG_eval::setAvoidanceConstraintsBound(IpoptSolver::Dvector* lb, IpoptSo
     std::size_t obstacle_num = obstable_bound_num_vec_.size();
     // Safe distance to maintain from obstacles (meters)
     double safe_dist = kSafeDist;   // Use the predefined safe distance (0.05m)
-    lb->resize(3 * N_ * obstacle_num);
-    ub->resize(3 * N_ * obstacle_num);
+    lb->resize(4 * N_ * obstacle_num);
+    ub->resize(4 * N_ * obstacle_num);
     std::size_t constraint_idx = 0;
     for (std::size_t i = 0; i < N_; ++i) {
         for (std::size_t j = 0; j < obstable_bound_num_vec_.size(); ++j) {
-            // Constraint 0: lambda^T * (A*c - b) - mu^T * g >= safe_dist (collision avoidance)
-            (*lb)[constraint_idx] = safe_dist;
-            (*ub)[constraint_idx] = kMaxValue;
-            // Constraint 1: mu^T * G + lambda^T * A * R = 0 (stationarity)
-            (*lb)[constraint_idx + 1] = -kEpsilon;
-            (*ub)[constraint_idx + 1] = kEpsilon;
-            // Constraint 2: 0 <= ||A^T * lambda||^2 <= 1 (dual variable norm constraint)
+            // Constraint 0: ||A^T * lambda||^2 in [0, 1]
+            (*lb)[constraint_idx] = 0.0;
+            (*ub)[constraint_idx] = 1.0;
+            // Constraint 1-2: stationarity equalities
+            (*lb)[constraint_idx + 1] = 0.0;
+            (*ub)[constraint_idx + 1] = 0.0;
             (*lb)[constraint_idx + 2] = 0.0;
-            (*ub)[constraint_idx + 2] = 1.0;
-            constraint_idx += 3;
+            (*ub)[constraint_idx + 2] = 0.0;
+            // Constraint 3: separation condition
+            (*lb)[constraint_idx + 3] = safe_dist;
+            (*ub)[constraint_idx + 3] = kMaxValue;
+            constraint_idx += 4;
         }
     }
     return true;
 }
 
 bool OBCAFG_eval::getObstacleBound(const std::shared_ptr<map::Map>& map_ptr) {
+    // 1. clear the obstacle_A and obstacle_b
+    obstacle_A_.resize(0, 2);
+    obstacle_b_.resize(0);
     // 2. get obstacle from map to build hyperlane
     if (map_ptr == nullptr) {
         LOG(WARNING) << "The map pointer is null.";

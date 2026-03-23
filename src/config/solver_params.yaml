@@ -1,6 +1,6 @@
 max_iter: 50
 map_resolution: 0.3 # meters
-backend_solver: "pwj" # optional: "obca" or "pwj"
+backend_solver: "obca" # optional: "obca" or "pwj"
 dt: 0.1 # seconds (time step for optimization)
 
 hybrid_a_star_param: # NOTE: the following key's name MUST be the same as those in protobuf/params.proto
@@ -36,6 +36,6 @@ piesewise_jerk_params:
   w_a_end: 50.0
 
 obca_params:
-  ref_weight: 5.0
+  ref_weight: 2.0
   smooth_weight: 0.5
-  control_weight: 100.0
+  control_weight: 1.0

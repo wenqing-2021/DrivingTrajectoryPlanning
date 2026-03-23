@@ -146,22 +146,22 @@ int main() {
         // Bottom-left
         cost_map::Pos2D* vertex1 = obs_polygon->add_vertex_pts();
         vertex1->set_x(11.0);
-        vertex1->set_y(2.7);
+        vertex1->set_y(0.7);
 
         // Bottom-right
         cost_map::Pos2D* vertex2 = obs_polygon->add_vertex_pts();
         vertex2->set_x(13.0);
-        vertex2->set_y(2.7);
+        vertex2->set_y(0.7);
 
         // Top-right
         cost_map::Pos2D* vertex3 = obs_polygon->add_vertex_pts();
         vertex3->set_x(13.0);
-        vertex3->set_y(3.7);
+        vertex3->set_y(1.7);
 
         // Top-left
         cost_map::Pos2D* vertex4 = obs_polygon->add_vertex_pts();
         vertex4->set_x(11.0);
-        vertex4->set_y(3.7);
+        vertex4->set_y(1.7);
 
         plan_problem.set_obstacle_num(1);
         LOG(INFO) << "Obstacle created: Square from (11, 0.7) to (13, 1.7)";
@@ -234,12 +234,13 @@ int main() {
         LOG(INFO) << "Configuring IPOPT solver...";
 
         std::string ipopt_options;
-        // ipopt_options += "Integer print_level         5\n";
-        ipopt_options += "String  sb                  yes\n";
-        ipopt_options += "Integer max_iter            20\n";
-        ipopt_options += "Numeric tol                 1e-3\n";
-        // Convergence based on objective function change
-        // ipopt_options += "String derivative_test   second-order\n";
+        ipopt_options += "Integer print_level      5\n";
+        ipopt_options += "String sb                yes\n";
+        ipopt_options += "Integer max_iter         30\n";
+        ipopt_options += "Numeric tol              1e-3\n";
+        ipopt_options += "Numeric acceptable_tol   5e-2\n";
+        ipopt_options += "Integer acceptable_iter  10\n";
+        ipopt_options += "String mu_strategy       adaptive\n";
 
         LOG(INFO) << "IPOPT configured";
 

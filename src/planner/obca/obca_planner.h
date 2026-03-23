@@ -58,16 +58,10 @@ class OBCAFG_eval : public FG_eval {
         //   Row 3: [ 0, -1] -> -y direction (right constraint)
         G_ << 1.0, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, -1.0;
 
-        // g vector defines the boundary limits in body frame (rear axle center at origin):
-        //   g[0] = front_x:  distance from rear axle center to front (length - rear_overhang)
-        //   g[1] = half_width: half of vehicle width
-        //   g[2] = rear_x:   distance from rear axle center to rear (rear_overhang, positive)
-        //   g[3] = half_width: half of vehicle width
-        double front_x    = vehicle_param.length() - vehicle_param.rear_overhang();   // 5.0 - 1.25 = 3.75m
-        double rear_x     = vehicle_param.rear_overhang();                            // 1.25m
-        double half_width = vehicle_param.width() / 2.0;                              // 2.0 / 2 = 1.0m
+        double half_length = vehicle_param.length() / 2.0;
+        double half_width  = vehicle_param.width() / 2.0;
 
-        g_ << front_x, half_width, rear_x, half_width;
+        g_ << half_length, half_width, half_length, half_width;
         return true;
     };   // Initialize the parameters for the OBCA algorithm
 
@@ -106,12 +100,12 @@ class OBCAFG_eval : public FG_eval {
     std::shared_ptr<vehicle_model::KinematicModel> dynamic_model_ptr_;
     std::shared_ptr<vehicle_model::VehiclePose>    start_pose_ptr_;
     std::shared_ptr<vehicle_model::VehiclePose>    goal_pose_ptr_;
-    Eigen::MatrixXd                                obstacle_A_;                   // obstacle boundary A
-    Eigen::VectorXd                                obstacle_b_;                   // obstacle boundary b
-    constexpr static double                        kDt                 = 0.1;     // s
-    constexpr static std::size_t                   kVehicleBoundaryNum = 4;       // number of vehicle boundary points
-    constexpr static double                        kSafeDist           = 0.001;   // m
-    constexpr static double                        kEpsilon            = 1e-4;    // Must match OBCAFG_eval::kEpsilon
+    Eigen::MatrixXd                                obstacle_A_;                  // obstacle boundary A
+    Eigen::VectorXd                                obstacle_b_;                  // obstacle boundary b
+    constexpr static double                        kDt                 = 0.1;    // s
+    constexpr static std::size_t                   kVehicleBoundaryNum = 4;      // number of vehicle boundary points
+    constexpr static double                        kSafeDist           = 0.5;    // m
+    constexpr static double                        kEpsilon            = 1e-4;   // Must match OBCAFG_eval::kEpsilon
     constexpr static double                        kMaxValue           = 1e4;
     params::OBCAParams                             obca_params_;
     Eigen::Matrix<CppAD::AD<double>, kVehicleBoundaryNum, 2> G_;   // ego vehicle matrix: Gx <= g
@@ -157,6 +151,7 @@ class OBCASolver : public IpoptSolver {
     }
     inline const std::vector<Eigen::Vector4d>& GetStatesResult() const { return states_result_; }
     inline const std::vector<Eigen::Vector2d>& GetControlsResult() const { return controls_result_; }
+    inline const std::vector<Eigen::Vector4d>& GetInitStates() const { return initial_states_; }
 
   private:
     bool setInitVariable(const vehicle_model::sdv_path& init_path, OBCAFG_eval* fg_eval, Dvector* init_variables,
@@ -179,6 +174,7 @@ class OBCASolver : public IpoptSolver {
 
     std::vector<Eigen::Vector4d> states_result_;     // Resulting states after optimization
     std::vector<Eigen::Vector2d> controls_result_;   // Resulting controls after optimization
+    std::vector<Eigen::Vector4d> initial_states_;    // Initial states for each time step
     OBCAFG_eval                  fg_eval_;
 
     std::shared_ptr<map::Map>                      map_ptr_;

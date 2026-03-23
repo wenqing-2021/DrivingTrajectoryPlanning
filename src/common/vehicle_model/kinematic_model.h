@@ -7,7 +7,7 @@
 namespace planning {
 namespace vehicle_model {
 
-using opt_status  = Eigen::MatrixXd;
+using opt_states  = Eigen::MatrixXd;
 using opt_control = Eigen::MatrixXd;
 
 struct VehiclePose {

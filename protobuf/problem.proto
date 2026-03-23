@@ -35,6 +35,8 @@ message PlanRes {
     repeated kinematic_model.StateVar init_traj = 5;
     double init_path_length = 6;
     repeated kinematic_model.ControlVar init_controls = 7;
+    repeated kinematic_model.StateVar pre_opt_traj = 8;
+    repeated kinematic_model.ControlVar pre_opt_controls = 9;
 }
 
 message SolverInput {

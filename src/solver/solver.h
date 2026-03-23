@@ -38,8 +38,10 @@ class Solver {
         vechile_pose.theta = state_var.theta();
     };
     void setSolverParams(const params::SolverParams& solver_params) { solver_params_ = solver_params; };
-    void setOptTraj(const planning::vehicle_model::opt_status&  opt_states,
+    void setOptTraj(const planning::vehicle_model::opt_states&  opt_states,
                     const planning::vehicle_model::opt_control& opt_controls);
+    void setPreOptTraj(const planning::vehicle_model::opt_states&  init_states,
+                       const planning::vehicle_model::opt_control& init_controls);
     // define pointer to the submodule
     std::shared_ptr<map::Map>                   map_ptr_;
     std::shared_ptr<collision_check::BaseCheck> collision_check_ptr_;

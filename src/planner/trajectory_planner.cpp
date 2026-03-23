@@ -18,10 +18,13 @@ TrajPlanner::TrajPlanner(const params::SolverParams& solver_params, const std::s
 void TrajPlanner::initObcaSolver(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr) {
     // Keep OBCA-specific setup out of the constructor body.
     std::string options;
-    options += "Integer print_level  0\n";
-    options += "String sb            yes\n";
-    options += "Integer max_iter     10\n";
-    options += "Numeric tol          1e-6\n";
+    options += "Integer print_level      5\n";
+    options += "String sb                yes\n";
+    options += "Integer max_iter         30\n";
+    options += "Numeric tol              1e-3\n";
+    options += "Numeric acceptable_tol   5e-2\n";
+    options += "Integer acceptable_iter  10\n";
+    options += "String mu_strategy       adaptive\n";
 
     params::OBCAParams obca_params;
     if (solver_params.has_obca_params()) {
@@ -67,10 +70,11 @@ bool TrajPlanner::runBackendOpt(const std::vector<Eigen::Vector3d>* const fronte
         auto start_vec_ptr = std::make_shared<vehicle_model::VehiclePose>(start_vec);
         auto goal_vec_ptr  = std::make_shared<vehicle_model::VehiclePose>(goal_vec);
         obca_solver_ptr_->Process(sdv_path, start_vec_ptr, goal_vec_ptr);
-        setStatusControls(obca_solver_ptr_->GetStatesResult());
+        setstatesControls(opt_states_, opt_controls_, obca_solver_ptr_->GetStatesResult());
+        setstatesControls(init_states_, init_controls_, obca_solver_ptr_->GetInitStates());
     } else if (backend_solver_ == "pwj" && pwj_speed_ptr_ != nullptr) {
         pwj_speed_ptr_->Optimize(*frontend_path, start_vec);
-        setStatusControls(pwj_speed_ptr_->GetResult());
+        setstatesControls(opt_states_, opt_controls_, pwj_speed_ptr_->GetResult());
     } else {
         LOG(ERROR) << "The backend solver " << backend_solver_ << " is not supported or not initialized.";
         return false;
@@ -79,36 +83,37 @@ bool TrajPlanner::runBackendOpt(const std::vector<Eigen::Vector3d>* const fronte
     return true;
 };
 
-bool TrajPlanner::setStatusControls(const std::vector<Eigen::Vector4d>& opt_traj) {
-    // 1. set the init status
+bool TrajPlanner::setstatesControls(vehicle_model::opt_states& opt_states, vehicle_model::opt_control& opt_controls,
+                                    const std::vector<Eigen::Vector4d>& opt_traj) {
+    // 1. set the init states
     if (opt_traj.size() < 2) {
         LOG(WARNING) << "The opt traj size is less than 2";
         return false;
     }
-    opt_status_.resize(opt_traj.size(), vehicle_model::KinematicModel::GetStateSize());
-    opt_controls_.resize(opt_traj.size() - 1, vehicle_model::KinematicModel::GetControlSize());
+    opt_states.resize(opt_traj.size(), vehicle_model::KinematicModel::GetStateSize());
+    opt_controls.resize(opt_traj.size() - 1, vehicle_model::KinematicModel::GetControlSize());
     for (std::size_t i = 0; i < opt_traj.size(); ++i) {
-        opt_status_(i, 0) = opt_traj[i].x();   // x
-        opt_status_(i, 1) = opt_traj[i].y();   // y
-        opt_status_(i, 2) = opt_traj[i].z();   // theta
-        opt_status_(i, 3) = opt_traj[i].w();   // v
+        opt_states(i, 0) = opt_traj[i].x();   // x
+        opt_states(i, 1) = opt_traj[i].y();   // y
+        opt_states(i, 2) = opt_traj[i].z();   // theta
+        opt_states(i, 3) = opt_traj[i].w();   // v
     }
 
     // 2. set the init controls using the forward difference
     const double dt = pwj_speed_ptr_->GetDt();
     const double L  = vehicle_model_ptr_->GetVehicleParam().length();
     for (std::size_t i = 0; i < opt_traj.size() - 1; ++i) {
-        opt_controls_(i, 0) = (opt_traj[i + 1].w() - opt_traj[i].w()) / dt;   // a
+        opt_controls(i, 0) = (opt_traj[i + 1].w() - opt_traj[i].w()) / dt;   // a
         // compute steer angle
         double delta_theta = common::math::NormalizeAngle(opt_traj[i + 1].z() - opt_traj[i].z());
         double delta_x     = opt_traj[i + 1].x() - opt_traj[i].x();
         double delta_y     = opt_traj[i + 1].y() - opt_traj[i].y();
         double delta_s     = std::sqrt(delta_x * delta_x + delta_y * delta_y);
         if (std::abs(delta_s) < kEpsilon) {
-            opt_controls_(i, 1) = 0.0;
+            opt_controls(i, 1) = 0.0;
         } else {
-            opt_controls_(i, 1) = std::atan2(L * delta_theta, delta_s);
-            opt_controls_(i, 1) = common::math::NormalizeAngle(opt_controls_(i, 1));
+            opt_controls(i, 1) = std::atan2(L * delta_theta, delta_s);
+            opt_controls(i, 1) = common::math::NormalizeAngle(opt_controls(i, 1));
         }
     }
 

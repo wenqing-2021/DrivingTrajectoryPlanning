@@ -52,6 +52,8 @@ const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {
     if (traj_planner_ptr_->Process(start_vec_, goal_vec_)) {
         setOptTraj(traj_planner_ptr_->GetOptStates(),
                    traj_planner_ptr_->GetOptControls());   // set the opt traj
+        setPreOptTraj(traj_planner_ptr_->GetInitStates(),
+                      traj_planner_ptr_->GetInitControls());   // set the pre-opt traj
         LOG(INFO) << "The opt traj has been set...";
         plan_res_.set_solve_success(true);
     } else {
@@ -72,7 +74,7 @@ const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {
     return plan_res_;
 };
 
-void Solver::setOptTraj(const planning::vehicle_model::opt_status&  opt_states,
+void Solver::setOptTraj(const planning::vehicle_model::opt_states&  opt_states,
                         const planning::vehicle_model::opt_control& opt_controls) {
     // 1. check the opt_states and opt_controls
     LOG(INFO) << "Set opt traj...";
@@ -104,6 +106,35 @@ void Solver::setOptTraj(const planning::vehicle_model::opt_status&  opt_states,
             opt_traj_control.set_accelerate(a);
             opt_traj_control.set_steer_angle(delta);
             plan_res_.add_init_controls()->CopyFrom(opt_traj_control);
+        }
+    }
+};
+
+void Solver::setPreOptTraj(const planning::vehicle_model::opt_states&  init_states,
+                           const planning::vehicle_model::opt_control& init_controls) {
+    LOG(INFO) << "Set pre-opt traj...";
+    if (init_states.rows() < 2) {
+        LOG(WARNING) << "The init states size is less than 2";
+        return;
+    } else if (init_states.rows() != init_controls.rows() + 1) {
+        LOG(WARNING) << "The init states size is not equal to the init controls size + 1";
+        return;
+    }
+    plan_res_.clear_pre_opt_traj();
+    plan_res_.clear_pre_opt_controls();
+    for (int i = 0; i < init_states.rows(); ++i) {
+        kinematic_model::StateVar st;
+        st.set_x(init_states(i, 0));
+        st.set_y(init_states(i, 1));
+        st.set_theta(init_states(i, 2));
+        st.set_v(init_states(i, 3));
+        plan_res_.add_pre_opt_traj()->CopyFrom(st);
+
+        if (i < init_controls.rows()) {
+            kinematic_model::ControlVar ct;
+            ct.set_accelerate(init_controls(i, 0));
+            ct.set_steer_angle(init_controls(i, 1));
+            plan_res_.add_pre_opt_controls()->CopyFrom(ct);
         }
     }
 };
