@@ -38,3 +38,4 @@ logs/*
 src/logs/*
 figures/*
 *.pyi
+solve_results/*

@@ -276,6 +276,8 @@ void HybridAstar::finishPath() {
     }
     std::reverse(final_path_.begin(), final_path_.end());
     final_path_.insert(final_path_.end(), final_rs_path_.begin(), final_rs_path_.end());
+    LOG(INFO) << "The final path length is " << path_length_ << "m, and the path has " << final_path_.size()
+              << " waypoints.";
 };
 
 }   // namespace frontend

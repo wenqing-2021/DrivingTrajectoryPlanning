@@ -145,26 +145,26 @@ int main() {
 
         // Bottom-left
         cost_map::Pos2D* vertex1 = obs_polygon->add_vertex_pts();
-        vertex1->set_x(11.0);
-        vertex1->set_y(0.7);
+        vertex1->set_x(16.0);
+        vertex1->set_y(0.2);
 
         // Bottom-right
         cost_map::Pos2D* vertex2 = obs_polygon->add_vertex_pts();
-        vertex2->set_x(13.0);
-        vertex2->set_y(0.7);
+        vertex2->set_x(18.0);
+        vertex2->set_y(0.2);
 
         // Top-right
         cost_map::Pos2D* vertex3 = obs_polygon->add_vertex_pts();
-        vertex3->set_x(13.0);
-        vertex3->set_y(1.7);
+        vertex3->set_x(18.0);
+        vertex3->set_y(1.2);
 
         // Top-left
         cost_map::Pos2D* vertex4 = obs_polygon->add_vertex_pts();
-        vertex4->set_x(11.0);
-        vertex4->set_y(1.7);
+        vertex4->set_x(16.0);
+        vertex4->set_y(1.2);
 
         plan_problem.set_obstacle_num(1);
-        LOG(INFO) << "Obstacle created: Square from (11, 0.7) to (13, 1.7)";
+        LOG(INFO) << "Obstacle created: Square from (16, 0.2) to (18, 1.2)";
 
         // Set map bounds
         problem::MapBound* map_bound = plan_problem.mutable_map_bound();
@@ -235,20 +235,21 @@ int main() {
 
         std::string ipopt_options;
         ipopt_options += "Integer print_level      5\n";
-        ipopt_options += "Integer max_iter         30\n";
+        ipopt_options += "Integer max_iter         15\n";
         ipopt_options += "Numeric tol              1e-3\n";
         ipopt_options += "Numeric acceptable_tol   5e-2\n";
         ipopt_options += "Integer acceptable_iter  10\n";
         ipopt_options += "String mu_strategy       adaptive\n";
+        ipopt_options += "String linear_solver     mumps\n";
 
         LOG(INFO) << "IPOPT configured";
 
         // ==================== Run OBCA Solver ====================
         LOG(INFO) << "Creating OBCA solver...";
         params::OBCAParams obca_params;
-        obca_params.set_ref_weight(5.0);
+        obca_params.set_ref_weight(2.0);
         obca_params.set_smooth_weight(0.5);
-        obca_params.set_control_weight(100.0);
+        obca_params.set_control_weight(1.0);
         backend::OBCASolver obca_solver(ipopt_options, dynamic_model_ptr, map_ptr, obca_params);
         LOG(INFO) << "OBCA solver created";
 

@@ -31,7 +31,6 @@ class BokehVis:
     def __init__(
         self,
         plan_problem: PlanProblem,
-        solver_params: SolverParams,
         plan_res: PlanRes,
         debug: bool = False,
     ):
@@ -41,7 +40,6 @@ class BokehVis:
         self.acceleration_plotter = figure(**FIG_VIS["acceleration_figure"])
         self.control_plotter = figure(**FIG_VIS["control_figure"])
         self.plan_problem = plan_problem
-        self.solver_params = solver_params
         self.plan_res = plan_res
         self.init_traj_dict = {}
         self.init_controls_dict = {}

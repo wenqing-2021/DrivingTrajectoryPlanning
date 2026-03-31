@@ -46,6 +46,7 @@ message OBCAParams {
     double ipopt_tol = 5;
     double ipopt_acceptable_tol = 6;
     int32 ipopt_acceptable_iter = 7;
+    string linear_solver = 8;
 }
 
 message SolverParams {

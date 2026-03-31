@@ -9,7 +9,7 @@
 - **起始点**: (0.0, 0.0)
 - **目标点**: (30.0, 0.0)
 - **初始路径**: 从起点到终点的直线，包含31个采样点（间距1.0m）
-- **障碍物**: 方形障碍物，范围从 (11, 0.7) 到 (13, 1.7)，高度为1.0m，宽度为2.0m
+- **障碍物**: 方形障碍物，范围从 (16, 0.2) 到 (18, 1.2)，高度为1.0m，宽度为2.0m
 - **车辆**: 长5.0m，宽2.0m，轴距2.5m
 
 ### 车辆参数
@@ -175,7 +175,7 @@ Setting up problem...
 Vehicle created: length=5.0m, width=2.0m
 Start position: (0, 0)
 Goal position: (30, 0)
-Obstacle created: Square from (11, 0.7) to (13, 1.7)
+Obstacle created: Square from (16, 0.2) to (18, 1.2)
 Map created with resolution 0.1m
 Configuring IPOPT solver...
 IPOPT configured

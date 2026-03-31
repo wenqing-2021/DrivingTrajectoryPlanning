@@ -27,6 +27,7 @@ void TrajPlanner::initObcaSolver(const params::SolverParams& solver_params, cons
         obca_params.set_ipopt_tol(1e-3);
         obca_params.set_ipopt_acceptable_tol(5e-2);
         obca_params.set_ipopt_acceptable_iter(10);
+        obca_params.set_linear_solver("mumps");
     }
 
     const int32_t ipopt_max_iter = obca_params.ipopt_max_iter() > 0 ? obca_params.ipopt_max_iter() : 30;
@@ -35,14 +36,17 @@ void TrajPlanner::initObcaSolver(const params::SolverParams& solver_params, cons
         obca_params.ipopt_acceptable_tol() > 0.0 ? obca_params.ipopt_acceptable_tol() : 5e-2;
     const int32_t ipopt_acceptable_iter =
         obca_params.ipopt_acceptable_iter() > 0 ? obca_params.ipopt_acceptable_iter() : 10;
+    const std::string ipopt_linear_solver = obca_params.linear_solver().empty() ? "mumps" : obca_params.linear_solver();
 
     // Keep OBCA-specific setup out of the constructor body.
     std::string options;
     options += "Integer print_level      5\n";
+    options += "String sb                yes\n";
     options += "Integer max_iter         " + std::to_string(ipopt_max_iter) + "\n";
     options += "Numeric tol              " + std::to_string(ipopt_tol) + "\n";
     options += "Numeric acceptable_tol   " + std::to_string(ipopt_acceptable_tol) + "\n";
     options += "Integer acceptable_iter  " + std::to_string(ipopt_acceptable_iter) + "\n";
+    options += "String linear_solver     " + ipopt_linear_solver + "\n";
     options += "String mu_strategy       adaptive\n";
 
     obca_solver_ptr_ = std::make_unique<obcaopt>(options, vehicle_model_ptr_, map_ptr, obca_params);
