@@ -42,6 +42,10 @@ message OBCAParams {
     double ref_weight = 1;
     double smooth_weight = 2;
     double control_weight = 3;
+    int32 ipopt_max_iter = 4;
+    double ipopt_tol = 5;
+    double ipopt_acceptable_tol = 6;
+    int32 ipopt_acceptable_iter = 7;
 }
 
 message SolverParams {

@@ -235,7 +235,6 @@ int main() {
 
         std::string ipopt_options;
         ipopt_options += "Integer print_level      5\n";
-        ipopt_options += "String sb                yes\n";
         ipopt_options += "Integer max_iter         30\n";
         ipopt_options += "Numeric tol              1e-3\n";
         ipopt_options += "Numeric acceptable_tol   5e-2\n";

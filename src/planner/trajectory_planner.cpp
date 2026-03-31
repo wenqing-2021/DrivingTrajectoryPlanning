@@ -16,16 +16,6 @@ TrajPlanner::TrajPlanner(const params::SolverParams& solver_params, const std::s
 };
 
 void TrajPlanner::initObcaSolver(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr) {
-    // Keep OBCA-specific setup out of the constructor body.
-    std::string options;
-    options += "Integer print_level      5\n";
-    options += "String sb                yes\n";
-    options += "Integer max_iter         30\n";
-    options += "Numeric tol              1e-3\n";
-    options += "Numeric acceptable_tol   5e-2\n";
-    options += "Integer acceptable_iter  10\n";
-    options += "String mu_strategy       adaptive\n";
-
     params::OBCAParams obca_params;
     if (solver_params.has_obca_params()) {
         obca_params = solver_params.obca_params();
@@ -33,7 +23,27 @@ void TrajPlanner::initObcaSolver(const params::SolverParams& solver_params, cons
         obca_params.set_ref_weight(5.0);
         obca_params.set_smooth_weight(0.5);
         obca_params.set_control_weight(100.0);
+        obca_params.set_ipopt_max_iter(30);
+        obca_params.set_ipopt_tol(1e-3);
+        obca_params.set_ipopt_acceptable_tol(5e-2);
+        obca_params.set_ipopt_acceptable_iter(10);
     }
+
+    const int32_t ipopt_max_iter = obca_params.ipopt_max_iter() > 0 ? obca_params.ipopt_max_iter() : 30;
+    const double  ipopt_tol      = obca_params.ipopt_tol() > 0.0 ? obca_params.ipopt_tol() : 1e-3;
+    const double  ipopt_acceptable_tol =
+        obca_params.ipopt_acceptable_tol() > 0.0 ? obca_params.ipopt_acceptable_tol() : 5e-2;
+    const int32_t ipopt_acceptable_iter =
+        obca_params.ipopt_acceptable_iter() > 0 ? obca_params.ipopt_acceptable_iter() : 10;
+
+    // Keep OBCA-specific setup out of the constructor body.
+    std::string options;
+    options += "Integer print_level      5\n";
+    options += "Integer max_iter         " + std::to_string(ipopt_max_iter) + "\n";
+    options += "Numeric tol              " + std::to_string(ipopt_tol) + "\n";
+    options += "Numeric acceptable_tol   " + std::to_string(ipopt_acceptable_tol) + "\n";
+    options += "Integer acceptable_iter  " + std::to_string(ipopt_acceptable_iter) + "\n";
+    options += "String mu_strategy       adaptive\n";
 
     obca_solver_ptr_ = std::make_unique<obcaopt>(options, vehicle_model_ptr_, map_ptr, obca_params);
 }

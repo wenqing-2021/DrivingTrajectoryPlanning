@@ -39,3 +39,7 @@ obca_params:
   ref_weight: 2.0
   smooth_weight: 0.5
   control_weight: 1.0
+  ipopt_max_iter: 30
+  ipopt_tol: 1.0e-3
+  ipopt_acceptable_tol: 5.0e-2
+  ipopt_acceptable_iter: 10
