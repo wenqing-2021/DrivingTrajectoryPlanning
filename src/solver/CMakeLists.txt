@@ -1,4 +1,4 @@
-project(AutomatedParkSolver)
+project(TrajectoryPlanningSolver)
 
 # Add source files and header files
 file(GLOB SOLVER_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")

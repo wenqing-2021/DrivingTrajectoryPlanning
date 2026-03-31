@@ -42,7 +42,6 @@ rear_overhang: 1.25 m          # 后悬（后轴中心到后保险杠）
 
 1. 项目已编译：
 ```bash
-cd /root/workspace/AutomatedPark
 mkdir -p build && cd build
 cmake ..
 make -j4

@@ -1,8 +1,12 @@
 import sys
+import os
 
-INSTALL_PATH = "/root/workspace/AutomatedPark/build/install"
-PYBIND_PATH = "/root/workspace/AutomatedPark/build/pybind_modules"
-PROTOBUF_PATH = "/root/workspace/AutomatedPark/build/install/protobuf"
+# get the current project root directory
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+INSTALL_PATH = os.path.join(PROJECT_ROOT, "build/install")
+PYBIND_PATH = os.path.join(PROJECT_ROOT, "build/pybind_modules")
+PROTOBUF_PATH = os.path.join(PROJECT_ROOT, "build/install/protobuf")
 sys.path.append(PYBIND_PATH)
 sys.path.append(PROTOBUF_PATH)
 sys.path.append(INSTALL_PATH)
@@ -76,7 +80,7 @@ def createTest():
 
 
 def checkCollision():
-    vehicle_cfg_path = "/root/workspace/AutomatedPark/src/config/vehicle_cfg.yaml"
+    vehicle_cfg_path = os.path.join(PROJECT_ROOT, "src/config/vehicle_cfg.yaml")
     vehicle_param = convert_yaml_to_protobuf(vehicle_cfg_path, VehicleParam())
     vehicle_param_str = vehicle_param.SerializeToString()
     polygon_pts, vehicle_pose = createTest()

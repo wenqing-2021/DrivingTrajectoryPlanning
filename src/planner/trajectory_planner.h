@@ -2,10 +2,8 @@
  * @Author: wenqing-2021 yuansj@hnu.edu.cn
  * @Date: 2026-01-31 12:14:24
  * @LastEditors: wenqing-2021 yuansj@hnu.edu.cn
- * @LastEditTime: 2026-03-23 12:33:40
- * @FilePath: /AutomatedPark/src/planner/trajectory_planner.h
- * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置:
- * https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ * @LastEditTime: 2026-03-31 10:56:13
+ * @Description: trajectory planner class definition
  */
 #pragma once
 #include "admm/admm_planner.h"

@@ -2,8 +2,7 @@
  * @Author: wenqing-2021 yuansj@hnu.edu.cn
  * @Date: 2025-05-17 00:28:52
  * @LastEditors: wenqing-2021 yuansj@hnu.edu.cn
- * @LastEditTime: 2026-03-22 03:27:03
- * @FilePath: /AutomatedPark/src/solver/pybind/solver_pybind.cpp
+ * @LastEditTime: 2026-03-31 10:57:27
  * @Description: pybind for c++ and python interface
  */
 #include "collision_check/gjk_check.h"

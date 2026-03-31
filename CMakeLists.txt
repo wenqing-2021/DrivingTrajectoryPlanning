@@ -9,7 +9,7 @@ set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # set project name
-project(AutomatedPark)
+project(TrajectoryPlanning)
 
 # find necessary packages
 find_package(Eigen3 REQUIRED)

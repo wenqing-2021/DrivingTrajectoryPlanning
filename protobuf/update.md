@@ -18,7 +18,6 @@ pip install mypy-protobuf==3.0.0
 项目已提供脚本：`scripts/mypy_protobuf.sh`
 
 ```bash
-cd /root/workspace/AutomatedPark
 bash scripts/mypy_protobuf.sh
 ```
 

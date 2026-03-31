@@ -16,7 +16,7 @@
                 "--params",
                 "config/solver_params.yaml",
                 "--file",
-                "/root/workspace/AutomatedPark/data/BenchmarkCases/Case1.csv",
+                "${workspaceFolder}/data/BenchmarkCases/Case1.csv",
             ],
         },
         {

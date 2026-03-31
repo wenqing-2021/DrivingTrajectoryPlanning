@@ -13,7 +13,7 @@ COLOR_MAP = {
 }
 
 FIG_VIS = {
-    "title": "AutomatedPark",
+    "title": "TrajectoryPlanning Visualization",
     "main_figure": {
         "width": 1280,
         "height": 720,

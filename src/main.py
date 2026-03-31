@@ -1,6 +1,5 @@
 """
 Author: wenqing yuansj@hnu.edu.cn
-FilePath: /AutomatedPark/src/main.py
 Description: The main entry of the project
 
 Copyright (c) 2024 by wenqing, All Rights Reserved.
@@ -48,7 +47,7 @@ def SolveProblem(
 
 
 def add_args():
-    args = argparse.ArgumentParser("AutomatedPark")
+    args = argparse.ArgumentParser("TrajectoryPlanning")
     args.add_argument(
         "--file",
         "-f",
