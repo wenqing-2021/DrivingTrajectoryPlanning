@@ -44,3 +44,6 @@ obca_params:
   ipopt_acceptable_tol: 5.0e-2
   ipopt_acceptable_iter: 3
   linear_solver: "mumps"
+
+rda_params:
+  max_iter: 50

@@ -21,6 +21,7 @@ find_package(GTest REQUIRED)
 include_directories(${GTEST_INCLUDE_DIRS})
 add_subdirectory(third-party/pybind11)
 add_subdirectory(third-party/glog)
+add_subdirectory(third-party/EiCOS)
 add_subdirectory(protobuf)
 add_subdirectory(src/logger)
 add_subdirectory(src/common)
@@ -33,6 +34,7 @@ set(UTILS_LIBRARIES ${UTILS_LIBRARIES}
     ProtoLib
     yaml-cpp
     Common
+    eicos
 )
 
 # add include directories

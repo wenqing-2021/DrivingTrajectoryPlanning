@@ -2,21 +2,21 @@
  * @Author: wenqing-2021 yuansj@hnu.edu.cn
  * @Date: 2026-01-31 12:14:24
  * @LastEditors: wenqing-2021 yuansj@hnu.edu.cn
- * @LastEditTime: 2026-03-31 10:56:13
+ * @LastEditTime: 2026-04-11 08:46:30
  * @Description: trajectory planner class definition
  */
 #pragma once
-#include "admm/admm_planner.h"
 #include "base_check.h"
 #include "hybrid_a_star/hybrid_a_star.h"
 #include "obca/obca_planner.h"
+#include "rda/rda_planner.h"
 #include "speed_planner/piece_wise_jerk.h"
 
 #include <string>
 
 namespace planning {
 using pwjspeed = backend::PiecewiseJerkSpeedOptimizer;
-using admmopt  = backend::ADMMSolver;
+using rdaopt   = backend::RDASolver;
 using obcaopt  = backend::OBCASolver;
 class TrajPlanner {
   public:
@@ -25,9 +25,9 @@ class TrajPlanner {
                 const kinematic_model::VehicleParam&               vehicle_param);
     ~TrajPlanner() = default;
 
-    bool                Process(const vehicle_model::VehiclePose& start_vec,
-                                const vehicle_model::VehiclePose& goal_vec);   // main function to generate the trajectory
-    inline const double GetInitPathLength() { return frontend_path_length_; };               // get the init path length
+    bool          Process(const vehicle_model::VehiclePose& start_vec,
+                          const vehicle_model::VehiclePose& goal_vec);     // main function to generate the trajectory
+    inline double GetInitPathLength() { return frontend_path_length_; };   // get the init path length
     inline std::vector<Eigen::Vector3d>& GetDebugNodeList() { return debug_node_list_; };    // get the debug node list
     const vehicle_model::opt_states&     GetOptStates() const { return opt_states_; };       // get the opt states
     const vehicle_model::opt_control&    GetOptControls() const { return opt_controls_; };   // get the opt controls
@@ -43,7 +43,7 @@ class TrajPlanner {
 
     std::unique_ptr<frontend::HybridAstar>         hybrid_astar_ptr_;   // pointer to the hybrid A* planner
     std::unique_ptr<pwjspeed>                      pwj_speed_ptr_;
-    std::unique_ptr<admmopt>                       admm_solver_ptr_;   // pointer to the ADMM solver
+    std::unique_ptr<rdaopt>                        rda_solver_ptr_;    // pointer to the RDA solver
     std::unique_ptr<obcaopt>                       obca_solver_ptr_;   // pointer to the OBCA solver
     std::shared_ptr<vehicle_model::KinematicModel> vehicle_model_ptr_;
     std::vector<Eigen::Vector3d>                   debug_node_list_;

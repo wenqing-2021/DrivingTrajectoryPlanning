@@ -49,12 +49,17 @@ message OBCAParams {
     string linear_solver = 8;
 }
 
+message RDAParams {
+    int32 max_iter = 1;
+}
+
 message SolverParams {
     double max_iter = 1;
     double map_resolution = 2;
     HybridAStarParams hybrid_a_star_param = 3;
     PiecewiseJerkParams piesewise_jerk_params = 4;
     OBCAParams obca_params = 5;
-    string backend_solver = 6;
-    double dt = 7;
+    RDAParams rda_params = 6;
+    string backend_solver = 7;
+    double dt = 8;
 }
