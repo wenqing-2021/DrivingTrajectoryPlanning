@@ -6,3 +6,6 @@
 	path = third-party/glog
 	url = https://github.com/google/glog.git
 	branch = v0.6.0
+[submodule "third-party/EiCOS"]
+	path = third-party/EiCOS
+	url = https://github.com/wenqing-2021/EiCOS.git
