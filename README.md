@@ -4,7 +4,7 @@ This repository implements a variety of trajectory planning methods for autonomo
 # 1. Installation
 Before start, you should install [docker](https://www.docker.com/) for Linux or [docker-desktop](https://www.docker.com/products/docker-desktop/) for Windows. After that, clone this repo and run the following command to build images:
 ```
-git clone https://github.com/wenqing-2021/DrivingTrajectoryPlanning.git
+git clone --recurse-submodules https://github.com/wenqing-2021/DrivingTrajectoryPlanning.git
 cd DrivingTrajectoryPlanning
 python3 docker/run_docker.py -b
 ```

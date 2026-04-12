@@ -3,6 +3,8 @@
 echo "installing extensions && thirdparty ... "
 
 ROOT_DIR=`pwd`
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+PROJECT_ROOT=$(cd "${SCRIPT_DIR}/../.." && pwd)
 
 echo ROOT_DIR: $ROOT_DIR
 
@@ -161,7 +163,7 @@ make && make install
 cd ..
 git clone https://github.com/coin-or-tools/ThirdParty-HSL.git
 cd ThirdParty-HSL
-cp -r /root/workspace/automated_park/docker/utils/coinhsl.zip ./
+cp -r "${PROJECT_ROOT}/docker/utils/coinhsl.zip" ./
 unzip coinhsl.zip
 ./configure
 make && make install

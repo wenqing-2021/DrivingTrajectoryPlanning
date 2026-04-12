@@ -14,7 +14,15 @@
     ],
     "fileheader.configObj": {
         "autoAdd": true,
-        "supportAutoLanguage": ["c", "cpp", "python", "javascript", "typescript"],
-        "prohibitAutoAdd": ["md"]
-    },
+        "supportAutoLanguage": [
+            "c",
+            "cpp",
+            "python",
+            "javascript",
+            "typescript"
+        ],
+        "prohibitAutoAdd": [
+            "md"
+        ]
+    }
 }
