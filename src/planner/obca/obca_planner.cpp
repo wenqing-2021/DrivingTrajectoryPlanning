@@ -85,6 +85,24 @@ bool OBCASolver::setResult(const CppAD::ipopt::solve_result<Dvector>& solution) 
 bool OBCASolver::setInitVariable(const vehicle_model::sdv_path& init_path, OBCAFG_eval* fg_eval,
                                  Dvector* init_variables, std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
                                  std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr) {
+    // Initialize control states first
+    if (!initializeControlStates(init_path, start_pose_ptr, goal_pose_ptr)) {
+        LOG(WARNING) << "Failed to initialize control states.";
+        return false;
+    }
+
+    // Then initialize dual variables
+    if (!initializeDualVariables(fg_eval, init_variables, start_pose_ptr, goal_pose_ptr)) {
+        LOG(WARNING) << "Failed to initialize dual variables.";
+        return false;
+    }
+
+    return true;
+};
+
+bool OBCASolver::initializeControlStates(const vehicle_model::sdv_path&               init_path,
+                                         std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
+                                         std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr) {
     // 1. Set the initial variables for the optimization problem.
     // NOTE: initial path including the start pose and the goal pose
     N_ = init_path.size();
@@ -154,8 +172,14 @@ bool OBCASolver::setInitVariable(const vehicle_model::sdv_path& init_path, OBCAF
         }
         x0_[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION] = acc_init;
     }
-    // 2. set the dual variables
-    // 2.1 get the obstacle from map
+
+    return true;
+}
+
+bool OBCASolver::initializeDualVariables(OBCAFG_eval* fg_eval, Dvector* init_variables,
+                                         std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
+                                         std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr) {
+    // 1. get the obstacle from map
     if (map_ptr_ == nullptr) {
         LOG(WARNING) << "The map pointer is null.";
         return false;
@@ -164,7 +188,8 @@ bool OBCASolver::setInitVariable(const vehicle_model::sdv_path& init_path, OBCAF
     std::size_t obstacle_num     = obs_list.size();
     std::size_t obstacle_num_pts = 0;
     for (const auto& obs : obs_list) { obstacle_num_pts += obs.num_points(); }
-    // 2.2 set the dual variables
+
+    // 2. Initialize dual variables
     std::size_t     lambda_num = obstacle_num_pts * N_;
     std::size_t     mu_num     = obstacle_num * N_ * kVehicleBoundaryNum;
     Eigen::VectorXd lambda0_(lambda_num);
@@ -173,15 +198,18 @@ bool OBCASolver::setInitVariable(const vehicle_model::sdv_path& init_path, OBCAF
     mu0_ *= 0.1;
     lambda0_.setOnes();
     lambda0_ *= 0.1;
-    // 3. set the initial value
+
+    // 3. Append dual variables to primal variables
     x0_.conservativeResize(x0_.size() + lambda0_.size() + mu0_.size());
     std::size_t offset                                 = x0_.size() - lambda0_.size() - mu0_.size();
     x0_.segment(offset, lambda0_.size())               = lambda0_;   // [offset, offset+lambda_size)
     x0_.segment(offset + lambda0_.size(), mu0_.size()) = mu0_;       // [offset+lambda_size, end)
-    auto x0_ptr                                        = std::make_shared<Eigen::VectorXd>(x0_);
+
+    // 4. Set init parameters in fg_eval and copy to init_variables
+    auto x0_ptr = std::make_shared<Eigen::VectorXd>(x0_);
     fg_eval->setInitParameters(
         x0_ptr, N_, state_num_, control_num_, lambda_num, mu_num, dynamic_model_ptr_, start_pose_ptr, goal_pose_ptr);
-    for (std::size_t i = 0; i < x0_.size(); ++i) { init_variables->push_back(x0_[i]); }
+    for (int i = 0; i < x0_.size(); ++i) { init_variables->push_back(x0_[i]); }
 
     return true;
 };

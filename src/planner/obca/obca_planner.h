@@ -157,6 +157,16 @@ class OBCASolver : public IpoptSolver {
     bool setInitVariable(const vehicle_model::sdv_path& init_path, OBCAFG_eval* fg_eval, Dvector* init_variables,
                          std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
                          std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr);
+
+    // Helper functions for initializing variables
+    bool initializeControlStates(const vehicle_model::sdv_path&               init_path,
+                                 std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
+                                 std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr);
+
+    bool initializeDualVariables(OBCAFG_eval* fg_eval, Dvector* init_variables,
+                                 std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
+                                 std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr);
+
     bool setResult(const CppAD::ipopt::solve_result<Dvector>& solution);
 
 
