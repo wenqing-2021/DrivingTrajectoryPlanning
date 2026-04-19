@@ -12,6 +12,23 @@
 namespace planning {
 namespace backend {
 
+enum class VariableIdx : std::size_t
+{
+    X = 0,
+    Y,
+    THETA,
+    V,
+    ACCELERATION,
+    STEER_ANGLE,
+};
+
+enum class DualVariableIdx : std::size_t
+{
+    LAMBDA = 0,   // for dynamic constraints
+    MU,           // for collision avoidance constraints
+    Z,
+};
+
 struct RDAOptimizationResult {
     std::vector<Eigen::Vector4d> states;     // [x, y, theta, v]
     std::vector<Eigen::Vector2d> controls;   // [acceleration, steering_angle]
@@ -49,9 +66,14 @@ class RDASolver {
                          std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr);
 
     // Initialize optimization variables
-    bool initializeOptimizationVariables(const vehicle_model::sdv_path&               init_path,
-                                         std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
-                                         std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr);
+    bool setInitVariable(const vehicle_model::sdv_path&               init_path,
+                         std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
+                         std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr);
+
+    // Helper: Initialize state and control variables
+    bool initializeStateControl(const vehicle_model::sdv_path& init_path);
+
+    bool initializeDualVariables();
 
     // Set constraint bounds
     bool setVariableBounds(Eigen::VectorXd& x_lower, Eigen::VectorXd& x_upper);
@@ -60,33 +82,12 @@ class RDASolver {
 
     bool setCollisionAvoidanceConstraints(Eigen::MatrixXd& A_collision, std::vector<Eigen::VectorXd>& b_collision_vec);
 
-    bool setControlConstraints(Eigen::MatrixXd& A_control, Eigen::VectorXd& b_control);
-
     // Solve SOCP using ECOS or similar solver
     bool solveSOCPProblem(const Eigen::MatrixXd& P, const Eigen::VectorXd& q, const Eigen::MatrixXd& A,
                           const Eigen::VectorXd& b, Eigen::VectorXd& solution);
 
-    // Extract and process results
-    bool extractOptimizationResult(const Eigen::VectorXd& solution);
-
-    // RDA-specific iterative refinement
-    bool performRDAIteration(Eigen::VectorXd& solution, int max_iterations);
-
-    bool checkSolutionFeasibility(const Eigen::VectorXd& solution);
-
-    // Obstacle and constraint processing
-    bool getObstacleSOCPForm(const std::shared_ptr<map::Map>& map_ptr, std::vector<Eigen::MatrixXd>& A_obstacles,
-                             std::vector<Eigen::VectorXd>& b_obstacles);
-
     // Cost function setup
     bool setupQuadraticCostFunction(Eigen::MatrixXd& P, Eigen::VectorXd& q);
-
-    // Vehicle geometry and kinematics
-    bool getVehicleGeometryMatrix(Eigen::MatrixXd& G, Eigen::VectorXd& g);
-
-    bool discreteKinematicConstraint(double x_prev, double y_prev, double theta_prev, double v_prev,
-                                     double acceleration, double steering_angle, double& x_next, double& y_next,
-                                     double& theta_next, double& v_next);
 
     // Member variables
     std::shared_ptr<vehicle_model::KinematicModel> dynamic_model_ptr_;
@@ -101,6 +102,9 @@ class RDASolver {
 
     // Optimization problem data
     Eigen::VectorXd       initial_variables_;
+    Eigen::VectorXd       dual_variables_;
+    Eigen::VectorXd       xi_;   // for penalty coefficients
+    Eigen::VectorXd       zeta_;
     Eigen::VectorXd       optimal_solution_;
     RDAOptimizationResult optimization_result_;
 
@@ -125,9 +129,10 @@ class RDASolver {
     double vehicle_width_;
 
     // Safety and numerical parameters
-    constexpr static double kSafetyMargin     = 0.3;   // m
-    constexpr static double kNumericalEpsilon = 1e-6;
-    constexpr static double kMaxConeWidth     = 1e4;   // For SOCP cone constraints
+    constexpr static double      kSafetyMargin       = 0.3;   // m
+    constexpr static std::size_t kVehicleBoundaryNum = 4;
+    constexpr static double      kNumericalEpsilon   = 1e-6;
+    constexpr static double      kMaxConeWidth       = 1e4;   // For SOCP cone constraints
 };
 
 }   // namespace backend
