@@ -95,6 +95,16 @@ bool TrajPlanner::runBackendOpt(const std::vector<Eigen::Vector3d>* const fronte
     } else if (backend_solver_ == "pwj" && pwj_speed_ptr_ != nullptr) {
         pwj_speed_ptr_->Optimize(*frontend_path, start_vec);
         setstatesControls(opt_states_, opt_controls_, pwj_speed_ptr_->GetResult());
+    } else if (backend_solver_ == "rda" && rda_solver_ptr_ != nullptr) {
+        auto sdv_path      = rdaopt::Vec3dToSdvPath(*frontend_path);
+        auto start_vec_ptr = std::make_shared<vehicle_model::VehiclePose>(start_vec);
+        auto goal_vec_ptr  = std::make_shared<vehicle_model::VehiclePose>(goal_vec);
+        if (!rda_solver_ptr_->Process(sdv_path, start_vec_ptr, goal_vec_ptr)) {
+            LOG(WARNING) << "RDA solver failed to optimize the trajectory.";
+            return false;
+        }
+        setstatesControls(opt_states_, opt_controls_, rda_solver_ptr_->GetStatesResult());
+        setstatesControls(init_states_, init_controls_, rda_solver_ptr_->GetInitialStates());
     } else {
         LOG(ERROR) << "The backend solver " << backend_solver_ << " is not supported or not initialized.";
         return false;

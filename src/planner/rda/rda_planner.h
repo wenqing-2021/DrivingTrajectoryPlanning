@@ -6,6 +6,7 @@
 #include "params.pb.h"
 #include "vehicle_model/kinematic_model.h"
 #include <Eigen/Core>
+#include <Eigen/Sparse>
 #include <memory>
 #include <vector>
 
@@ -37,6 +38,18 @@ struct RDAOptimizationResult {
     bool                         is_feasible;
 };
 
+struct RDAObstacleWorkspace {
+    Eigen::MatrixXd A;
+    Eigen::VectorXd b;
+    Eigen::MatrixXd lambda;
+    Eigen::MatrixXd mu;
+    Eigen::VectorXd z;
+    Eigen::MatrixXd xi;
+    Eigen::VectorXd zeta;
+    Eigen::MatrixXd obsA_lam;
+    Eigen::VectorXd obsb_lam;
+};
+
 class RDASolver {
   public:
     // Constructor and Destructor
@@ -60,10 +73,10 @@ class RDASolver {
     static std::vector<Eigen::Vector3d> SdvPathToVec3d(const vehicle_model::sdv_path& path);
 
   private:
-    // SOCP problem formulation
-    bool formSOCPProblem(const vehicle_model::sdv_path&               init_path,
-                         std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
-                         std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr);
+    // Iterative ADMM-based solving
+    bool iterativeSolve(const vehicle_model::sdv_path&               init_path,
+                        std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
+                        std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr);
 
     // Initialize optimization variables
     bool setInitVariable(const vehicle_model::sdv_path&               init_path,
@@ -82,12 +95,32 @@ class RDASolver {
 
     bool setCollisionAvoidanceConstraints(Eigen::MatrixXd& A_collision, std::vector<Eigen::VectorXd>& b_collision_vec);
 
-    // Solve SOCP using ECOS or similar solver
-    bool solveSOCPProblem(const Eigen::MatrixXd& P, const Eigen::VectorXd& q, const Eigen::MatrixXd& A,
-                          const Eigen::VectorXd& b, Eigen::VectorXd& solution);
+    bool constructCostAndConstraints(Eigen::MatrixXd& P, Eigen::VectorXd& q, Eigen::MatrixXd& Aeq, Eigen::VectorXd& beq,
+                                     Eigen::MatrixXd& G, Eigen::VectorXd& h);
+    bool initializeAdmmWorkspace(const Eigen::MatrixXd& P, const Eigen::VectorXd& q, const Eigen::MatrixXd& Aeq,
+                                 const Eigen::VectorXd& beq, const Eigen::MatrixXd& G, const Eigen::VectorXd& h);
+    bool runAdmmIterations();
+    bool solveStateControlStepWithEicos();
+    bool solveLambdaMuZStepWithEicos(double& dual_residual);
+    bool solveObstacleLambdaMuZWithEicos(std::size_t obs_index, double& residual);
+    double updateXiZeta();
+    void   setOptimalResultFromAdmm();
+    bool   initializeRDAWorkspace();
+    void   updateObstacleDualProducts();
+    double computeIm(const std::size_t obs_index, const std::size_t time_index, const Eigen::VectorXd& variables) const;
+    Eigen::RowVector2d computeHm(const std::size_t obs_index, const std::size_t time_index,
+                                 const Eigen::VectorXd& variables) const;
+    double             getDistanceVariable(const Eigen::VectorXd& variables, const std::size_t time_index) const;
+    std::size_t        getDistanceIndex(const std::size_t time_index) const;
+
+    static std::size_t Idx(VariableIdx idx);
+    static double      SoftThreshold(double value, double threshold);
+    static bool        ComputeObstacleHyperLane(const common::math::Polygon2d& obstacle, Eigen::MatrixXd& obstacle_A,
+                                                Eigen::VectorXd& obstacle_b);
 
     // Cost function setup
-    bool setupQuadraticCostFunction(Eigen::MatrixXd& P, Eigen::VectorXd& q);
+    bool setCostFunction(Eigen::MatrixXd& P, Eigen::VectorXd& q);
+    bool setReferenceCost(Eigen::MatrixXd& P, Eigen::VectorXd& q);
 
     // Member variables
     std::shared_ptr<vehicle_model::KinematicModel> dynamic_model_ptr_;
@@ -108,17 +141,46 @@ class RDASolver {
     Eigen::VectorXd       optimal_solution_;
     RDAOptimizationResult optimization_result_;
 
+    std::vector<RDAObstacleWorkspace> rda_obstacles_;
+    Eigen::Matrix<double, 4, 2>       vehicle_G_;
+    Eigen::Matrix<double, 4, 1>       vehicle_h_;
+
+    Eigen::MatrixXd admm_P_;
+    Eigen::MatrixXd admm_Aeq_;
+    Eigen::MatrixXd admm_G_;
+    Eigen::VectorXd admm_q_;
+    Eigen::VectorXd admm_beq_;
+    Eigen::VectorXd admm_h_;
+    Eigen::VectorXd admm_x_;
+    Eigen::VectorXd admm_z_;
+    Eigen::VectorXd admm_lambda_;
+    Eigen::VectorXd admm_mu_;
+    Eigen::VectorXd admm_u_;
+    double          admm_rho_{1.0};
+    double          admm_l1_weight_{1e-2};
+    std::size_t     admm_var_num_{0};
+    std::size_t     admm_constraint_num_{0};
+    std::size_t     distance_dim_{0};
+    std::size_t     distance_offset_{0};
+
     // Results storage
     std::vector<Eigen::Vector4d> states_result_;
     std::vector<Eigen::Vector2d> controls_result_;
     std::vector<Eigen::Vector4d> initial_states_;
+    std::vector<Eigen::Vector2d> initial_controls_;
 
     // Algorithm parameters
     double              convergence_tolerance_;
     int                 max_rda_iterations_;
     double              penalty_weight_;
+    double              l1_weight_;
     bool                use_warm_start_;
     std::vector<double> cost_history_;   // For convergence monitoring
+    double              min_safety_distance_{0.1};
+    double              max_safety_distance_{1.0};
+    double              slack_gain_{8.0};
+    double              hm_penalty_weight_{1.0};
+    double              im_penalty_weight_{1.0};
 
     // Vehicle constraints
     double max_velocity_;

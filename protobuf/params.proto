@@ -51,6 +51,10 @@ message OBCAParams {
 
 message RDAParams {
     int32 max_iter = 1;
+    double convergence_tolerance = 2;
+    double penalty_weight = 3;
+    bool use_warm_start = 4;
+    double l1_weight = 5;
 }
 
 message SolverParams {
