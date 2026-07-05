@@ -1,6 +1,7 @@
 #include "rda_planner.h"
 #include "math/math_utils.h"
 #include <cmath>
+#include <limits>
 
 #include <Eigen/Sparse>
 
@@ -18,143 +19,49 @@ double RDASolver::SoftThreshold(const double value, const double threshold) {
 }
 
 bool RDASolver::solveStateControlStepWithEicos() {
-    struct ScalarQuadraticTerm {
-        Eigen::RowVectorXd coeff;
-        double             offset{0.0};
-        double             weight{1.0};
-    };
+    if (!qp_solver_ptr_) { qp_solver_ptr_ = std::make_unique<QPSolver>(); }
 
-    updateObstacleDualProducts();
+    const Eigen::Index var_num = static_cast<Eigen::Index>(admm_var_num_);
+    const Eigen::Index eq_num  = static_cast<Eigen::Index>(admm_Aeq_.rows());
 
-    std::vector<ScalarQuadraticTerm> quadratic_terms;
-    quadratic_terms.reserve(admm_var_num_ + rda_obstacles_.size() * distance_dim_ * 3);
-    for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(admm_var_num_); ++i) {
-        if (admm_P_(i, i) <= kNumericalEpsilon) { continue; }
+    const Eigen::SparseMatrix<double> G_sparse = admm_G_.sparseView();
+    Eigen::SparseMatrix<double>       H        = admm_P_.sparseView();
+    H += admm_rho_ * (G_sparse.transpose() * G_sparse);
 
-        const double        sqrt_p = std::sqrt(admm_P_(i, i));
-        ScalarQuadraticTerm term;
-        term.coeff    = Eigen::RowVectorXd::Zero(admm_var_num_);
-        term.coeff(i) = sqrt_p;
-        term.offset   = admm_q_(i) / sqrt_p;
-        term.weight   = 1.0;
-        quadratic_terms.emplace_back(term);
-    }
+    Eigen::VectorXd g = admm_q_;
+    if (admm_G_.rows() > 0) { g += admm_G_.transpose() * (admm_lambda_ - admm_rho_ * admm_z_); }
 
-    for (std::size_t obs_index = 0; obs_index < rda_obstacles_.size(); ++obs_index) {
-        const auto& obs = rda_obstacles_[obs_index];
-        for (std::size_t time_index = 0; time_index < distance_dim_; ++time_index) {
-            const std::size_t  state_index = time_index + 1;
-            const std::size_t  state_base  = state_index * (state_dim_ + control_dim_);
-            const Eigen::Index x_index     = static_cast<Eigen::Index>(state_base + Idx(VariableIdx::X));
-            const Eigen::Index y_index     = static_cast<Eigen::Index>(state_base + Idx(VariableIdx::Y));
-            const Eigen::Index theta_index = static_cast<Eigen::Index>(state_base + Idx(VariableIdx::THETA));
-            const Eigen::Index dist_index  = static_cast<Eigen::Index>(getDistanceIndex(time_index));
-
-            const Eigen::RowVector2d obsA_lam = obs.obsA_lam.row(state_index);
-
-            ScalarQuadraticTerm im_term;
-            im_term.coeff             = Eigen::RowVectorXd::Zero(admm_var_num_);
-            im_term.coeff(x_index)    = obsA_lam.x();
-            im_term.coeff(y_index)    = obsA_lam.y();
-            im_term.coeff(dist_index) = -1.0;
-            im_term.offset = -obs.obsb_lam(state_index) - obs.mu.col(state_index).dot(vehicle_h_) - obs.z(time_index) +
-                             obs.zeta(time_index);
-            im_term.weight = im_penalty_weight_;
-            quadratic_terms.emplace_back(im_term);
-
-            const double             theta     = admm_x_(theta_index);
-            const double             cos_theta = std::cos(theta);
-            const double             sin_theta = std::sin(theta);
-            const Eigen::RowVector2d obsA_lam_rot(obsA_lam.x() * cos_theta + obsA_lam.y() * sin_theta,
-                                                  -obsA_lam.x() * sin_theta + obsA_lam.y() * cos_theta);
-            const Eigen::RowVector2d d_obsA_lam_rot(-obsA_lam.x() * sin_theta + obsA_lam.y() * cos_theta,
-                                                    -obsA_lam.x() * cos_theta - obsA_lam.y() * sin_theta);
-            const Eigen::RowVector2d mu_G       = obs.mu.col(state_index).transpose() * vehicle_G_;
-            const Eigen::RowVector2d hm_nominal = mu_G + obsA_lam_rot + obs.xi.row(state_index);
-
-            for (Eigen::Index component = 0; component < 2; ++component) {
-                ScalarQuadraticTerm hm_term;
-                hm_term.coeff              = Eigen::RowVectorXd::Zero(admm_var_num_);
-                hm_term.coeff(theta_index) = d_obsA_lam_rot(component);
-                hm_term.offset             = hm_nominal(component) - d_obsA_lam_rot(component) * theta;
-                hm_term.weight             = hm_penalty_weight_;
-                quadratic_terms.emplace_back(hm_term);
-            }
-        }
-    }
-
-    const Eigen::Index state_control_var_num = static_cast<Eigen::Index>(admm_var_num_);
-    const Eigen::Index epigraph_var_num      = static_cast<Eigen::Index>(quadratic_terms.size());
-    const Eigen::Index ecos_var_num          = state_control_var_num + epigraph_var_num;
-    const Eigen::Index linear_ineq_num       = static_cast<Eigen::Index>(admm_constraint_num_);
-    const Eigen::Index soc_ineq_num          = 3 * epigraph_var_num;
-
-    Eigen::SparseMatrix<double>         G_soc(linear_ineq_num + soc_ineq_num, ecos_var_num);
+    Eigen::SparseMatrix<double>         A(eq_num, var_num);
     std::vector<Eigen::Triplet<double>> triplets;
-    triplets.reserve(static_cast<std::size_t>(admm_G_.nonZeros()) + 8 * quadratic_terms.size());
-
-    for (Eigen::Index row = 0; row < admm_G_.rows(); ++row) {
-        for (Eigen::Index col = 0; col < admm_G_.cols(); ++col) {
-            const double val = admm_G_(row, col);
-            if (std::abs(val) > 1e-12) { triplets.emplace_back(row, col, val); }
-        }
-    }
-
-    for (Eigen::Index term = 0; term < epigraph_var_num; ++term) {
-        const Eigen::Index t_index = state_control_var_num + term;
-        const Eigen::Index row     = linear_ineq_num + 3 * term;
-
-        triplets.emplace_back(row, t_index, -1.0);
-        for (Eigen::Index col = 0; col < state_control_var_num; ++col) {
-            const double val = quadratic_terms[term].coeff(col);
-            if (std::abs(val) > 1e-12) { triplets.emplace_back(row + 1, col, -2.0 * val); }
-        }
-        triplets.emplace_back(row + 2, t_index, -1.0);
-    }
-    G_soc.setFromTriplets(triplets.begin(), triplets.end());
-
-    Eigen::VectorXd h_soc(linear_ineq_num + soc_ineq_num);
-    h_soc.head(linear_ineq_num) = admm_h_;
-    for (Eigen::Index term = 0; term < epigraph_var_num; ++term) {
-        const Eigen::Index row = linear_ineq_num + 3 * term;
-
-        h_soc(row)     = 1.0;
-        h_soc(row + 1) = 2.0 * quadratic_terms[term].offset;
-        h_soc(row + 2) = -1.0;
-    }
-
-    Eigen::VectorXd c_soc = Eigen::VectorXd::Zero(ecos_var_num);
-    for (Eigen::Index i = 0; i < state_control_var_num; ++i) {
-        if (admm_P_(i, i) <= kNumericalEpsilon) { c_soc(i) = admm_q_(i); }
-    }
-    for (Eigen::Index term = 0; term < epigraph_var_num; ++term) {
-        c_soc(state_control_var_num + term) = 0.5 * quadratic_terms[term].weight;
-    }
-
-    Eigen::SparseMatrix<double>         Aeq_soc(admm_Aeq_.rows(), ecos_var_num);
-    std::vector<Eigen::Triplet<double>> aeq_triplets;
-    aeq_triplets.reserve(static_cast<std::size_t>(admm_Aeq_.nonZeros()));
+    triplets.reserve(static_cast<std::size_t>(admm_Aeq_.nonZeros()));
     for (Eigen::Index row = 0; row < admm_Aeq_.rows(); ++row) {
         for (Eigen::Index col = 0; col < admm_Aeq_.cols(); ++col) {
             const double val = admm_Aeq_(row, col);
-            if (std::abs(val) > 1e-12) { aeq_triplets.emplace_back(row, col, val); }
+            if (std::abs(val) > 1e-12) { triplets.emplace_back(row, col, val); }
         }
     }
-    Aeq_soc.setFromTriplets(aeq_triplets.begin(), aeq_triplets.end());
+    A.setFromTriplets(triplets.begin(), triplets.end());
 
-    Eigen::VectorXd beq_soc = admm_beq_;
-    Eigen::VectorXi qdims(epigraph_var_num);
-    for (Eigen::Index term = 0; term < epigraph_var_num; ++term) { qdims(term) = 3; }
+    Eigen::VectorXd lower_bound(eq_num);
+    Eigen::VectorXd upper_bound(eq_num);
+    lower_bound = admm_beq_;
+    upper_bound = admm_beq_;
 
-    EiCOS::Solver solver_soc(G_soc, Aeq_soc, c_soc, h_soc, beq_soc, qdims);
-    const auto    exit_code = solver_soc.solve(true);
-    LOG(INFO) << "RDASolver::solveStateControlStepWithEicos: EiCOS solver exit code: " << static_cast<int>(exit_code);
-    if (!(exit_code == EiCOS::exitcode::optimal || exit_code == EiCOS::exitcode::close_to_optimal)) { return false; }
+    qp_solver_ptr_->setVariableNums(static_cast<int>(var_num));
+    qp_solver_ptr_->setConstraintNums(static_cast<int>(eq_num));
 
-    const Eigen::VectorXd& sol_soc = solver_soc.solution();
-    if (sol_soc.size() != ecos_var_num) { return false; }
+    if (!qp_solver_ptr_->Solve(H, g, A, lower_bound, upper_bound)) {
+        LOG(WARNING) << "RDASolver::solveStateControlStepWithEicos failed: QP solver failed.";
+        return false;
+    }
 
-    admm_x_ = sol_soc.head(state_control_var_num);
+    const Eigen::VectorXd* solution = qp_solver_ptr_->GetResult();
+    if (solution == nullptr || solution->size() != var_num) {
+        LOG(WARNING) << "RDASolver::solveStateControlStepWithEicos failed: unexpected QP solution size.";
+        return false;
+    }
+
+    admm_x_ = *solution;
     return true;
 }
 
@@ -214,6 +121,7 @@ RDASolver::RDASolver(const std::shared_ptr<vehicle_model::KinematicModel>& dynam
 
     hm_penalty_weight_ = penalty_weight_;
     im_penalty_weight_ = penalty_weight_;
+    qp_solver_ptr_     = std::make_unique<QPSolver>();
 }
 
 // ─── Main interface ──────────────────────────────────────────────────────────
@@ -503,6 +411,9 @@ bool RDASolver::runAdmmIterations() {
         cost_history_.emplace_back(obj);
 
         if (primal_norm < convergence_tolerance_ && dual_norm < convergence_tolerance_) { break; }
+
+        LOG(INFO) << "ADMM Iteration " << iter + 1 << ": cost = " << obj << ", primal_norm = " << primal_norm
+                  << ", dual_norm = " << dual_norm;
     }
 
     return true;

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "OsqpEigen/OsqpEigen.h"
 
 namespace planning {

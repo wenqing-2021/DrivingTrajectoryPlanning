@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/qp_solver/qp_solver.h"
 #include "eicos.hpp"
 #include "logger.h"
 #include "map.h"
@@ -145,23 +146,24 @@ class RDASolver {
     Eigen::Matrix<double, 4, 2>       vehicle_G_;
     Eigen::Matrix<double, 4, 1>       vehicle_h_;
 
-    Eigen::MatrixXd admm_P_;
-    Eigen::MatrixXd admm_Aeq_;
-    Eigen::MatrixXd admm_G_;
-    Eigen::VectorXd admm_q_;
-    Eigen::VectorXd admm_beq_;
-    Eigen::VectorXd admm_h_;
-    Eigen::VectorXd admm_x_;
-    Eigen::VectorXd admm_z_;
-    Eigen::VectorXd admm_lambda_;
-    Eigen::VectorXd admm_mu_;
-    Eigen::VectorXd admm_u_;
-    double          admm_rho_{1.0};
-    double          admm_l1_weight_{1e-2};
-    std::size_t     admm_var_num_{0};
-    std::size_t     admm_constraint_num_{0};
-    std::size_t     distance_dim_{0};
-    std::size_t     distance_offset_{0};
+    Eigen::MatrixXd           admm_P_;
+    Eigen::MatrixXd           admm_Aeq_;
+    Eigen::MatrixXd           admm_G_;
+    Eigen::VectorXd           admm_q_;
+    Eigen::VectorXd           admm_beq_;
+    Eigen::VectorXd           admm_h_;
+    Eigen::VectorXd           admm_x_;
+    Eigen::VectorXd           admm_z_;
+    Eigen::VectorXd           admm_lambda_;
+    Eigen::VectorXd           admm_mu_;
+    Eigen::VectorXd           admm_u_;
+    double                    admm_rho_{1.0};
+    std::unique_ptr<QPSolver> qp_solver_ptr_;
+    double                    admm_l1_weight_{1e-2};
+    std::size_t               admm_var_num_{0};
+    std::size_t               admm_constraint_num_{0};
+    std::size_t               distance_dim_{0};
+    std::size_t               distance_offset_{0};
 
     // Results storage
     std::vector<Eigen::Vector4d> states_result_;
