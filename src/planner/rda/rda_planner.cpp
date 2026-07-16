@@ -24,12 +24,65 @@ bool RDASolver::solveStateControlStepWithEicos() {
     const Eigen::Index var_num = static_cast<Eigen::Index>(admm_var_num_);
     const Eigen::Index eq_num  = static_cast<Eigen::Index>(admm_Aeq_.rows());
 
-    const Eigen::SparseMatrix<double> G_sparse = admm_G_.sparseView();
-    Eigen::SparseMatrix<double>       H        = admm_P_.sparseView();
-    H += admm_rho_ * (G_sparse.transpose() * G_sparse);
+    // Compute dynamic H and g including Im and Hm ADMM penalty terms.
+    Eigen::MatrixXd H_dense = admm_P_;
+    Eigen::VectorXd g       = admm_q_;
 
-    Eigen::VectorXd g = admm_q_;
+    // Add original ADMM penalty from general inequalities G * x <= h
+    const Eigen::SparseMatrix<double> G_sparse = admm_G_.sparseView();
+    H_dense += admm_rho_ * Eigen::MatrixXd(G_sparse.transpose() * G_sparse);
     if (admm_G_.rows() > 0) { g += admm_G_.transpose() * (admm_lambda_ - admm_rho_ * admm_z_); }
+
+    // Inject Im and Hm penalties.
+    for (std::size_t obs_index = 0; obs_index < rda_obstacles_.size(); ++obs_index) {
+        const auto& obs = rda_obstacles_[obs_index];
+        for (std::size_t time_index = 0; time_index < distance_dim_; ++time_index) {
+            const std::size_t state_index = time_index + 1;
+            const std::size_t state_base  = state_index * (state_dim_ + control_dim_);
+
+            // Recompute values
+            // distance_var is technically getDistanceVariable(admm_x_, time_index) but we just use it implicitly in
+            // jacobian
+            const double             im = computeIm(obs_index, time_index, admm_x_);
+            const Eigen::RowVector2d hm = computeHm(obs_index, time_index, admm_x_);
+
+            // --- Inject Im Penalty ---
+            // Im = obsA_lam^T * [x; y] - obsb_lam - mu^T * h - dis - z + zeta
+            // d(Im)/d(x) = obsA_lam(0)
+            // d(Im)/d(y) = obsA_lam(1)
+            // d(Im)/d(dis) = -1
+            Eigen::VectorXd J_im                   = Eigen::VectorXd::Zero(var_num);
+            J_im(state_base + Idx(VariableIdx::X)) = obs.obsA_lam(state_index, 0);
+            J_im(state_base + Idx(VariableIdx::Y)) = obs.obsA_lam(state_index, 1);
+            J_im(getDistanceIndex(time_index))     = -1.0;
+
+            // The penalty is 0.5 * ro1 * Im^2.
+            // Using Gauss-Newton approximation: H += ro1 * J_im * J_im^T, g += ro1 * Im * J_im
+            H_dense += im_penalty_weight_ * J_im * J_im.transpose();
+            g += im_penalty_weight_ * im * J_im;
+
+            // --- Inject Hm Penalty ---
+            // Hm = mu^T * G + obsA_lam^T * R(theta) + xi
+            // We differentiate Hm with respect to theta.
+            const double theta     = admm_x_(state_base + Idx(VariableIdx::THETA));
+            const double cos_theta = std::cos(theta);
+            const double sin_theta = std::sin(theta);
+
+            // d(R)/d(theta) = [-sin, -cos; cos, -sin]
+            Eigen::RowVector2d obsA_lam = obs.obsA_lam.row(state_index);
+            Eigen::RowVector2d d_obsA_lam_rot(obsA_lam.x() * (-sin_theta) + obsA_lam.y() * cos_theta,
+                                              obsA_lam.x() * (-cos_theta) + obsA_lam.y() * (-sin_theta));
+
+            Eigen::MatrixXd J_hm                          = Eigen::MatrixXd::Zero(2, var_num);
+            J_hm(0, state_base + Idx(VariableIdx::THETA)) = d_obsA_lam_rot.x();
+            J_hm(1, state_base + Idx(VariableIdx::THETA)) = d_obsA_lam_rot.y();
+
+            H_dense += hm_penalty_weight_ * J_hm.transpose() * J_hm;
+            g += hm_penalty_weight_ * J_hm.transpose() * hm.transpose();
+        }
+    }
+
+    Eigen::SparseMatrix<double> H = H_dense.sparseView();
 
     Eigen::SparseMatrix<double>         A(eq_num, var_num);
     std::vector<Eigen::Triplet<double>> triplets;
@@ -102,9 +155,12 @@ RDASolver::RDASolver(const std::shared_ptr<vehicle_model::KinematicModel>& dynam
     , total_var_dim_(0)
     , convergence_tolerance_(rda_params.convergence_tolerance() > 0.0 ? rda_params.convergence_tolerance() : 1e-4)
     , max_rda_iterations_(rda_params.max_iter() > 0 ? rda_params.max_iter() : 10)
-    , penalty_weight_(rda_params.penalty_weight() > 0.0 ? rda_params.penalty_weight() : 1.0)
+    , penalty_weight_(rda_params.penalty_weight() > 0.0 ? rda_params.penalty_weight() : 200.0)
     , l1_weight_(rda_params.l1_weight() > 0.0 ? rda_params.l1_weight() : 1e-2)
-    , use_warm_start_(rda_params.use_warm_start()) {
+    , use_warm_start_(rda_params.use_warm_start())
+    , slack_gain_(8.0)
+    , w_s_(rda_params.w_s() > 0.0 ? rda_params.w_s() : 1.0)
+    , w_u_(rda_params.w_u() > 0.0 ? rda_params.w_u() : 1.0) {
     if (!dynamic_model_ptr_ || !map_ptr_) {
         throw std::runtime_error("RDASolver: dynamic_model_ptr or map_ptr is null.");
     }
@@ -119,7 +175,7 @@ RDASolver::RDASolver(const std::shared_ptr<vehicle_model::KinematicModel>& dynam
     vehicle_G_ << 1.0, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, -1.0;
     vehicle_h_ << vehicle_length_ / 2.0, vehicle_width_ / 2.0, vehicle_length_ / 2.0, vehicle_width_ / 2.0;
 
-    hm_penalty_weight_ = penalty_weight_;
+    hm_penalty_weight_ = 1.0;
     im_penalty_weight_ = penalty_weight_;
     qp_solver_ptr_     = std::make_unique<QPSolver>();
 }
@@ -282,13 +338,6 @@ bool RDASolver::constructCostAndConstraints(Eigen::MatrixXd& P, Eigen::VectorXd&
         return false;
     }
 
-    Eigen::MatrixXd              A_collision;
-    std::vector<Eigen::VectorXd> b_collision_vec;
-    if (!setCollisionAvoidanceConstraints(A_collision, b_collision_vec)) {
-        LOG(WARNING) << "RDASolver::constructCostAndConstraints failed: setCollisionAvoidanceConstraints failed.";
-        return false;
-    }
-
     const std::size_t               n = total_var_dim_;
     std::vector<Eigen::RowVectorXd> eq_rows;
     std::vector<double>             eq_bounds;
@@ -297,8 +346,8 @@ bool RDASolver::constructCostAndConstraints(Eigen::MatrixXd& P, Eigen::VectorXd&
 
     eq_rows.reserve(static_cast<std::size_t>(A_dyn.rows()) + 8);
     eq_bounds.reserve(static_cast<std::size_t>(b_dyn.size()) + 8);
-    ineq_rows.reserve(2 * n + static_cast<std::size_t>(A_collision.rows()));
-    ineq_bounds.reserve(2 * n + static_cast<std::size_t>(A_collision.rows()));
+    ineq_rows.reserve(2 * n);
+    ineq_bounds.reserve(2 * n);
 
     for (Eigen::Index row = 0; row < A_dyn.rows(); ++row) {
         eq_rows.emplace_back(A_dyn.row(row));
@@ -324,14 +373,6 @@ bool RDASolver::constructCostAndConstraints(Eigen::MatrixXd& P, Eigen::VectorXd&
         if (lower > -kMaxConeWidth) {
             ineq_rows.emplace_back(-row);
             ineq_bounds.emplace_back(-lower);
-        }
-    }
-
-    if (A_collision.rows() > 0 && !b_collision_vec.empty()) {
-        const Eigen::VectorXd& b_collision = b_collision_vec.front();
-        for (Eigen::Index row = 0; row < A_collision.rows(); ++row) {
-            ineq_rows.emplace_back(A_collision.row(row));
-            ineq_bounds.emplace_back(b_collision(row));
         }
     }
 
@@ -425,7 +466,12 @@ bool RDASolver::solveLambdaMuZStepWithEicos(double& dual_residual) {
 
     for (std::size_t obs_index = 0; obs_index < rda_obstacles_.size(); ++obs_index) {
         double obstacle_residual = 0.0;
-        if (!solveObstacleLambdaMuZWithEicos(obs_index, obstacle_residual)) { return false; }
+        if (!solveObstacleLambdaMuZWithEicos(obs_index, obstacle_residual)) {
+            LOG(WARNING) << "RDASolver::solveLambdaMuZStepWithEicos failed: solveObstacleLambdaMuZWithEicos failed for "
+                            "obstacle index "
+                         << obs_index;
+            return false;
+        }
         dual_residual += obstacle_residual;
     }
 
@@ -958,66 +1004,6 @@ bool RDASolver::setDynamicConstraints(Eigen::MatrixXd& A_constraint, Eigen::Vect
     return true;
 }
 
-bool RDASolver::setCollisionAvoidanceConstraints(Eigen::MatrixXd&              A_collision,
-                                                 std::vector<Eigen::VectorXd>& b_collision_vec) {
-    A_collision.resize(0, total_var_dim_);
-    b_collision_vec.clear();
-
-    if (map_ptr_ == nullptr) {
-        LOG(WARNING) << "RDASolver::setCollisionAvoidanceConstraints failed: map pointer is null.";
-        return false;
-    }
-
-    const auto& obs_list = map_ptr_->GetObsList();
-    if (obs_list.empty()) { return true; }
-
-    // Build one linear separating half-space per obstacle and timestep using current trajectory.
-    std::vector<Eigen::RowVectorXd> rows;
-    std::vector<double>             collision_bounds;
-    rows.reserve(obs_list.size() * N_);
-    collision_bounds.reserve(obs_list.size() * N_);
-
-    for (std::size_t obs_idx = 0; obs_idx < obs_list.size(); ++obs_idx) {
-        Eigen::MatrixXd obs_A;
-        Eigen::VectorXd obs_b;
-        if (!ComputeObstacleHyperLane(obs_list[obs_idx], obs_A, obs_b)) { continue; }
-
-        if (obs_A.rows() == 0) { continue; }
-
-        for (std::size_t k = 0; k < N_; ++k) {
-            const double xk = initial_states_[k].x();
-            const double yk = initial_states_[k].y();
-
-            // Pick the most violated edge at reference point and keep vehicle on the outside side.
-            Eigen::VectorXd residual = obs_A * Eigen::Vector2d(xk, yk) - obs_b;
-            Eigen::Index    edge_idx = 0;
-            residual.maxCoeff(&edge_idx);
-
-            Eigen::RowVectorXd row  = Eigen::RowVectorXd::Zero(total_var_dim_);
-            const std::size_t  base = k * (state_dim_ + control_dim_);
-
-            // a^T p >= b + margin  <=>  -a^T p <= -(b + margin)
-            row[base + Idx(VariableIdx::X)] = -obs_A(edge_idx, 0);
-            row[base + Idx(VariableIdx::Y)] = -obs_A(edge_idx, 1);
-
-            rows.emplace_back(row);
-            collision_bounds.emplace_back(-(obs_b(edge_idx) + kSafetyMargin));
-        }
-    }
-
-    if (rows.empty()) { return true; }
-
-    A_collision                 = Eigen::MatrixXd::Zero(rows.size(), total_var_dim_);
-    Eigen::VectorXd b_collision = Eigen::VectorXd::Zero(rows.size());
-    for (std::size_t i = 0; i < rows.size(); ++i) {
-        A_collision.row(i) = rows[i];
-        b_collision(i)     = collision_bounds[i];
-    }
-    b_collision_vec.emplace_back(b_collision);
-
-    return true;
-}
-
 // ─── Private: RDA iteration ──────────────────────────────────────────────────
 
 // ─── Private: obstacle / cost helpers ────────────────────────────────────────
@@ -1042,15 +1028,13 @@ bool RDASolver::setCostFunction(Eigen::MatrixXd& P, Eigen::VectorXd& q) {
 }
 
 bool RDASolver::setReferenceCost(Eigen::MatrixXd& P, Eigen::VectorXd& q) {
-    if (initial_states_.size() != N_) {
-        LOG(WARNING) << "RDASolver::setReferenceCost failed: initial_states size does not match horizon.";
+    if (initial_states_.size() != N_ || initial_controls_.size() != N_) {
+        LOG(WARNING) << "RDASolver::setReferenceCost failed: initial_states or controls size does not match horizon.";
         return false;
     }
 
-    constexpr double kRefWeight = 1.0;
-
-    // QP objective uses 0.5 * x^T P x + q^T x. For w * ||x - x_ref||^2,
-    // each diagonal term is 2w and each linear term is -2w * x_ref.
+    // QP objective uses 0.5 * x^T P x + q^T x.
+    // For w * ||x - x_ref||^2, each diagonal term is 2w and each linear term is -2w * x_ref.
     for (std::size_t i = 0; i < N_; ++i) {
         const std::size_t      base      = i * (state_dim_ + control_dim_);
         const Eigen::Vector4d& ref_state = initial_states_[i];
@@ -1060,15 +1044,29 @@ bool RDASolver::setReferenceCost(Eigen::MatrixXd& P, Eigen::VectorXd& q) {
         const std::size_t theta_index = base + Idx(VariableIdx::THETA);
         const std::size_t v_index     = base + Idx(VariableIdx::V);
 
-        P(x_index, x_index) += 2.0 * kRefWeight;
-        P(y_index, y_index) += 2.0 * kRefWeight;
-        P(theta_index, theta_index) += 2.0 * kRefWeight;
-        P(v_index, v_index) += 2.0 * kRefWeight;
+        P(x_index, x_index) += 2.0 * w_s_;
+        P(y_index, y_index) += 2.0 * w_s_;
+        P(theta_index, theta_index) += 2.0 * w_s_;
 
-        q(x_index) -= 2.0 * kRefWeight * ref_state.x();
-        q(y_index) -= 2.0 * kRefWeight * ref_state.y();
-        q(theta_index) -= 2.0 * kRefWeight * ref_state.z();
-        q(v_index) -= 2.0 * kRefWeight * ref_state.w();
+        q(x_index) -= 2.0 * w_s_ * ref_state.x();
+        q(y_index) -= 2.0 * w_s_ * ref_state.y();
+        q(theta_index) -= 2.0 * w_s_ * ref_state.z();
+
+        // Control variables and velocity (following Github's tracking design)
+        if (i < N_ - 1) {
+            const Eigen::Vector2d& ref_control = initial_controls_[i];
+            const std::size_t      acc_index   = base + Idx(VariableIdx::ACCELERATION);
+            const std::size_t      steer_index = base + Idx(VariableIdx::STEER_ANGLE);
+
+            P(v_index, v_index) += 2.0 * w_u_;
+            q(v_index) -= 2.0 * w_u_ * ref_state.w();
+
+            P(acc_index, acc_index) += 2.0 * w_u_;
+            q(acc_index) -= 2.0 * w_u_ * ref_control.x();
+
+            P(steer_index, steer_index) += 2.0 * w_u_;
+            q(steer_index) -= 2.0 * w_u_ * ref_control.y();
+        }
     }
 
     return true;

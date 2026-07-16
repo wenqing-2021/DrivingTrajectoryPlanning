@@ -94,8 +94,6 @@ class RDASolver {
 
     bool setDynamicConstraints(Eigen::MatrixXd& A_constraint, Eigen::VectorXd& b_constraint);
 
-    bool setCollisionAvoidanceConstraints(Eigen::MatrixXd& A_collision, std::vector<Eigen::VectorXd>& b_collision_vec);
-
     bool constructCostAndConstraints(Eigen::MatrixXd& P, Eigen::VectorXd& q, Eigen::MatrixXd& Aeq, Eigen::VectorXd& beq,
                                      Eigen::MatrixXd& G, Eigen::VectorXd& h);
     bool initializeAdmmWorkspace(const Eigen::MatrixXd& P, const Eigen::VectorXd& q, const Eigen::MatrixXd& Aeq,
@@ -134,7 +132,19 @@ class RDASolver {
     size_t control_dim_;     // Control dimension (2: acceleration, steering_angle)
     size_t total_var_dim_;   // Total optimization variable dimension
 
-    // Optimization problem data
+    // ADMM and weights parameters
+    double                convergence_tolerance_;
+    int                   max_rda_iterations_;
+    double                penalty_weight_;      // base ADMM rho
+    double                hm_penalty_weight_;   // ADMM ro2
+    double                im_penalty_weight_;   // ADMM ro1
+    double                l1_weight_;
+    bool                  use_warm_start_;
+    double                slack_gain_;
+    double                w_s_;
+    double                w_u_;
+    double                min_safety_distance_ = 0.1;
+    double                max_safety_distance_ = 1.0;
     Eigen::VectorXd       initial_variables_;
     Eigen::VectorXd       dual_variables_;
     Eigen::VectorXd       xi_;   // for penalty coefficients
@@ -172,17 +182,8 @@ class RDASolver {
     std::vector<Eigen::Vector2d> initial_controls_;
 
     // Algorithm parameters
-    double              convergence_tolerance_;
-    int                 max_rda_iterations_;
-    double              penalty_weight_;
-    double              l1_weight_;
-    bool                use_warm_start_;
+    // Note: Most of these parameters were declared earlier, so we only declare those not already declared above.
     std::vector<double> cost_history_;   // For convergence monitoring
-    double              min_safety_distance_{0.1};
-    double              max_safety_distance_{1.0};
-    double              slack_gain_{8.0};
-    double              hm_penalty_weight_{1.0};
-    double              im_penalty_weight_{1.0};
 
     // Vehicle constraints
     double max_velocity_;

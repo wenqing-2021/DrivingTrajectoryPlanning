@@ -55,6 +55,8 @@ message RDAParams {
     double penalty_weight = 3;
     bool use_warm_start = 4;
     double l1_weight = 5;
+    double w_s = 6;
+    double w_u = 7;
 }
 
 message SolverParams {
