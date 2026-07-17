@@ -87,6 +87,8 @@ class RDASolver {
     Eigen::MatrixXd G_vehicle_;   // 4 x 2
     Eigen::VectorXd h_vehicle_;   // 4 x 1
     double          L_;           // wheelbase
+
+    int admm_iter_ = 0;   // current ADMM iteration (for trust-region scheduling)
 };
 
 }   // namespace backend

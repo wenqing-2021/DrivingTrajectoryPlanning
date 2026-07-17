@@ -18,8 +18,13 @@ namespace planning {
 namespace backend {
 
 namespace {
-constexpr double kInf = 1e20;
-}
+// Use a moderate "infinity" for OSQP bounds: 1e20 degrades the constraint
+// matrix conditioning and can make OSQP report spurious primal infeasibility.
+constexpr double kInf = 1e10;
+// Trust region (rad) limiting per-iteration change of theta so that the
+// first-order linearization of R(theta) stays valid (large-heading parking).
+constexpr double kThetaTrustRegion = 0.5;
+}   // namespace
 
 RDASolver::RDASolver(const std::shared_ptr<vehicle_model::KinematicModel>& dynamic_model_ptr,
                      const std::shared_ptr<map::Map>& map_ptr, const params::RDAParams& rda_params, double dt)
@@ -105,37 +110,14 @@ void RDASolver::getObstaclesFromMap() {
         return;
     }
 
-    // Only keep obstacles that are close enough to the reference trajectory to
-    // matter. Far-away obstacles produce degenerate (all-positive A*s-b) SOCPs
-    // that make EiCOS fail with a "numerics" error, and they do not affect the
-    // plan anyway. Threshold = vehicle diagonal/2 + safety margin.
-    const double veh_diag =
-        std::hypot(dynamic_model_ptr_->GetVehicleParam().length(), dynamic_model_ptr_->GetVehicleParam().width());
-    const double keep_radius = 0.5 * veh_diag + 3.0;   // metres
-
-    auto dist_to_traj = [&](double px, double py) {
-        double dmin = std::numeric_limits<double>::max();
-        for (std::size_t t = 0; t <= T_; ++t) {
-            double dx = px - state_traj_(0, t);
-            double dy = py - state_traj_(1, t);
-            dmin      = std::min(dmin, std::hypot(dx, dy));
-        }
-        return dmin;
-    };
-
+    // All obstacles are considered. (A previous distance-based filter was removed:
+    // it was not principled and could drop obstacles that the vehicle must avoid.)
     for (std::size_t i = 0; i < obs_list.size(); ++i) {
         const auto& obstacle = obs_list[i];
 
         std::size_t num_edges = obstacle.num_points();
         if (num_edges < 3) {
             LOG(WARNING) << "Obstacle " << i << " has fewer than 3 edges. Skipping.";
-            continue;
-        }
-
-        // Skip obstacles far from the trajectory (they cause EiCOS numerics errors)
-        double d_obs = dist_to_traj(obstacle.center().x(), obstacle.center().y());
-        if (d_obs > keep_radius) {
-            LOG(INFO) << "Obstacle " << i << " is " << d_obs << " m from trajectory; skipping.";
             continue;
         }
 
@@ -387,6 +369,17 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
         } else {
             lower_bound(bnd + idx_X(t) + 3) = -max_speed;
             upper_bound(bnd + idx_X(t) + 3) = max_speed;
+
+            // Trust region on theta: keep the linearization of R(theta) valid by
+            // limiting how far theta can move from the current reference in one
+            // ADMM iteration. Skip the trust region on the very first iteration
+            // (reference is a coarse straight-line guess that may be far from the
+            // feasible manifold); apply it from the second iteration onward.
+            if (admm_iter_ > 0) {
+                double theta_ref                = state_traj_(2, t);
+                lower_bound(bnd + idx_X(t) + 2) = theta_ref - kThetaTrustRegion;
+                upper_bound(bnd + idx_X(t) + 2) = theta_ref + kThetaTrustRegion;
+            }
         }
     }
 
@@ -426,6 +419,16 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
     }
 
     const Eigen::VectorXd* sol = qp_solver.GetResult();
+
+    // Health check: OSQP may report "solved" but return a huge/NaN solution when
+    // the QP is primal infeasible (e.g. an over-tight trust region). Reject such
+    // solutions instead of poisoning the trajectory.
+    if (sol->hasNaN() || sol->cwiseAbs().maxCoeff() > 1e6) {
+        LOG(ERROR) << "SU QP returned an invalid solution (max|x|=" << sol->cwiseAbs().maxCoeff()
+                   << "); likely primal infeasible.";
+        return false;
+    }
+
     for (std::size_t t = 0; t <= T_; ++t) {
         state_traj_.col(t) = sol->segment<4>(idx_X(t));
         if (t < T_) {
@@ -673,6 +676,7 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
     std::vector<RDADualVariables> duals_prev = duals_;
 
     for (int iter = 0; iter < max_iter; ++iter) {
+        admm_iter_ = iter;
         if (!solveSU(*start_pose_ptr, *goal_pose_ptr)) {
             LOG(ERROR) << "Failed to solve SU subproblem at iteration " << iter;
             return false;
