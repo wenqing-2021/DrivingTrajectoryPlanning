@@ -12,4 +12,4 @@ set_property(TARGET RDAPlanner PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Include directories for headers
 target_include_directories(RDAPlanner PUBLIC ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(RDAPlanner PUBLIC ${UTILS_LIBRARIES} Map)
+target_link_libraries(RDAPlanner PUBLIC ${UTILS_LIBRARIES} Map eicos OsqpEigen::OsqpEigen)
