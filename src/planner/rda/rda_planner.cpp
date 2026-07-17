@@ -109,8 +109,8 @@ void RDASolver::getObstaclesFromMap() {
     // matter. Far-away obstacles produce degenerate (all-positive A*s-b) SOCPs
     // that make EiCOS fail with a "numerics" error, and they do not affect the
     // plan anyway. Threshold = vehicle diagonal/2 + safety margin.
-    const double veh_diag   = std::hypot(dynamic_model_ptr_->GetVehicleParam().length(),
-                                         dynamic_model_ptr_->GetVehicleParam().width());
+    const double veh_diag =
+        std::hypot(dynamic_model_ptr_->GetVehicleParam().length(), dynamic_model_ptr_->GetVehicleParam().width());
     const double keep_radius = 0.5 * veh_diag + 3.0;   // metres
 
     auto dist_to_traj = [&](double px, double py) {
@@ -560,8 +560,8 @@ bool RDASolver::solveLamMuZ() {
         } else {
             // Keep the previous-iteration dual variables for this obstacle and
             // continue with the others instead of aborting the whole ADMM solve.
-            LOG(WARNING) << "LamMuZ EiCOS failed for obstacle " << obs_idx << " (status "
-                         << static_cast<int>(status) << "); keeping previous duals.";
+            LOG(WARNING) << "LamMuZ EiCOS failed for obstacle " << obs_idx << " (status " << static_cast<int>(status)
+                         << "); keeping previous duals.";
         }
     }
 
