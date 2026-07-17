@@ -16,12 +16,13 @@ namespace planning {
 namespace backend {
 
 struct RDAObstacle {
-    std::vector<Eigen::MatrixXd> A_list;   // T+1 size, each max_edge_num x 2
-    std::vector<Eigen::VectorXd> b_list;   // T+1 size, each max_edge_num x 1
+    std::size_t                  edge_num = 0;   // number of edges of this obstacle
+    std::vector<Eigen::MatrixXd> A_list;         // T+1 size, each edge_num x 2
+    std::vector<Eigen::VectorXd> b_list;         // T+1 size, each edge_num x 1
 };
 
 struct RDADualVariables {
-    Eigen::MatrixXd lam;    // max_edge_num x (T+1)
+    Eigen::MatrixXd lam;    // edge_num x (T+1)
     Eigen::MatrixXd mu;     // 4 x (T+1) (assuming vehicle is modeled as 4 lines)
     Eigen::VectorXd z;      // 1 x T
     Eigen::MatrixXd xi;     // (T+1) x 2
@@ -57,16 +58,19 @@ class RDASolver {
     bool solveSU(const vehicle_model::VehiclePose& start_pose, const vehicle_model::VehiclePose& goal_pose);
     bool solveLamMuZ();
     void updateMultipliers();
-    void computeLinearizedDynamics(double v, double delta, double theta, Eigen::MatrixXd& A, Eigen::MatrixXd& B,
-                                   Eigen::VectorXd& C);
+
+    // Linearize kinematic bicycle model (no slip angle beta) at the reference point.
+    // X = [x, y, theta, v]^T, U = [delta, a]^T, dt is the time interval (also an optimization variable).
+    // X_{t+1} ~= A * X_t + B * U_t + D * dt_t + C
+    void computeLinearizedDynamics(double v, double delta, double theta, double a, double dt, Eigen::MatrixXd& A,
+                                   Eigen::MatrixXd& B, Eigen::VectorXd& D, Eigen::VectorXd& C);
 
     // Member variables
     std::shared_ptr<vehicle_model::KinematicModel> dynamic_model_ptr_;
     std::shared_ptr<map::Map>                      map_ptr_;
     params::RDAParams                              rda_params_;
-    double                                         dt_;
+    double                                         dt_;   // nominal time interval
     std::size_t                                    T_;
-    std::size_t                                    max_edge_num_ = 5;
 
     std::vector<RDAObstacle>      obstacles_;
     std::vector<RDADualVariables> duals_;
@@ -74,6 +78,7 @@ class RDASolver {
     Eigen::MatrixXd state_traj_;     // 4 x (T+1)
     Eigen::MatrixXd control_traj_;   // 2 x T
     Eigen::VectorXd slack_d_;        // 1 x T
+    Eigen::VectorXd dt_traj_;        // 1 x T (per-segment time interval, optimization variable)
 
     std::vector<Eigen::Vector4d> opt_traj_;
     std::vector<Eigen::Vector4d> init_traj_;

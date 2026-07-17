@@ -52,11 +52,18 @@ message OBCAParams {
 message RDAParams {
     int32 max_iter = 1;
     double convergence_tolerance = 2;
-    double penalty_weight = 3;
+    double penalty_weight = 3;   // ro1 in ADMM
     bool use_warm_start = 4;
-    double l1_weight = 5;
+    double l1_weight = 5;        // slack gain for safety distance
     double w_s = 6;
     double w_u = 7;
+    double ro2 = 8;              // second ADMM penalty weight
+    double min_sd = 9;           // minimum safety distance
+    double max_sd = 10;          // maximum safety distance
+    double dt_min = 11;          // minimum time interval
+    double dt_max = 12;          // maximum time interval
+    double w_dt = 13;            // weight for dt regularization
+    double iter_threshold = 14;  // ADMM early-stop residual threshold
 }
 
 message SolverParams {

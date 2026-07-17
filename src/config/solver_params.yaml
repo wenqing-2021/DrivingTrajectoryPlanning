@@ -46,8 +46,17 @@ obca_params:
   linear_solver: "mumps"
 
 rda_params:
-  max_iter: 10
-  convergence_tolerance: 1.0e-4
-  penalty_weight: 1.0
+  max_iter: 50
+  convergence_tolerance: 0.05
+  penalty_weight: 200.0
   use_warm_start: false
-  l1_weight: 1.0e-2
+  l1_weight: 8.0
+  w_s: 1.0
+  w_u: 1.0
+  ro2: 1.0
+  min_sd: 0.1
+  max_sd: 1.0
+  dt_min: 0.05
+  dt_max: 0.2
+  w_dt: 1.0
+  iter_threshold: 0.05
