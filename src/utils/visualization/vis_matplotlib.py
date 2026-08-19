@@ -1,6 +1,7 @@
 """
 Load saved protobuf results and visualize with Matplotlib.
-Saves static images to solve_results/vis/.
+Saves static images to the same scenario directory as the protobuf results
+(solve_results/park/场景_<solve time> by default).
 """
 
 import os
@@ -520,7 +521,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--save_dir", type=str, default=None,
-        help="Output directory for images (default: solve_results/vis/<res_save_path_basename>)",
+        help="Output directory for images (default: same as --res_save_path)",
     )
     parser.add_argument("--debug", "-d", action="store_true")
     return parser.parse_args()
@@ -545,10 +546,9 @@ def main():
     load_pb(result_path, plan_res)
 
     if args.save_dir is None:
-        # Default: solve_results/vis/<case_name>
-        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
-        case_name = os.path.basename(os.path.normpath(args.res_save_path))
-        save_dir = os.path.join(repo_root, "solve_results", "vis", case_name)
+        # Default: save the images alongside the protobuf results in the same
+        # scenario directory (solve_results/park/场景_<solve time>).
+        save_dir = os.path.normpath(args.res_save_path)
     else:
         save_dir = args.save_dir
 

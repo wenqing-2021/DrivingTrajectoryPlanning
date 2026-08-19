@@ -1,0 +1,37 @@
+simulation:
+  max_steps: 120
+  target_speed: 7.0
+  goal_tolerance: 2.5
+
+planner:
+  horizon: 40
+  num_samples: 768
+  num_iterations: 4
+  temperature: 1.0
+  wheelbase: 2.7
+
+  min_steering: -0.55
+  max_steering: 0.55
+  min_acceleration: -4.0
+  max_acceleration: 2.5
+  min_velocity: 0.0
+  max_velocity: 15.0
+
+  steering_noise: 0.2
+  acceleration_noise: 1.0
+  noise_smoothing: 0.95
+
+  position_weight: 3.0
+  heading_weight: 1.0
+  velocity_weight: 2.0
+  control_weight: 0.08
+  control_rate_weight: 8.0
+  terminal_weight: 8.0
+  obstacle_weight: 35.0
+  obstacle_softening: 2.5
+  collision_cost: 100000.0
+  vehicle_radius: 1.4
+  road_left_limit: 5.0
+  road_right_limit: -2.0
+  road_boundary_weight: 50.0
+  random_seed: 42

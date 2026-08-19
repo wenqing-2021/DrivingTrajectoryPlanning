@@ -5,8 +5,14 @@ echo "installing extensions && thirdparty ... "
 ROOT_DIR=`pwd`
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 PROJECT_ROOT=$(cd "${SCRIPT_DIR}/../.." && pwd)
+REQUIREMENTS_FILE="${PROJECT_ROOT}/requirements.txt"
 
 echo ROOT_DIR: $ROOT_DIR
+
+if [[ ! -f "${REQUIREMENTS_FILE}" ]]; then
+    echo "requirements file not found: ${REQUIREMENTS_FILE}"
+    exit 1
+fi
 
 function has_pkg(){
     local find_pkg=0
@@ -183,3 +189,9 @@ make
 make test
 make install
 cd ..
+
+# Install project Python dependencies last so their pinned versions take
+# precedence over packages installed by the extension setup above.
+echo "installing Python requirements from ${REQUIREMENTS_FILE}"
+python3 -m pip install --no-cache-dir -r "${REQUIREMENTS_FILE}" || exit 1
+echo "successfully installed project Python requirements"

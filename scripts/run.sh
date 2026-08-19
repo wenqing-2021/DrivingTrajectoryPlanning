@@ -1,13 +1,17 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-cd build/install/src
-# export BOKEH_ALLOW_WS_ORIGIN=127.0.0.1:5006
+SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPOSITORY_ROOT="$(cd "${SCRIPT_DIRECTORY}/.." && pwd)"
+INSTALL_SOURCE="${REPOSITORY_ROOT}/build/install/src"
 
-RES_SAVE_PATH=${RES_SAVE_PATH:-"solve_results/latest"}
+export PYTHONPATH="${INSTALL_SOURCE}:${INSTALL_SOURCE}/protobuf:${REPOSITORY_ROOT}/build/pybind_modules:${PYTHONPATH:-}"
+RESULT_PATH="${RES_SAVE_PATH:-${REPOSITORY_ROOT}/solve_results/park/场景_$(date +%Y%m%d-%H%M%S)}"
+cd "${INSTALL_SOURCE}"
 
 # 1) Solve first and save pb files.
-python3 main.py --res_save_path "$RES_SAVE_PATH" "$@"
+python3 -m scenarios.park.main --res_save_path "${RESULT_PATH}" "$@"
 
 # 2) Visualize saved pb files with vis_main.
-bokeh serve --show utils/visualization/vis_main.py --args --res_save_path "$RES_SAVE_PATH"
+bokeh serve --show utils/visualization/vis_main.py \
+    --args --res_save_path "${RESULT_PATH}"

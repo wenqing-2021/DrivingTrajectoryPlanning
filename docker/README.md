@@ -44,7 +44,10 @@ python3 docker/run_docker.py --enter
 ```
 
 ### 5. Optinal: Install Extensions
-after enter the container, you can run the following command to install the extension. You can read the `install_extensions.sh` to see the details and remove some extensions you don't need.
+after enter the container, you can run the following command to install the
+extensions, native planning dependencies, and Python packages from the project
+`requirements.txt`. You can read `install_extensions.sh` to see the details
+and remove extensions you don't need.
 ```bash
 python3 docker/install_extensions.py -i
 ```

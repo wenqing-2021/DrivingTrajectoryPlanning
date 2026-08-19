@@ -10,6 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # set project name
 project(TrajectoryPlanning)
+enable_testing()
 
 # find necessary packages
 find_package(Eigen3 REQUIRED)
@@ -62,7 +63,10 @@ ENDFOREACH()
 install(
     DIRECTORY ./src/
     DESTINATION ${CMAKE_BINARY_DIR}/install/src/
-    FILES_MATCHING PATTERN "*.py" PATTERN "*.yaml"
+    FILES_MATCHING
+        PATTERN "*.py"
+        PATTERN "*.yaml"
+        PATTERN "__pycache__" EXCLUDE
 )
 
 # add excutable
@@ -73,3 +77,4 @@ add_subdirectory(src/test/collision_check)
 add_subdirectory(src/test/cpp_ad)
 add_subdirectory(src/test/obca)
 add_subdirectory(src/test/rda)
+add_subdirectory(src/test/mppi)
