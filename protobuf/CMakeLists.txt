@@ -7,8 +7,8 @@ add_library(ProtoLib ${PROTO_SRCS} ${PROTO_HDRS} ${PROTO_PY})
 set_property(TARGET ProtoLib PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(ProtoLib PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(ProtoLib PUBLIC ${PROTOBUF_LIBRARIES})
+target_link_libraries(ProtoLib PUBLIC protobuf::protobuf)
 install(
     FILES ${PROTO_PY}
-    DESTINATION ${CMAKE_BINARY_DIR}/install/src/protobuf
+    DESTINATION src/protobuf
 )

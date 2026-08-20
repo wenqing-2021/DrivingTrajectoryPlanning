@@ -1,6 +1,6 @@
 /*
  * @Author: wenqing-2021 yuansj@hnu.edu.cn
- * @FilePath: /AutomatedPark/src/planner/rda/rda_planner.cpp
+ * @FilePath: /DrivingTrajectoryPlanning/src/planner/rda/rda_planner.cpp
  * @Description: RDA (Reduced Dual-space ADMM) planner, C++ implementation.
  *               Reference: https://github.com/hanruihua/RDA-planner/blob/main/RDA_planner/rda_solver.py
  *               Differences from the Python version:

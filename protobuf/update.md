@@ -4,14 +4,13 @@
 
 ## 1. 环境依赖
 
-在项目根目录执行以下命令，确保工具存在：
+在项目根目录执行一次完整环境配置：
 
 ```bash
-pip install protobuf==3.19.0
-pip install mypy-protobuf==3.0.0
+bash scripts/setup.sh
 ```
 
-如果 `protoc` 不存在（`command not found`），先安装系统 protobuf 编译器。
+`protoc` 由 Conan 提供，`mypy-protobuf` 由 uv 提供，不需要单独使用 pip。
 
 ## 2. 一键更新 pyi（推荐）
 
@@ -48,14 +47,14 @@ git diff src/protobuf/params_pb2.pyi
 ## 4. 常见问题
 
 `protoc-gen-mypy: program not found or is not executable`
-说明 `mypy-protobuf` 没安装到当前 Python 环境里，重新安装：
+说明 uv 环境尚未同步，重新执行：
 
 ```bash
-pip install mypy-protobuf==3.0.0
+uv sync --all-groups --frozen
 ```
 
 `protoc: command not found`
-说明系统缺少 protobuf 编译器，需要先安装 `protoc`。
+说明 Conan 构建环境尚未生成，请先执行 `bash scripts/setup.sh`。
 
 ## 5. 备注
 

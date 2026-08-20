@@ -8,6 +8,7 @@
             "name": "Python Debugger: Main",
             "type": "debugpy",
             "request": "launch",
+            "python": "${workspaceFolder}/.venv/bin/python",
             "cwd": "${workspaceFolder}/build/install/src",
             "program": "main.py",
             "console": "integratedTerminal",
@@ -23,6 +24,7 @@
             "name": "Python Debugger: Current",
             "type": "debugpy",
             "request": "launch",
+            "python": "${workspaceFolder}/.venv/bin/python",
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [

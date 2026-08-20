@@ -4,27 +4,44 @@ cmake_minimum_required(VERSION 3.23.0)
 # set the C++ version
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_BUILD_TYPE Debug)
-# set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
+endif()
 
 # set project name
 project(TrajectoryPlanning)
 enable_testing()
 
 # find necessary packages
-find_package(Eigen3 REQUIRED)
-find_package(OsqpEigen REQUIRED)
+find_package(Eigen3 CONFIG REQUIRED)
+find_package(fmt CONFIG REQUIRED)
+find_package(glog CONFIG REQUIRED)
+find_package(GTest CONFIG REQUIRED)
+find_package(osqp CONFIG REQUIRED)
+find_package(OsqpEigen 0.11.2 EXACT CONFIG REQUIRED)
 find_package(Protobuf REQUIRED)
-find_package(yaml-cpp REQUIRED)
-# Find GoogleTest package
-find_package(GTest REQUIRED)
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
+set(PYBIND11_FINDPYTHON ON)
+find_package(pybind11 CONFIG REQUIRED)
+find_package(yaml-cpp CONFIG REQUIRED)
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(IPOPT REQUIRED IMPORTED_TARGET ipopt)
+
+find_path(CPPAD_INCLUDE_DIR cppad/cppad.hpp REQUIRED)
+add_library(CppAD::CppAD INTERFACE IMPORTED)
+set_target_properties(CppAD::CppAD PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${CPPAD_INCLUDE_DIR};${IPOPT_PREFIX}/include"
+)
+
 include_directories(${GTEST_INCLUDE_DIRS})
-add_subdirectory(third-party/pybind11)
-add_subdirectory(third-party/glog)
 add_subdirectory(third-party/EiCOS)
 add_subdirectory(protobuf)
 add_subdirectory(src/logger)
+target_link_libraries(Logger PUBLIC yaml-cpp::yaml-cpp)
 add_subdirectory(src/common)
 set(PYBIND_LIBRARIES "" CACHE INTERNAL "LIST FOR PYBIND11 LIBRARIES")
 set(UTILS_LIBRARIES "" CACHE INTERNAL "LIST FOR UTILS LIBRARIES")
@@ -50,7 +67,7 @@ add_subdirectory(src/solver)
 
 # BUILD PYBIND11 MODULE
 # set the output directory
-set(PYBIND_OUT_DIR ${CMAKE_BINARY_DIR}/pybind_modules)
+set(PYBIND_OUT_DIR "${CMAKE_SOURCE_DIR}/build/pybind_modules")
 message(STATUS "pybind11 output directory: ${PYBIND_OUT_DIR}")
 message(STATUS "pybind11 libraries: ${PYBIND_LIBRARIES}")
 FOREACH(pybind_lib ${PYBIND_LIBRARIES})
@@ -62,7 +79,7 @@ ENDFOREACH()
 
 install(
     DIRECTORY ./src/
-    DESTINATION ${CMAKE_BINARY_DIR}/install/src/
+    DESTINATION src/
     FILES_MATCHING
         PATTERN "*.py"
         PATTERN "*.yaml"

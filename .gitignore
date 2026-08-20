@@ -32,10 +32,13 @@
 *.app
 build/*
 .cache/*
+.local/
+.venv/
+CMakeUserPresets.json
 # .vscode/*
 *.pyc
 logs/*
 src/logs/*
 figures/*
 *.pyi
-src/test/*
+coinhsl.zip

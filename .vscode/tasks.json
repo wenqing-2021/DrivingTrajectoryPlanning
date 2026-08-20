@@ -2,29 +2,35 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "setup",
+            "type": "shell",
+            "command": "bash",
+            "args": ["${workspaceFolder}/scripts/setup.sh"],
+            "problemMatcher": []
+        },
+        {
             "label": "build",
             "type": "shell",
-            "command": "cmake",
-            "args": [
-                "-S",
-                "${workspaceFolder}",
-                "-B",
-                "${workspaceFolder}/build",
-                "&&",
-                "cmake",
-                "--build",
-                "${workspaceFolder}/build",
-                "&&",
-                "cmake",
-                "--install",
-                "${workspaceFolder}/build",
-            ],
+            "command": "bash",
+            "args": ["${workspaceFolder}/scripts/build.sh"],
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
-            "problemMatcher": ["$gcc"],
-            "detail": "Configure and build the project using CMake"
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "test",
+            "type": "shell",
+            "command": "uv",
+            "args": ["run", "pytest"],
+            "options": {
+                "env": {
+                    "UV_CACHE_DIR": "${workspaceFolder}/.cache/uv"
+                }
+            },
+            "group": "test",
+            "problemMatcher": []
         }
     ]
 }

@@ -1,28 +1,19 @@
 {
     "terminal.integrated.defaultProfile.linux": "zsh",
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "cmake.configureOnOpen": false,
+    "cmake.buildDirectory": "${workspaceFolder}/build/cmake",
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/build/cmake/compile_commands.json",
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}/build/cmake",
+        "--header-insertion=never"
+    ],
     "[cpp]": {
         "editor.formatOnSave": true,
         "editor.formatOnSaveMode": "file"
     },
     "[python]": {
-        "editor.formatOnType": true,
-        "editor.defaultFormatter": "ms-python.black-formatter"
-    },
-    "clangd.path": "/usr/bin/clangd-12",
-    "clangd.arguments": [
-        "--header-insertion=never"
-    ],
-    "fileheader.configObj": {
-        "autoAdd": true,
-        "supportAutoLanguage": [
-            "c",
-            "cpp",
-            "python",
-            "javascript",
-            "typescript"
-        ],
-        "prohibitAutoAdd": [
-            "md"
-        ]
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true
     }
 }

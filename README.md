@@ -26,7 +26,7 @@ MPPI planner and Python simulation/rendering.
 ├── assets/                    # Images and other static assets
 ├── data/
 │   └── BenchmarkCases/        # Test cases (CSV format)
-├── docker/                    # Docker configuration and scripts
+├── conanfile.py               # C++ dependency manifest
 ├── docs/
 │   ├── paper/                 # Related papers
 │   └── repo_design/           # Repository design documentation
@@ -45,7 +45,8 @@ MPPI planner and Python simulation/rendering.
 │   ├── solver/                # Solver interfaces and Python bindings
 │   ├── test/                  # Unit tests
 │   └── utils/                 # Python utilities and visualization
-└── third-party/               # External dependencies (EiCOS, glog, pybind11)
+├── pyproject.toml             # Python dependencies and tool configuration
+└── third-party/               # EiCOS and optional local Coin-HSL archive
 ```
 
 ## Visualization Results
@@ -59,31 +60,25 @@ Here are the latest trajectory planning results:
 
 # 1. Installation
 
-The project is built and run in an Ubuntu 22.04 container. Install
-[Docker](https://www.docker.com/) for Linux or
-[Docker Desktop](https://www.docker.com/products/docker-desktop/) for Windows.
-Then clone this repository and build the image:
+The supported environment is Ubuntu 22.04 or a compatible Debian-based Linux
+host. Install [uv](https://docs.astral.sh/uv/getting-started/installation/), clone the
+repository with its EiCOS submodule, then run the one-command setup:
 
 ```
-git clone --recurse-submodules https://github.com/wenqing-2021/DrivingTrajectoryPlanning.git
+git clone --recurse-submodules <repository-url>
 cd DrivingTrajectoryPlanning
-python3 docker/run_docker.py -b
+bash scripts/setup.sh
 ```
 
-After entering the container, install the native extensions and the Python
-packages from `requirements.txt`:
+To install the recommended VS Code extensions:
 
 ```bash
-python3 docker/install_extensions.py -i
+uv run python scripts/install_vscode_extensions.py --install
 ```
-
-The extension script installs `requirements.txt` after the native toolchain so
-its pinned CommonRoad, Matplotlib, test, and formatting versions take
-precedence.
 
 # 2. Run
 
-Enter the container and build the C++ libraries and pybind11 modules:
+Build the C++ libraries and pybind11 modules after changing native code:
 
 ```
 bash scripts/build.sh
