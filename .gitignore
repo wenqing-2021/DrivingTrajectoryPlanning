@@ -40,5 +40,6 @@ CMakeUserPresets.json
 logs/*
 src/logs/*
 figures/*
+solve_results/
 *.pyi
 coinhsl.zip

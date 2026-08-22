@@ -53,10 +53,10 @@ MPPI planner and Python simulation/rendering.
 Here are the latest trajectory planning results:
 
 ### Urban (MPPI)
-![Urban MPPI Trajectory](solve_results/urban/场景_20260801-154923/trajectory.png)
+![Urban MPPI Trajectory](assets/urban_mppi_trajectory.png)
 
 ### Park (RDA)
-![Park RDA Trajectory](solve_results/park/场景_20260719-062503/main.png)
+![Park RDA Trajectory](assets/park_rda_main.png)
 
 # 1. Installation
 
