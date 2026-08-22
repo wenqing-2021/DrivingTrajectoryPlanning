@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/image.png" alt="DrivingTrajectoryPlanning Logo" width="400">
+  <img src="assets/image.png" alt="DrivingTrajectoryPlanning Logo" width="1600">
 </div>
 
 # DrivingTrajectoryPlanning
