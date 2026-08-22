@@ -73,7 +73,7 @@ bash scripts/setup.sh
 To install the recommended VS Code extensions:
 
 ```bash
-uv run python scripts/install_vscode_extensions.py --install
+bash scripts/install_vscode_extensions.sh
 ```
 
 # 2. Run

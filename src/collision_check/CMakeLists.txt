@@ -1,7 +1,6 @@
 project(CollisionCheck)
 
 file(GLOB COLLISION_CHECK_SRC "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
-file(GLOB COLLISION_CHECK_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
 
 add_library(CollisionCheck ${COLLISION_CHECK_SRC})
 

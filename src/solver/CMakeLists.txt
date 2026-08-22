@@ -16,7 +16,6 @@ target_link_libraries(Solver PUBLIC Map ${UTILS_LIBRARIES} Planner)
 file(GLOB SOLVER_PYBIND_SRC
     "${CMAKE_CURRENT_SOURCE_DIR}/pybind/*.cpp"
 )
-message(STATUS "SOLVER_PYBIND_SRC: ${SOLVER_PYBIND_SRC}")
 pybind11_add_module(solver_pybind ${SOLVER_PYBIND_SRC})
 target_link_libraries(solver_pybind PUBLIC Solver)
 

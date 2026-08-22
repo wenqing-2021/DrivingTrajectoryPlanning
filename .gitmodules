@@ -1,3 +1,6 @@
 [submodule "third-party/EiCOS"]
 	path = third-party/EiCOS
 	url = https://github.com/wenqing-2021/EiCOS.git
+[submodule "third-party/EigenGdb"]
+	path = third-party/EigenGdb
+	url = https://github.com/fandesfyf/EigenGdb.git

@@ -30,6 +30,7 @@ find_package(yaml-cpp CONFIG REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(IPOPT REQUIRED IMPORTED_TARGET ipopt)
+pkg_get_variable(IPOPT_PREFIX ipopt prefix)
 
 find_path(CPPAD_INCLUDE_DIR cppad/cppad.hpp REQUIRED)
 add_library(CppAD::CppAD INTERFACE IMPORTED)
@@ -37,7 +38,6 @@ set_target_properties(CppAD::CppAD PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES "${CPPAD_INCLUDE_DIR};${IPOPT_PREFIX}/include"
 )
 
-include_directories(${GTEST_INCLUDE_DIRS})
 add_subdirectory(third-party/EiCOS)
 add_subdirectory(protobuf)
 add_subdirectory(src/logger)
@@ -54,11 +54,6 @@ set(UTILS_LIBRARIES ${UTILS_LIBRARIES}
     Common
     eicos
 )
-
-# add include directories
-# add_subdirectory(src/forward_simulator)
-# add_subdirectory(src/risk_assessment)
-# add_subdirectory(src/ilqr_planner)
 
 add_subdirectory(src/collision_check)
 add_subdirectory(src/map)

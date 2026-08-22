@@ -1,7 +1,6 @@
 project(Planner)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/hybrid_a_star)
-# add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/qp_solver)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/speed_planner)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/rda)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/obca)

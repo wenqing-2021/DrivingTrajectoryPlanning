@@ -1,5 +1,3 @@
-cmake_minimum_required(VERSION 3.10)
-
 # RDA Planner Tests
 
 add_executable(test_rda_main

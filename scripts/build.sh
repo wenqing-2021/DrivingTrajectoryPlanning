@@ -15,49 +15,47 @@ BUILD_REPOSITORY_MARKER="${BUILD_DIRECTORY}/.repository-root"
 
 export UV_CACHE_DIR="${UV_CACHE_DIR:-${REPOSITORY_ROOT}/.cache/uv}"
 export PKG_CONFIG_PATH="${IPOPT_PREFIX}/lib/pkgconfig:${IPOPT_PREFIX}/lib64/pkgconfig:${PKG_CONFIG_PATH:-}"
-export LD_LIBRARY_PATH="${IPOPT_PREFIX}/lib:${IPOPT_PREFIX}/lib64:${LD_LIBRARY_PATH:-}"
-export CMAKE_PREFIX_PATH="${OSQP_PREFIX}:${CMAKE_PREFIX_PATH:-}"
 
-missing_system_dependencies=()
+missing_dependencies=()
 if ! command -v g++ >/dev/null 2>&1; then
-    missing_system_dependencies+=("C++ compiler")
+    missing_dependencies+=("C++ compiler")
 fi
 if ! command -v pkg-config >/dev/null 2>&1; then
-    missing_system_dependencies+=("pkg-config")
-elif ! pkg-config --exists ipopt; then
-    missing_system_dependencies+=("Ipopt development package")
+    missing_dependencies+=("pkg-config")
+elif [[ "$(pkg-config --variable=prefix ipopt 2>/dev/null || true)" != "${IPOPT_PREFIX}" ]]; then
+    missing_dependencies+=("Ipopt installed under ${IPOPT_PREFIX}")
 fi
-if [[ ! -f "${OSQP_INSTALL_MARKER}" ]]; then
-    missing_system_dependencies+=("OSQP 1.0.0 and OsqpEigen 0.11.2")
-else
-    osqp_install_prefix=""
+osqp_install_prefix=""
+if [[ -f "${OSQP_INSTALL_MARKER}" ]]; then
     IFS= read -r osqp_install_prefix < "${OSQP_INSTALL_MARKER}" || true
-    if [[ "${osqp_install_prefix}" != "${OSQP_PREFIX}" ]]; then
-        missing_system_dependencies+=("OSQP environment for this repository path")
-    fi
+fi
+if [[ "${osqp_install_prefix}" != "${OSQP_PREFIX}" ]] \
+    || [[ ! -f "${OSQP_PREFIX}/lib/cmake/osqp/osqp-config.cmake" ]] \
+    || [[ ! -f "${OSQP_PREFIX}/lib/cmake/OsqpEigen/OsqpEigenConfig.cmake" ]]; then
+    missing_dependencies+=("OSQP 1.0.0 and OsqpEigen 0.11.2 installed under ${OSQP_PREFIX}")
 fi
 if [[ ! -f "${CONAN_OUTPUT_DIRECTORY}/conan_toolchain.cmake" \
     || ! -f "${CONAN_OUTPUT_DIRECTORY}/.build-type" \
     || ! -f "${CONAN_OUTPUT_DIRECTORY}/.repository-root" ]]; then
-    missing_system_dependencies+=("Conan dependency environment")
+    missing_dependencies+=("Conan dependency environment")
 else
     conan_build_type=""
     IFS= read -r conan_build_type < "${CONAN_OUTPUT_DIRECTORY}/.build-type" || true
     if [[ "${conan_build_type}" != "${BUILD_TYPE}" ]]; then
-        missing_system_dependencies+=("Conan dependency environment for ${BUILD_TYPE}")
+        missing_dependencies+=("Conan dependency environment for ${BUILD_TYPE}")
     fi
     conan_repository_root=""
     IFS= read -r conan_repository_root < "${CONAN_OUTPUT_DIRECTORY}/.repository-root" || true
     if [[ "${conan_repository_root}" != "${REPOSITORY_ROOT}" ]]; then
-        missing_system_dependencies+=("Conan environment for this repository path")
+        missing_dependencies+=("Conan environment for this repository path")
     fi
 fi
 if [[ ! -f /usr/include/cppad/cppad.hpp ]]; then
-    missing_system_dependencies+=("CppAD headers")
+    missing_dependencies+=("CppAD headers")
 fi
-if (( ${#missing_system_dependencies[@]} > 0 )); then
-    echo "Missing system dependencies: ${missing_system_dependencies[*]}" >&2
-    echo "Run 'bash scripts/setup.sh' to install them on Ubuntu." >&2
+if (( ${#missing_dependencies[@]} > 0 )); then
+    echo "Missing dependencies: ${missing_dependencies[*]}" >&2
+    echo "Run 'bash scripts/setup.sh' to install them." >&2
     exit 1
 fi
 

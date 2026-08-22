@@ -15,5 +15,11 @@
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff",
         "editor.formatOnSave": true
+    },
+    "cmake.cpackPath": "${workspaceFolder}/.venv/bin/cpack",
+    "cmake.cmakePath": "${workspaceFolder}/.venv/bin/cmake",
+    "cmake.ctestPath": "${workspaceFolder}/.venv/bin/ctest",
+    "cmake.configureSettings": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
     }
 }
