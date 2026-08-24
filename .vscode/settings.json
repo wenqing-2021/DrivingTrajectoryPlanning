@@ -1,11 +1,14 @@
 {
-    "terminal.integrated.defaultProfile.linux": "zsh",
+    "terminal.integrated.defaultProfile.linux": "bash",
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
     "cmake.configureOnOpen": false,
     "cmake.buildDirectory": "${workspaceFolder}/build/cmake",
     "C_Cpp.default.compileCommands": "${workspaceFolder}/build/cmake/compile_commands.json",
+    "C_Cpp.intelliSenseEngine": "disabled",
+    "clangd.path": "/usr/bin/clangd",
     "clangd.arguments": [
         "--compile-commands-dir=${workspaceFolder}/build/cmake",
+        "--background-index",
         "--header-insertion=never"
     ],
     "[cpp]": {

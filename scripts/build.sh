@@ -9,6 +9,7 @@ CONAN_OUTPUT_DIRECTORY="${BUILD_ROOT}/conan"
 BUILD_TYPE="${BUILD_TYPE:-Debug}"
 BUILD_JOBS="${BUILD_JOBS:-4}"
 IPOPT_PREFIX="${IPOPT_PREFIX:-${REPOSITORY_ROOT}/.local/ipopt}"
+CPPAD_PREFIX="${CPPAD_PREFIX:-${REPOSITORY_ROOT}/.local/cppad}"
 OSQP_PREFIX="${OSQP_PREFIX:-${REPOSITORY_ROOT}/.local/osqp}"
 OSQP_INSTALL_MARKER="${OSQP_PREFIX}/.installed-osqp-1.0.0-osqp-eigen-0.11.2-${BUILD_TYPE}-pic"
 BUILD_REPOSITORY_MARKER="${BUILD_DIRECTORY}/.repository-root"
@@ -50,8 +51,13 @@ else
         missing_dependencies+=("Conan environment for this repository path")
     fi
 fi
-if [[ ! -f /usr/include/cppad/cppad.hpp ]]; then
-    missing_dependencies+=("CppAD headers")
+if [[ ! -f "${CPPAD_PREFIX}/include/cppad/cppad.hpp" ]] \
+    || [[ ! -f "${CPPAD_PREFIX}/include/cppad/ipopt/solve_callback.hpp" ]] \
+    || ! grep -Fq '<coin-or/IpIpoptApplication.hpp>' \
+        "${CPPAD_PREFIX}/include/cppad/ipopt/solve_callback.hpp" 2>/dev/null \
+    || ! grep -Fq 'CPPAD_PACKAGE_STRING "cppad-20210000.8"' \
+        "${CPPAD_PREFIX}/include/cppad/configure.hpp" 2>/dev/null; then
+    missing_dependencies+=("CppAD 20210000.8 installed under ${CPPAD_PREFIX}")
 fi
 if (( ${#missing_dependencies[@]} > 0 )); then
     echo "Missing dependencies: ${missing_dependencies[*]}" >&2
@@ -75,6 +81,8 @@ uv run --frozen --no-sync cmake --fresh \
     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
     -DCMAKE_INSTALL_PREFIX="${BUILD_ROOT}/install" \
     -DCMAKE_PREFIX_PATH="${OSQP_PREFIX}" \
+    -DIPOPT_ROOT="${IPOPT_PREFIX}" \
+    -DCPPAD_ROOT="${CPPAD_PREFIX}" \
     -DCMAKE_BUILD_RPATH="${IPOPT_PREFIX}/lib;${IPOPT_PREFIX}/lib64" \
     -DCMAKE_INSTALL_RPATH="${IPOPT_PREFIX}/lib;${IPOPT_PREFIX}/lib64" \
     -DCMAKE_TOOLCHAIN_FILE="${CONAN_OUTPUT_DIRECTORY}/conan_toolchain.cmake"

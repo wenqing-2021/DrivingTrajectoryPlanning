@@ -16,7 +16,6 @@ if command -v apt-get >/dev/null 2>&1; then
         autoconf
         automake
         build-essential
-        cppad
         gfortran
         git
         libblas-dev
@@ -59,6 +58,7 @@ if [[ -f "${REPOSITORY_ROOT}/.venv/bin/cmake" ]] \
     uv_sync_arguments+=(--reinstall)
 fi
 uv "${uv_sync_arguments[@]}"
+bash "${SCRIPT_DIRECTORY}/install_cppad.sh"
 bash "${SCRIPT_DIRECTORY}/install_conan.sh"
 bash "${SCRIPT_DIRECTORY}/install_ipopt.sh"
 bash "${SCRIPT_DIRECTORY}/install_osqp.sh"

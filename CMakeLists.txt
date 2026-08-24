@@ -28,14 +28,40 @@ set(PYBIND11_FINDPYTHON ON)
 find_package(pybind11 CONFIG REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
 
+set(IPOPT_ROOT "${CMAKE_SOURCE_DIR}/.local/ipopt" CACHE PATH "Ipopt installation prefix")
+set(CPPAD_ROOT "${CMAKE_SOURCE_DIR}/.local/cppad" CACHE PATH "CppAD installation prefix")
+set(CPPAD_REQUIRED_VERSION "20210000.8")
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(IPOPT REQUIRED IMPORTED_TARGET ipopt)
-pkg_get_variable(IPOPT_PREFIX ipopt prefix)
+pkg_get_variable(IPOPT_PKGCONFIG_PREFIX ipopt prefix)
+file(REAL_PATH "${IPOPT_ROOT}" IPOPT_ROOT_REAL)
+file(REAL_PATH "${IPOPT_PKGCONFIG_PREFIX}" IPOPT_PKGCONFIG_PREFIX_REAL)
+if(NOT IPOPT_PKGCONFIG_PREFIX_REAL STREQUAL IPOPT_ROOT_REAL)
+    message(FATAL_ERROR
+        "Expected Ipopt from ${IPOPT_ROOT_REAL}, but pkg-config found ${IPOPT_PKGCONFIG_PREFIX_REAL}"
+    )
+endif()
 
-find_path(CPPAD_INCLUDE_DIR cppad/cppad.hpp REQUIRED)
+find_path(CPPAD_INCLUDE_DIR cppad/cppad.hpp
+    PATHS "${CPPAD_ROOT}/include"
+    NO_DEFAULT_PATH
+    REQUIRED
+)
+file(READ "${CPPAD_INCLUDE_DIR}/cppad/ipopt/solve_callback.hpp" CPPAD_IPOPT_CALLBACK)
+if(NOT CPPAD_IPOPT_CALLBACK MATCHES "<coin-or/IpIpoptApplication.hpp>")
+    message(FATAL_ERROR "CppAD under ${CPPAD_ROOT} does not use the coin-or Ipopt include layout")
+endif()
+file(READ "${CPPAD_INCLUDE_DIR}/cppad/configure.hpp" CPPAD_CONFIGURATION)
+string(FIND "${CPPAD_CONFIGURATION}"
+    "CPPAD_PACKAGE_STRING \"cppad-${CPPAD_REQUIRED_VERSION}\""
+    CPPAD_VERSION_POSITION
+)
+if(CPPAD_VERSION_POSITION EQUAL -1)
+    message(FATAL_ERROR "CppAD under ${CPPAD_ROOT} is not version ${CPPAD_REQUIRED_VERSION}")
+endif()
 add_library(CppAD::CppAD INTERFACE IMPORTED)
 set_target_properties(CppAD::CppAD PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES "${CPPAD_INCLUDE_DIR};${IPOPT_PREFIX}/include"
+    INTERFACE_INCLUDE_DIRECTORIES "${IPOPT_ROOT_REAL}/include;${CPPAD_INCLUDE_DIR}"
 )
 
 add_subdirectory(third-party/EiCOS)
