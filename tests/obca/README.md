@@ -56,10 +56,10 @@ pip install matplotlib numpy
 
 ```bash
 # 运行OBCA测试程序（生成结果CSV和结果到 /tmp/obca_test_results/）
-./build/src/test/obca/test_obca_main
+./build/tests/obca/test_obca_main
 
 # 运行Python可视化脚本（生成 obca_result.png）
-python3 src/test/obca/visualize_obca_result.py
+python3 tests/obca/visualize_obca_result.py
 ```
 
 ## 📊 输出说明

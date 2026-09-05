@@ -162,10 +162,10 @@ cmake -S . -B build
 cmake --build build --target test_rda_main
 
 # 运行单元测试
-cd /tmp && /root/workspace/AutomatedPark/build/src/test/rda/test_rda_main
+cd /tmp && /root/workspace/AutomatedPark/build/tests/rda/test_rda_main
 
 # 生成可视化对比图
-python3 /root/workspace/AutomatedPark/src/test/rda/visualize_rda_result.py
+python3 /root/workspace/AutomatedPark/tests/rda/visualize_rda_result.py
 ```
 
 输出：

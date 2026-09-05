@@ -4,15 +4,10 @@ import os
 # get the current project root directory
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-INSTALL_PATH = os.path.join(PROJECT_ROOT, "build/install")
+INSTALL_PATH = os.path.join(PROJECT_ROOT, "build/install/src")
 PYBIND_PATH = os.path.join(PROJECT_ROOT, "build/pybind_modules")
-PROTOBUF_PATH = os.path.join(PROJECT_ROOT, "build/install/protobuf")
-sys.path.append(PYBIND_PATH)
-sys.path.append(PROTOBUF_PATH)
-sys.path.append(INSTALL_PATH)
-import solver_pybind
-from utils.plan_utils import convert_yaml_to_protobuf
-from protobuf.kinematic_model_pb2 import VehicleParam
+PROTOBUF_PATH = os.path.join(INSTALL_PATH, "protobuf")
+sys.path[:0] = [PYBIND_PATH, PROTOBUF_PATH, INSTALL_PATH]
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -80,6 +75,10 @@ def createTest():
 
 
 def checkCollision():
+    import solver_pybind
+    from protobuf.kinematic_model_pb2 import VehicleParam
+    from utils.plan_utils import convert_yaml_to_protobuf
+
     vehicle_cfg_path = os.path.join(PROJECT_ROOT, "src/config/vehicle_cfg.yaml")
     vehicle_param = convert_yaml_to_protobuf(vehicle_cfg_path, VehicleParam())
     vehicle_param_str = vehicle_param.SerializeToString()

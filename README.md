@@ -5,9 +5,11 @@
 # DrivingTrajectoryPlanning
 
 [![C++](https://img.shields.io/badge/C++-17-blue.svg)](https://isocpp.org/)
+[![Python](https://img.shields.io/badge/Python-3.10-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![CMake](https://img.shields.io/badge/CMake-3.23.0+-green.svg)](https://cmake.org/)
 [![Code style: clang-format](https://img.shields.io/badge/code%20style-clang--format-ff69b4.svg)](https://clang.llvm.org/docs/ClangFormat.html)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Visitors](https://visitor-badge.laobi.icu/badge?page_id=wenqing-2021.DrivingTrajectoryPlanning)](https://github.com/wenqing-2021/DrivingTrajectoryPlanning)
 
 
 This repository implements a variety of trajectory planning methods for autonomous driving, with a focus on optimization-based approaches. It integrates optimal control planning models with solver interfaces for both OSQP and IPOPT. In addition, the project offers an intuitive visualization window and a streamlined execution pipeline for ease of use.
