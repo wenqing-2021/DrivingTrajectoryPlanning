@@ -15,6 +15,13 @@ cd "${INSTALL_SOURCE}"
 # 1) Solve first and save pb files.
 uv run python -m scenarios.park.main --res_save_path "${RESULT_PATH}" "$@"
 
+# Explicit PNG/GIF selection is a headless batch run.
+for argument in "$@"; do
+    if [[ "$argument" == --visualize || "$argument" == --visualize=* ]]; then
+        exit 0
+    fi
+done
+
 # 2) Visualize saved pb files with vis_main.
 uv run bokeh serve --show utils/visualization/vis_main.py \
     --args --res_save_path "${RESULT_PATH}"

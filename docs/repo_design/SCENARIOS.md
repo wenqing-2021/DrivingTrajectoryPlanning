@@ -24,8 +24,10 @@ obstacle occupancy, route generation, and Matplotlib renderer:
 4. `mppi_pybind` calls the C++ `planning::mppi::MppiPlanner`.
 5. The first control is applied to a kinematic bicycle model and the process
    repeats as a receding-horizon simulation.
-6. `renderer.py` draws the CommonRoad map, planning problem, reference path,
-   and executed MPPI trajectory.
+6. The Urban adapter converts map, goals, reference path and obstacle occupancies
+   into a shared scene. The common renderer exports trajectory PNG/GIF and a
+   self-contained `replay.json`; `renderer.py` retains separate control/cost plots.
+   See [shared visualization](VISUALIZATION.md) for the Urban/Park replay interface.
 
 The C++ planner samples steering/acceleration perturbations, rolls out all
 candidate controls, evaluates tracking, terminal, control, control-rate,

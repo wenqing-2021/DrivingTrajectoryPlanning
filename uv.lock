@@ -301,6 +301,7 @@ dependencies = [
     { name = "commonroad-route-planner" },
     { name = "matplotlib" },
     { name = "numpy" },
+    { name = "pillow" },
     { name = "protobuf" },
     { name = "pyyaml" },
 ]
@@ -323,6 +324,7 @@ requires-dist = [
     { name = "commonroad-route-planner", specifier = "==2022.3" },
     { name = "matplotlib", specifier = ">=3.5.2,<3.8" },
     { name = "numpy", specifier = ">=1.21,<2" },
+    { name = "pillow", specifier = ">=9.1" },
     { name = "protobuf", specifier = ">=3.20,<4" },
     { name = "pyyaml", specifier = ">=6,<7" },
 ]

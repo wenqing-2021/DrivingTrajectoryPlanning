@@ -9,16 +9,18 @@ from scenarios.urban.commonroad_scenario import create_demo_scenario, load_scena
 from scenarios.urban.config import default_config_path, load_config
 from scenarios.urban.renderer import (
     render_control_curves,
-    render_result,
     save_result_data,
 )
 from scenarios.urban.simulation import run_simulation
+from utils.visualization.adapters.urban import from_urban
+from utils.visualization.cli import add_render_arguments, export_scene
+from utils.visualization.model import Vehicle
 
 _DEFAULT_RESULT_ROOT = Path("solve_results/urban")
 
 
 def _default_output_dir() -> Path:
-    """Return a timestamped scenario directory: solve_results/urban/场景_<solve time>."""
+    """Return a timestamped directory under solve_results/urban."""
     solve_time = datetime.now().strftime("%Y%m%d-%H%M%S")
     return _DEFAULT_RESULT_ROOT / f"场景_{solve_time}"
 
@@ -46,6 +48,20 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
             "(default: solve_results/urban/场景_<solve time>)."
         ),
     )
+    add_render_arguments(parser, default="png")
+    parser.add_argument(
+        "--vehicle-length",
+        type=float,
+        default=4.5,
+        help="Displayed vehicle length in meters.",
+    )
+    parser.add_argument("--vehicle-width", type=float, default=2.0)
+    parser.add_argument(
+        "--vehicle-center-offset",
+        type=float,
+        default=0.0,
+        help="Display body center offset from planner position (m).",
+    )
     return parser.parse_args(argv)
 
 
@@ -56,11 +72,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     urban_scenario = (
         load_scenario(args.scenario) if args.scenario else create_demo_scenario()
     )
-    result = run_simulation(urban_scenario, load_config(args.config))
+    config = load_config(args.config)
+    result = run_simulation(urban_scenario, config)
 
-    render_result(urban_scenario, result, output_dir / "trajectory.png")
-    render_control_curves(result, output_dir)
+    scene = from_urban(
+        urban_scenario,
+        result,
+        vehicle=Vehicle(
+            args.vehicle_length,
+            args.vehicle_width,
+            args.vehicle_center_offset,
+            wheel_base=config.planner.wheelbase,
+        ),
+    )
     save_result_data(result, output_dir)
+    export_scene(scene, output_dir, args)
+    if args.visualize in ("png", "both"):
+        render_control_curves(result, output_dir)
 
     final_state = result.states[-1]
     print(

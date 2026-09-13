@@ -51,15 +51,6 @@ MPPI planner and Python simulation/rendering.
 └── third-party/               # EiCOS and optional local Coin-HSL archive
 ```
 
-## Visualization Results
-Here are the latest trajectory planning results:
-
-### Urban (MPPI)
-![Urban MPPI Trajectory](assets/urban_mppi_trajectory.png)
-
-### Park (RDA)
-![Park RDA Trajectory](assets/park_rda_main.png)
-
 # 1. Installation
 
 The supported environment is Ubuntu 22.04 or a compatible Debian-based Linux
@@ -112,6 +103,27 @@ saved under `solve_results/park/场景_<solve time>/`. See
 [`docs/repo_design/SCENARIOS.md`](docs/repo_design/SCENARIOS.md) for the architecture and data flow.
 Planner and simulation parameters are stored in
 [`src/config/urban_mppi.yaml`](src/config/urban_mppi.yaml).
+
+## Visualization Results
+
+Urban and Park share PNG/GIF export and standalone result replay:
+
+```bash
+bash scripts/run_urban.sh --visualize both
+bash scripts/run.sh --visualize both
+bash scripts/visualize.sh solve_results/urban/<run> --visualize gif
+```
+
+See [shared visualization](docs/repo_design/VISUALIZATION.md) for export options,
+legacy result loading, timing conventions, and architecture.
+
+Here are the latest trajectory planning results:
+
+### Urban (MPPI)
+![Urban MPPI Trajectory](assets/urban_mppi_trajectory.png)
+
+### Park (RDA)
+![Park RDA Trajectory](assets/park_rda_main.png)
 
 # 3. Optimization planner
 

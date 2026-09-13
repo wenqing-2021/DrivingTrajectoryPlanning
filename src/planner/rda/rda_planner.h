@@ -51,6 +51,7 @@ class RDASolver {
     }
 
     const std::vector<Eigen::Vector4d>& GetStatesResult() const { return opt_traj_; }
+    const Eigen::VectorXd& GetTimeSteps() const { return dt_traj_; }
     const std::vector<Eigen::Vector4d>& GetInitialStates() const { return init_traj_; }
 
   private:

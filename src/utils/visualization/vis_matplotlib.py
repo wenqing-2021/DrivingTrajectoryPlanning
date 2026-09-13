@@ -11,8 +11,6 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")  # non-interactive backend for saving to disk
 import matplotlib.pyplot as plt
-from matplotlib.patches import Polygon, Rectangle
-from matplotlib.collections import PatchCollection
 from typing import Optional
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -20,12 +18,18 @@ SRC_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "../.."))
 # protobuf generated .py files are flat modules (not a package) under build/install/src/protobuf/
 # NOTE: "protobuf" is a namespace package that shadows the local protobuf/ directory,
 # so we import the pb2 modules directly instead of using `from protobuf.xxx import ...`.
-PROTOBUF_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "../../../build/install/src/protobuf"))
+from pathlib import Path
 
 if SRC_ROOT not in sys.path:
     sys.path.insert(0, SRC_ROOT)
-if PROTOBUF_PATH not in sys.path:
-    sys.path.insert(0, PROTOBUF_PATH)
+for parent in Path(__file__).resolve().parents:
+    for candidate in (parent / "protobuf", parent / "build/install/src/protobuf"):
+        if (candidate / "problem_pb2.py").is_file():
+            sys.path.insert(0, str(candidate))
+            break
+    else:
+        continue
+    break
 
 import problem_pb2 as _problem_pb2
 import kinematic_model_pb2 as _kinematic_model_pb2
@@ -38,69 +42,10 @@ ControlVar = _kinematic_model_pb2.ControlVar
 CostMap = _cost_map_pb2.CostMap
 
 
-# ---------------------------------------------------------------------------
-# Inline helpers (avoid cross-module import issues with the protobuf namespace)
-# ---------------------------------------------------------------------------
-def norm_angle(angle: float) -> float:
-    """Normalize angle to [-pi, pi)."""
-    return (angle + np.pi) % (2.0 * np.pi) - np.pi
-
-
-def convert_rear_to_mid(rear_pts, rear_overhang, vehicle_len, theta):
-    """Convert rear-axle coordinates to vehicle mid-point coordinates."""
-    rear_pts_arr = np.array(rear_pts)
-    revert_angle = norm_angle(theta - np.pi)
-    back_pts = rear_pts_arr + np.array(
-        [rear_overhang * np.cos(revert_angle), rear_overhang * np.sin(revert_angle)]
-    )
-    half_vehicle_len = vehicle_len / 2.0
-    mid_pts = back_pts + np.array(
-        [half_vehicle_len * np.cos(theta), half_vehicle_len * np.sin(theta)]
-    )
-    return mid_pts
-
-
-# ---------------------------------------------------------------------------
-# Colour / style configuration (mirrors vis_config.py where possible)
-# ---------------------------------------------------------------------------
-COLOR_MAP = {
-    "red": "#FF0000",
-    "green": "#00FF00",
-    "blue": "#0000FF",
-    "yellow": "#FFFF00",
-    "cyan": "#00FFFF",
-    "magenta": "#FF00FF",
-    "orange": "#FFA500",
-    "gray": "#808080",
-    "black": "#000000",
-}
-
-RENDER = {
-    "obs_polygon": {"facecolor": COLOR_MAP["gray"], "edgecolor": "black", "linewidth": 1.5, "alpha": 0.5},
-    "init_state": {"facecolor": "none", "edgecolor": COLOR_MAP["green"], "linewidth": 2},
-    "goal_state": {"facecolor": "none", "edgecolor": COLOR_MAP["red"], "linewidth": 2},
-    "occ_scatter": {"color": COLOR_MAP["black"], "marker": "s", "s": 4},
-    "init_path": {"color": COLOR_MAP["magenta"], "linewidth": 2, "linestyle": "-", "label": "opt path"},
-    "init_path_scatter": {"color": COLOR_MAP["magenta"], "s": 20, "marker": "o", "zorder": 5},
-    "init_path_rect": {"facecolor": "none", "edgecolor": COLOR_MAP["magenta"], "linewidth": 1.5},
-    "pre_opt_path": {"color": COLOR_MAP["cyan"], "linewidth": 2, "linestyle": "--", "label": "pre-opt path"},
-    "pre_opt_path_scatter": {"color": COLOR_MAP["cyan"], "s": 14, "marker": "o", "zorder": 4},
-    "pre_opt_path_rect": {"facecolor": "none", "edgecolor": COLOR_MAP["cyan"], "linewidth": 1, "linestyle": "--"},
-    # speed
-    "init_speed": {"color": COLOR_MAP["red"], "linewidth": 2, "label": "speed opt (m/s)"},
-    "pre_opt_speed": {"color": COLOR_MAP["orange"], "linewidth": 2, "linestyle": "--", "label": "speed pre-opt (m/s)"},
-    # acceleration
-    "init_acc": {"color": COLOR_MAP["green"], "linewidth": 2, "label": "acc opt (m/s²)"},
-    "pre_opt_acc": {"color": COLOR_MAP["cyan"], "linewidth": 2, "linestyle": "--", "label": "acc pre-opt (m/s²)"},
-    # steering
-    "init_steer": {"color": COLOR_MAP["blue"], "linewidth": 2, "label": "steer opt (rad)"},
-    "pre_opt_steer": {"color": COLOR_MAP["magenta"], "linewidth": 2, "linestyle": "--", "label": "steer pre-opt (rad)"},
-}
-
-FIGURE_SIZE_MAIN = (14, 8)
-FIGURE_SIZE_SMALL = (8, 4)
-FIGURE_SIZE_ESDF = (12, 8)
-SAVE_DPI = 150
+from utils.visualization.model import convert_rear_to_mid
+from utils.visualization.style import (
+    RENDER, FIGURE_SIZE_SMALL, FIGURE_SIZE_ESDF, SAVE_DPI,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -153,27 +98,6 @@ class MatplotlibVis:
         if span < 1e-9:
             span = max(abs(hi) * pad, 1e-2)
         return lo - span * pad, hi + span * pad
-
-    def _draw_vehicle_rect(self, ax, x_rear, y_rear, theta, style: dict):
-        """Draw a rotated rectangle representing the vehicle at the given rear-axle pose."""
-        mid = convert_rear_to_mid(
-            [x_rear, y_rear],
-            self.plan_problem.vehicle_param.rear_overhang,
-            self.plan_problem.vehicle_param.length,
-            theta,
-        )
-        w = self.plan_problem.vehicle_param.length
-        h = self.plan_problem.vehicle_param.width
-        angle_deg = np.degrees(theta)
-
-        rect = Rectangle(
-            (mid[0] - w / 2, mid[1] - h / 2),
-            w, h,
-            angle=angle_deg,
-            rotation_point="center",
-            **style,
-        )
-        ax.add_patch(rect)
 
     # ------------------------------------------------------------------
     #  parse plan problem
@@ -285,74 +209,16 @@ class MatplotlibVis:
     # ==================================================================
 
     def draw_main(self):
-        """Main figure: obstacles + init/goal + paths + vehicle rectangles."""
-        fig, ax = plt.subplots(figsize=FIGURE_SIZE_MAIN)
-        ax.set_aspect("equal")
-        ax.set_title("Trajectory Planning — Main View")
-        ax.set_xlabel("x (m)")
-        ax.set_ylabel("y (m)")
+        """Render the Park overview with the shared Urban/Park renderer."""
+        from pathlib import Path
+        from utils.visualization.adapters.park import from_park
+        from utils.visualization.export import save_png
 
-        # --- obstacles ---
-        for xs, ys in self.obs_polygons:
-            ax.fill(xs, ys, **RENDER["obs_polygon"])
-
-        # --- init / goal vehicle rects ---
-        pp = self.plan_problem
-        w, h = pp.vehicle_param.length, pp.vehicle_param.width
-        self._draw_vehicle_rect(ax, pp.init_state.x, pp.init_state.y, pp.init_state.theta, RENDER["init_state"])
-        self._draw_vehicle_rect(ax, pp.goal_state.x, pp.goal_state.y, pp.goal_state.theta, RENDER["goal_state"])
-
-        # --- pre-opt path (dashed cyan) ---
-        pre = self.pre_opt_traj_dict
-        if pre:
-            ax.plot(pre["x"], pre["y"], **{k: v for k, v in RENDER["pre_opt_path"].items() if k != "label"})
-            ax.scatter(pre["x"], pre["y"], **{k: v for k, v in RENDER["pre_opt_path_scatter"].items()})
-
-            # vehicle rects along pre-opt path (decimate to avoid clutter)
-            step = max(1, len(pre["x"]) // 30)
-            for i in range(0, len(pre["x"]), step):
-                self._draw_vehicle_rect(ax, pre["x"][i], pre["y"][i], pre["head"][i], RENDER["pre_opt_path_rect"])
-
-        # --- opt path (solid magenta) ---
-        init = self.init_traj_dict
-        if init:
-            ax.plot(init["x"], init["y"], **{k: v for k, v in RENDER["init_path"].items() if k != "label"})
-            ax.scatter(init["x"], init["y"], **RENDER["init_path_scatter"])
-
-            step = max(1, len(init["x"]) // 30)
-            for i in range(0, len(init["x"]), step):
-                self._draw_vehicle_rect(ax, init["x"][i], init["y"][i], init["head"][i], RENDER["init_path_rect"])
-
-        # legend
-        handles = []
-        if pre:
-            from matplotlib.lines import Line2D
-            handles.append(Line2D([0], [0], **RENDER["pre_opt_path"]))
-        if init:
-            from matplotlib.lines import Line2D
-            handles.append(Line2D([0], [0], **RENDER["init_path"]))
-        if handles:
-            ax.legend(handles=handles, loc="upper left")
-
-        # auto-scale
-        all_x, all_y = [], []
-        for xs, ys in self.obs_polygons:
-            all_x.extend(xs); all_y.extend(ys)
-        if init:
-            all_x.extend(init["x"]); all_y.extend(init["y"])
-        if pre:
-            all_x.extend(pre["x"]); all_y.extend(pre["y"])
-        if all_x:
-            xl, xr = self._calc_axis_margin(np.array(all_x))
-            yl, yr = self._calc_axis_margin(np.array(all_y))
-            ax.set_xlim(xl, xr)
-            ax.set_ylim(yl, yr)
-
-        fig.tight_layout()
-        path = os.path.join(self.save_dir, "main.png")
-        fig.savefig(path, dpi=SAVE_DPI)
-        plt.close(fig)
-        print(f"[MatplotlibVis] saved {path}")
+        if not self.plan_res.solve_success:
+            print("[MatplotlibVis] Park solve failed; skipping trajectory overview.")
+            return
+        scene = from_park(self.plan_problem, self.plan_res)
+        save_png(scene, Path(self.save_dir) / "main.png")
 
     def draw_esdf(self):
         """ESDF contour map + occupancy scatter."""

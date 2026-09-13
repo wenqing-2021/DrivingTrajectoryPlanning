@@ -1,6 +1,39 @@
 #include "trajectory_planner.h"
+#include <cmath>
+#include <stdexcept>
 
 namespace planning {
+
+// Invert the rear-axle forward-Euler bicycle model used by RDA and OBCA.
+// States: [x, y, heading, signed speed]; controls: [acceleration, steering].
+Eigen::MatrixXd TrajPlanner::ReconstructTrajectoryControls(const Eigen::MatrixXd& states,
+                                                     const std::vector<double>& timestamps,
+                                                     double wheelbase) {
+    if (states.cols() != 4 || states.rows() < 2 || !states.allFinite() ||
+        timestamps.size() != static_cast<std::size_t>(states.rows()) ||
+        !std::isfinite(wheelbase) || wheelbase <= 0.0) {
+        throw std::invalid_argument("Invalid trajectory control reconstruction input");
+    }
+    Eigen::MatrixXd controls(states.rows() - 1, 2);
+    double steering = 0.0;
+    for (Eigen::Index i = 0; i < controls.rows(); ++i) {
+        const double dt = timestamps[i + 1] - timestamps[i];
+        if (!std::isfinite(timestamps[i]) || !std::isfinite(dt) || dt <= 0.0) {
+            throw std::invalid_argument("Trajectory timestamps must be finite and increasing");
+        }
+        controls(i, 0) = (states(i + 1, 3) - states(i, 3)) / dt;
+        const double heading_change = std::atan2(std::sin(states(i + 1, 2) - states(i, 2)),
+                                                std::cos(states(i + 1, 2) - states(i, 2)));
+        // At rest steering is unobservable from motion; ignore solver noise and
+        // retain the previous angle. The initial steering is defined to be zero.
+        if (i > 0 && std::abs(states(i, 3)) > 1e-4) {
+            steering = std::atan(wheelbase * heading_change / (states(i, 3) * dt));
+        }
+        controls(i, 1) = steering;
+    }
+    return controls;
+}
+
 
 TrajPlanner::TrajPlanner(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr,
                          const std::shared_ptr<collision_check::BaseCheck>& collision_checker,
@@ -110,6 +143,16 @@ bool TrajPlanner::runBackendOpt(const std::vector<Eigen::Vector3d>* const fronte
         return false;
     }
 
+    // Reconstruct optimized controls using actual timing and signed velocity.
+    const double nominal_dt = backend_solver_ == "obca" ? obca_solver_ptr_->GetDt() : pwj_speed_ptr_->GetDt();
+    opt_timestamps_.assign(opt_states_.rows(), 0.0);
+    for (std::size_t i = 1; i < opt_timestamps_.size(); ++i) {
+        const double dt = backend_solver_ == "rda" ? rda_solver_ptr_->GetTimeSteps()(i - 1) : nominal_dt;
+        opt_timestamps_[i] = opt_timestamps_[i - 1] + dt;
+    }
+    opt_controls_ = ReconstructTrajectoryControls(
+        opt_states_, opt_timestamps_, vehicle_model_ptr_->GetVehicleParam().wheel_base());
+
     return true;
 };
 
@@ -130,20 +173,19 @@ bool TrajPlanner::setstatesControls(vehicle_model::opt_states& opt_states, vehic
     }
 
     // 2. set the init controls using the forward difference
-    const double dt = pwj_speed_ptr_->GetDt();
-    const double L  = vehicle_model_ptr_->GetVehicleParam().length();
+    const double dt = backend_solver_ == "obca" ? obca_solver_ptr_->GetDt() : pwj_speed_ptr_->GetDt();
+    const double L  = vehicle_model_ptr_->GetVehicleParam().wheel_base();
     for (std::size_t i = 0; i < opt_traj.size() - 1; ++i) {
         opt_controls(i, 0) = (opt_traj[i + 1].w() - opt_traj[i].w()) / dt;   // a
         // compute steer angle
         double delta_theta = common::math::NormalizeAngle(opt_traj[i + 1].z() - opt_traj[i].z());
         double delta_x     = opt_traj[i + 1].x() - opt_traj[i].x();
         double delta_y     = opt_traj[i + 1].y() - opt_traj[i].y();
-        double delta_s     = std::sqrt(delta_x * delta_x + delta_y * delta_y);
-        if (std::abs(delta_s) < kEpsilon) {
+        double delta_s     = delta_x * std::cos(opt_traj[i].z()) + delta_y * std::sin(opt_traj[i].z());
+        if (i == 0 || std::abs(delta_s) < kEpsilon) {
             opt_controls(i, 1) = 0.0;
         } else {
-            opt_controls(i, 1) = std::atan2(L * delta_theta, delta_s);
-            opt_controls(i, 1) = common::math::NormalizeAngle(opt_controls(i, 1));
+            opt_controls(i, 1) = std::atan(L * delta_theta / delta_s);
         }
     }
 

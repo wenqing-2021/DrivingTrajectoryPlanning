@@ -9,6 +9,8 @@ from protobuf.cost_map_pb2 import CostMap
 from protobuf.params_pb2 import SolverParams
 from protobuf.problem_pb2 import PlanProblem, PlanRes, SolverInput
 from utils.plan_utils import build_problem, load_solver_params
+from utils.visualization.adapters.park import from_park
+from utils.visualization.cli import add_render_arguments, export_scene
 
 
 def _load_solver_module():
@@ -107,6 +109,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help="Directory for the result protobuf files.",
     )
     parser.add_argument("--debug", "-d", action="store_true")
+    add_render_arguments(parser)
     return parser.parse_args(argv)
 
 
@@ -118,6 +121,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     solver = _load_solver_module().make_solver()
     plan_result = solve_problem(solver, plan_problem, solver_params, args.debug)
     store_solved_result(plan_problem, plan_result, args.res_save_path)
+    if plan_result.solve_success and args.res_save_path:
+        export_scene(
+            from_park(plan_problem, plan_result),
+            Path(args.res_save_path),
+            args,
+            stem="main",
+        )
+    elif args.visualize != "none":
+        raise ValueError(
+            "Visualization requires a successful solve and --res_save_path"
+        )
     return 0
 
 

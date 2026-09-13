@@ -116,6 +116,7 @@ def run_simulation(
     planning_costs = []
     reached_goal = False
 
+    initial_step = int(urban_scenario.planning_problem.initial_state.time_step)
     for time_step in range(config.simulation.max_steps):
         local_reference = sample_local_reference(
             urban_scenario.reference_path,
@@ -127,7 +128,7 @@ def run_simulation(
         result = planner.plan(
             current_state,
             _binding_states(module, local_reference),
-            _binding_obstacles(module, urban_scenario, time_step),
+            _binding_obstacles(module, urban_scenario, initial_step + time_step),
         )
         if len(result.states) < 2 or not result.controls:
             raise RuntimeError("MPPI returned an empty rollout")

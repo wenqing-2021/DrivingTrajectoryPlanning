@@ -37,6 +37,8 @@ message PlanRes {
     repeated kinematic_model.ControlVar init_controls = 7;
     repeated kinematic_model.StateVar pre_opt_traj = 8;
     repeated kinematic_model.ControlVar pre_opt_controls = 9;
+    // Optimized trajectory timestamps in seconds, starting at zero.
+    repeated double init_timestamps = 10;
 }
 
 message SolverInput {

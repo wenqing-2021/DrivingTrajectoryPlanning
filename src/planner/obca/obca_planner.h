@@ -149,6 +149,7 @@ class OBCASolver : public IpoptSolver {
         }
         return sdv_path;
     }
+    double GetDt() const { return kDt; }
     inline const std::vector<Eigen::Vector4d>& GetStatesResult() const { return states_result_; }
     inline const std::vector<Eigen::Vector2d>& GetControlsResult() const { return controls_result_; }
     inline const std::vector<Eigen::Vector4d>& GetInitStates() const { return initial_states_; }

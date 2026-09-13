@@ -45,6 +45,7 @@ const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {
     const params::SolverParams solver_params = solver_input.solver_params();
     LOG(INFO) << "Load problem from protobuf...";
     Solver::LoadProblem(plan_problem, solver_params);
+    plan_res_.clear_init_timestamps();
     plan_res_.set_solve_success(false);
 
     // 2. process
@@ -54,6 +55,9 @@ const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {
                    traj_planner_ptr_->GetOptControls());   // set the opt traj
         setPreOptTraj(traj_planner_ptr_->GetInitStates(),
                       traj_planner_ptr_->GetInitControls());   // set the pre-opt traj
+        for (double time : traj_planner_ptr_->GetOptTimestamps()) {
+            plan_res_.add_init_timestamps(time);
+        }
         LOG(INFO) << "The opt traj has been set...";
         plan_res_.set_solve_success(true);
     } else {
@@ -86,6 +90,7 @@ void Solver::setOptTraj(const planning::vehicle_model::opt_states&  opt_states,
         return;
     }
     plan_res_.clear_init_traj();
+    plan_res_.clear_init_controls();
     for (int i = 0; i < opt_states.rows(); ++i) {
         kinematic_model::StateVar   opt_traj_state;
         kinematic_model::ControlVar opt_traj_control;

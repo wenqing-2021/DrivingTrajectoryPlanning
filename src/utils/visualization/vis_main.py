@@ -1,6 +1,4 @@
-"""
-Load saved protobuf results and visualize with Bokeh.
-"""
+"""Load saved protobuf results and visualize with Bokeh."""
 
 import argparse
 import os
@@ -9,7 +7,9 @@ import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SRC_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "../.."))
-PROTOBUF_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "../../../../install/src/protobuf"))
+PROTOBUF_PATH = os.path.abspath(
+    os.path.join(SCRIPT_DIR, "../../../../install/src/protobuf")
+)
 
 if SRC_ROOT not in sys.path:
     sys.path.append(SRC_ROOT)

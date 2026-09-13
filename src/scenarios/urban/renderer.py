@@ -19,58 +19,11 @@ def render_result(
     *,
     show: bool = False,
 ) -> None:
-    """Render the CommonRoad map, reference path, and driven trajectory."""
-    from commonroad.visualization.mp_renderer import MPRenderer
+    """Render through the shared Urban/Park scene renderer."""
+    from utils.visualization.adapters.urban import from_urban
+    from utils.visualization.export import save_png
 
-    all_points = np.vstack((urban_scenario.reference_path, result.states[:, :2]))
-    margin = 8.0
-    plot_limits = [
-        float(np.min(all_points[:, 0]) - margin),
-        float(np.max(all_points[:, 0]) + margin),
-        float(np.min(all_points[:, 1]) - margin),
-        float(np.max(all_points[:, 1]) + margin),
-    ]
-    renderer = MPRenderer(plot_limits=plot_limits, figsize=(12, 5))
-    urban_scenario.scenario.draw(renderer)
-    urban_scenario.planning_problem.draw(renderer)
-    renderer.render()
-    renderer.ax.plot(
-        urban_scenario.reference_path[:, 0],
-        urban_scenario.reference_path[:, 1],
-        "--",
-        color="tab:blue",
-        linewidth=1.5,
-        label="CommonRoad reference",
-        zorder=20,
-    )
-    renderer.ax.plot(
-        result.states[:, 0],
-        result.states[:, 1],
-        color="tab:red",
-        linewidth=2.5,
-        label="MPPI trajectory",
-        zorder=21,
-    )
-    renderer.ax.scatter(
-        result.states[0, 0],
-        result.states[0, 1],
-        color="tab:green",
-        marker="o",
-        label="start",
-        zorder=10,
-    )
-    renderer.ax.legend(loc="upper right")
-    renderer.ax.set_title(
-        f"Urban MPPI simulation — goal reached: {result.reached_goal}"
-    )
-    renderer.ax.set_aspect("equal")
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    figure = renderer.ax.figure
-    figure.savefig(output_path, dpi=160, bbox_inches="tight")
-    if show:
-        plt.show()
-    plt.close(figure)
+    save_png(from_urban(urban_scenario, result), output_path)
 
 
 def _plot_curve(

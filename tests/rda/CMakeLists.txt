@@ -1,5 +1,9 @@
 # RDA Planner Tests
 
+add_executable(test_trajectory_controls test_trajectory_controls.cpp)
+target_link_libraries(test_trajectory_controls PRIVATE Planner)
+add_test(NAME test_trajectory_controls COMMAND test_trajectory_controls)
+
 add_executable(test_rda_main
     test_rda_main.cpp
 )

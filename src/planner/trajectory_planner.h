@@ -13,6 +13,7 @@
 #include "speed_planner/piece_wise_jerk.h"
 
 #include <string>
+#include <vector>
 
 namespace planning {
 using pwjspeed = backend::PiecewiseJerkSpeedOptimizer;
@@ -34,6 +35,12 @@ class TrajPlanner {
     const vehicle_model::opt_states&     GetInitStates() const { return init_states_; };     // get the init states
     const vehicle_model::opt_control&    GetInitControls() const { return init_controls_; };   // get the init controls
 
+    static Eigen::MatrixXd ReconstructTrajectoryControls(const Eigen::MatrixXd& states,
+                                                        const std::vector<double>& timestamps,
+                                                        double wheelbase);
+
+    const std::vector<double>& GetOptTimestamps() const { return opt_timestamps_; }
+
   private:
     void initObcaSolver(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr);
     bool runBackendOpt(const std::vector<Eigen::Vector3d>* const frontend_path,
@@ -48,6 +55,7 @@ class TrajPlanner {
     std::shared_ptr<vehicle_model::KinematicModel> vehicle_model_ptr_;
     std::vector<Eigen::Vector3d>                   debug_node_list_;
     std::string                                    backend_solver_;
+    std::vector<double> opt_timestamps_;
     std::vector<Eigen::Vector4d>                   init_traj_;   // initial trajectory for optimization
     double                                         frontend_path_length_{0.0};
     vehicle_model::opt_states                      opt_states_;
