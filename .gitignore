@@ -43,3 +43,4 @@ figures/*
 solve_results/
 *.pyi
 coinhsl.zip
+assets/rda_benchmark/*

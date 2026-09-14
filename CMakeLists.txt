@@ -65,6 +65,12 @@ set_target_properties(CppAD::CppAD PROPERTIES
 )
 
 add_subdirectory(third-party/EiCOS)
+# EiCOS publishes -O2 -march=native in Release. Besides overriding the chosen
+# optimization level, this changes Eigen alignment relative to OsqpEigen and
+# can crash when copying its solution. Use the project toolchain for both
+# EiCOS and its consumers; keep upstream warnings local to EiCOS.
+set_property(TARGET eicos PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Debug>:-Wall;-Wextra;-Wpedantic>")
+set_property(TARGET eicos PROPERTY INTERFACE_COMPILE_OPTIONS "")
 add_subdirectory(protobuf)
 add_subdirectory(src/logger)
 target_link_libraries(Logger PUBLIC yaml-cpp::yaml-cpp)
