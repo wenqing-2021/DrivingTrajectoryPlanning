@@ -2,6 +2,7 @@
 
 #include "eicos.hpp"
 #include "map/map.h"
+#include "math/box2d.h"
 #include "math/polygon2d.h"
 #include "params.pb.h"
 #include "qp_solver/qp_solver.h"
@@ -59,6 +60,10 @@ class RDASolver {
     bool solveSU(const vehicle_model::VehiclePose& start_pose, const vehicle_model::VehiclePose& goal_pose);
     bool solveLamMuZ();
     void updateMultipliers();
+    // Per-segment flags (indexed like d_t, i.e. step t covers the state at t + 1):
+    // 1 when that footprint overlaps a map obstacle. Drives the per-step adaptive
+    // safety distance during ADMM.
+    std::vector<char> collidingSteps(const Eigen::MatrixXd& state) const;
 
     // Linearize kinematic bicycle model (no slip angle beta) at the reference point.
     // X = [x, y, theta, v]^T, U = [delta, a]^T, dt is the time interval (also an optimization variable).
@@ -87,9 +92,12 @@ class RDASolver {
     // Vehicle collision constraints
     Eigen::MatrixXd G_vehicle_;   // 4 x 2
     Eigen::VectorXd h_vehicle_;   // 4 x 1
+    Eigen::Vector2d origin_ = Eigen::Vector2d::Zero();
     double          L_;           // wheelbase
 
     int admm_iter_ = 0;   // current ADMM iteration (for trust-region scheduling)
+    std::vector<double> sd_min_;          // per-step lower bound of the safety distance d
+    int                 collision_streak_ = 0;   // consecutive colliding ADMM iterations
 };
 
 }   // namespace backend

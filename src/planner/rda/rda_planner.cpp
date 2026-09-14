@@ -13,6 +13,7 @@
 #include "rda_planner.h"
 #include "logger.h"
 #include <cmath>
+#include <algorithm>
 
 namespace planning {
 namespace backend {
@@ -24,6 +25,23 @@ constexpr double kInf = 1e10;
 // Trust region (rad) limiting per-iteration change of theta so that the
 // first-order linearization of R(theta) stays valid (large-heading parking).
 constexpr double kThetaTrustRegion = 0.5;
+// Small neighborhood (m, and rad for theta) by which the start/goal boxes may be
+// met. These boxes are the hard linearized form of nonlinear reach targets: after
+// a reference update the linearized dynamics plus exact endpoint boxes can be
+// marginally inconsistent (Case18 needs about 2e-3 m more room), which makes the
+// SU subproblem infeasible and aborts the whole solve. Meeting the endpoints
+// within a small neighborhood keeps the linearized iterate feasible; the tracking
+// cost still pulls the poses toward the exact start/goal.
+constexpr double kEndpointRelaxation = 0.05;
+// Step by which the adaptive safety distance is raised per ADMM iteration while
+// the current iterate still overlaps an obstacle.
+constexpr double kSafetyDistanceStep = 0.1;
+// Upper bound for the adaptive raise. min_sd is not a monotone lever: beyond about
+// 0.25 m the ADMM shifts to worse solutions and collisions grow, so cap it there.
+constexpr double kSafetyDistanceCap = 0.25;
+// Consecutive colliding iterations required before the safety distance is raised.
+// 1 = raise as soon as an iterate overlaps an obstacle.
+constexpr int kSafetyDistancePersist = 1;
 }   // namespace
 
 RDASolver::RDASolver(const std::shared_ptr<vehicle_model::KinematicModel>& dynamic_model_ptr,
@@ -39,11 +57,15 @@ RDASolver::RDASolver(const std::shared_ptr<vehicle_model::KinematicModel>& dynam
     G_vehicle_.resize(4, 2);
     G_vehicle_ << 1.0, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, -1.0;
 
-    double half_length = dynamic_model_ptr_->GetVehicleParam().length() / 2.0;
-    double half_width  = dynamic_model_ptr_->GetVehicleParam().width() / 2.0;
-
+    const auto&  vehicle_param = dynamic_model_ptr_->GetVehicleParam();
+    const double half_width    = vehicle_param.width() / 2.0;
     h_vehicle_.resize(4);
-    h_vehicle_ << half_length, half_width, half_length, half_width;
+    // Body-frame box of the real footprint relative to the rear-axle state:
+    // front = length - rear_overhang, rear = rear_overhang. It matches the GJK
+    // collision checker; a box centered on the rear axle would leave the front
+    // of the vehicle unprotected.
+    h_vehicle_ << vehicle_param.length() - vehicle_param.rear_overhang(), half_width,
+        vehicle_param.rear_overhang(), half_width;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,7 +135,11 @@ void RDASolver::getObstaclesFromMap() {
     // All obstacles are considered. (A previous distance-based filter was removed:
     // it was not principled and could drop obstacles that the vehicle must avoid.)
     for (std::size_t i = 0; i < obs_list.size(); ++i) {
-        const auto& obstacle = obs_list[i];
+        std::vector<common::math::Vec2d> local_points;
+        for (const auto& point : obs_list[i].points()) {
+            local_points.emplace_back(point.x() - origin_.x(), point.y() - origin_.y());
+        }
+        const common::math::Polygon2d obstacle(std::move(local_points));
 
         std::size_t num_edges = obstacle.num_points();
         if (num_edges < 3) {
@@ -189,7 +215,6 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
     const double rho1       = rda_params_.penalty_weight() > 0 ? rda_params_.penalty_weight() : 200.0;
     const double rho2       = rda_params_.ro2() > 0 ? rda_params_.ro2() : 1.0;
     const double w_dt       = rda_params_.w_dt() > 0 ? rda_params_.w_dt() : 1.0;
-    const double min_sd     = rda_params_.min_sd() > 0 ? rda_params_.min_sd() : 0.1;
     const double max_sd     = rda_params_.max_sd() > 0 ? rda_params_.max_sd() : 1.0;
     const double dt_min     = rda_params_.dt_min() > 0 ? rda_params_.dt_min() : 0.5 * dt_;
     const double dt_max     = rda_params_.dt_max() > 0 ? rda_params_.dt_max() : 2.0 * dt_;
@@ -344,26 +369,28 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
     }
 
     // Start / goal box constraints (with tolerance)
-    double tol_xy    = rda_params_.convergence_tolerance() > 0 ? rda_params_.convergence_tolerance() : 0.05;
-    double tol_theta = tol_xy;
+    double tol_xy         = rda_params_.convergence_tolerance() > 0 ? rda_params_.convergence_tolerance() : 0.05;
+    double tol_theta      = tol_xy;
+    double tol_end        = tol_xy + kEndpointRelaxation;
+    double tol_end_theta  = tol_theta + kEndpointRelaxation;
 
     for (std::size_t t = 0; t <= T_; ++t) {
         if (t == 0) {
-            lower_bound(bnd + idx_X(0) + 0) = start_pose.x - tol_xy;
-            upper_bound(bnd + idx_X(0) + 0) = start_pose.x + tol_xy;
-            lower_bound(bnd + idx_X(0) + 1) = start_pose.y - tol_xy;
-            upper_bound(bnd + idx_X(0) + 1) = start_pose.y + tol_xy;
-            lower_bound(bnd + idx_X(0) + 2) = start_pose.theta - tol_theta;
-            upper_bound(bnd + idx_X(0) + 2) = start_pose.theta + tol_theta;
+            lower_bound(bnd + idx_X(0) + 0) = start_pose.x - tol_end;
+            upper_bound(bnd + idx_X(0) + 0) = start_pose.x + tol_end;
+            lower_bound(bnd + idx_X(0) + 1) = start_pose.y - tol_end;
+            upper_bound(bnd + idx_X(0) + 1) = start_pose.y + tol_end;
+            lower_bound(bnd + idx_X(0) + 2) = start_pose.theta - tol_end_theta;
+            upper_bound(bnd + idx_X(0) + 2) = start_pose.theta + tol_end_theta;
             lower_bound(bnd + idx_X(0) + 3) = 0.0;
             upper_bound(bnd + idx_X(0) + 3) = 0.0;
         } else if (t == T_) {
-            lower_bound(bnd + idx_X(T_) + 0) = goal_pose.x - tol_xy;
-            upper_bound(bnd + idx_X(T_) + 0) = goal_pose.x + tol_xy;
-            lower_bound(bnd + idx_X(T_) + 1) = goal_pose.y - tol_xy;
-            upper_bound(bnd + idx_X(T_) + 1) = goal_pose.y + tol_xy;
-            lower_bound(bnd + idx_X(T_) + 2) = goal_pose.theta - tol_theta;
-            upper_bound(bnd + idx_X(T_) + 2) = goal_pose.theta + tol_theta;
+            lower_bound(bnd + idx_X(T_) + 0) = goal_pose.x - tol_end;
+            upper_bound(bnd + idx_X(T_) + 0) = goal_pose.x + tol_end;
+            lower_bound(bnd + idx_X(T_) + 1) = goal_pose.y - tol_end;
+            upper_bound(bnd + idx_X(T_) + 1) = goal_pose.y + tol_end;
+            lower_bound(bnd + idx_X(T_) + 2) = goal_pose.theta - tol_end_theta;
+            upper_bound(bnd + idx_X(T_) + 2) = goal_pose.theta + tol_end_theta;
             lower_bound(bnd + idx_X(T_) + 3) = 0.0;
             upper_bound(bnd + idx_X(T_) + 3) = 0.0;
         } else {
@@ -390,7 +417,8 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
         lower_bound(bnd + idx_U(t) + 1) = -max_acc;
         upper_bound(bnd + idx_U(t) + 1) = max_acc;
         // Safety-distance slack bounds
-        lower_bound(bnd + idx_d(t)) = min_sd;
+        // Per-step lower bound so the adaptive raise only moves the stuck steps.
+        lower_bound(bnd + idx_d(t)) = t < sd_min_.size() ? sd_min_[t] : 0.1;
         upper_bound(bnd + idx_d(t)) = max_sd;
         // Time interval bounds
         lower_bound(bnd + idx_dt(t)) = dt_min;
@@ -409,7 +437,9 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
     Eigen::SparseMatrix<double> A_mat(n_cons, n_var);
     A_mat.setFromTriplets(A_triplets.begin(), A_triplets.end());
 
-    QPSolver qp_solver(false);
+    // Difficult reverse trajectories need more than OSQP's default 4000
+    // iterations. Keep the convergence criteria; never accept MaxIterReached.
+    QPSolver qp_solver(false, 20000);
     qp_solver.setVariableNums(n_var);
     qp_solver.setConstraintNums(n_cons);
 
@@ -420,12 +450,11 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
 
     const Eigen::VectorXd* sol = qp_solver.GetResult();
 
-    // Health check: OSQP may report "solved" but return a huge/NaN solution when
-    // the QP is primal infeasible (e.g. an over-tight trust region). Reject such
-    // solutions instead of poisoning the trajectory.
+    // QPSolver checks termination status. This additional guard applies to local
+    // coordinates, so large world-coordinate offsets cannot reject valid paths.
     if (sol->hasNaN() || sol->cwiseAbs().maxCoeff() > 1e6) {
         LOG(ERROR) << "SU QP returned an invalid solution (max|x|=" << sol->cwiseAbs().maxCoeff()
-                   << "); likely primal infeasible.";
+                   << "); rejecting invalid local solution.";
         return false;
     }
 
@@ -605,19 +634,59 @@ void RDASolver::updateMultipliers() {
 // ---------------------------------------------------------------------------
 // Main entry: ADMM iteration
 // ---------------------------------------------------------------------------
+std::vector<char> RDASolver::collidingSteps(const Eigen::MatrixXd& state) const {
+    std::vector<char> hit(T_, 0);
+    if (map_ptr_ == nullptr) { return hit; }
+    const auto& obstacles = map_ptr_->GetObsList();
+    if (obstacles.empty()) { return hit; }
+
+    const auto&  vehicle = dynamic_model_ptr_->GetVehicleParam();
+    // Box2d is centered on the vehicle body, i.e. length/2 - rear_overhang ahead of
+    // the rear-axle state (same convention as the GJK collision checker). d_t
+    // constrains the state at t + 1.
+    const double offset = vehicle.length() / 2.0 - vehicle.rear_overhang();
+    for (std::size_t t = 0; t < T_; ++t) {
+        const std::size_t s     = t + 1;
+        const double      x     = state(0, s) + origin_.x();
+        const double      y     = state(1, s) + origin_.y();
+        const double      theta = state(2, s);
+        const common::math::Vec2d center(x + offset * std::cos(theta), y + offset * std::sin(theta));
+        const common::math::Box2d box(center, theta, vehicle.length(), vehicle.width());
+        const common::math::Polygon2d footprint(box);
+        for (const auto& obstacle : obstacles) {
+            if (footprint.HasOverlap(obstacle)) {
+                hit[t] = 1;
+                break;
+            }
+        }
+    }
+    return hit;
+}
+
 bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
                         std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
                         std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr) {
-    if (init_path.empty()) { return false; }
+    opt_traj_.clear();
+    init_traj_.clear();
+    if (init_path.size() < 2 || !start_pose_ptr || !goal_pose_ptr) { return false; }
+    origin_ << start_pose_ptr->x, start_pose_ptr->y;
+    auto start_pose = *start_pose_ptr;
+    auto goal_pose = *goal_pose_ptr;
+    start_pose.x -= origin_.x();
+    start_pose.y -= origin_.y();
+    goal_pose.x -= origin_.x();
+    goal_pose.y -= origin_.y();
+    start_pose.theta = std::atan2(std::sin(start_pose.theta), std::cos(start_pose.theta));
     T_ = init_path.size() - 1;
 
     state_traj_.resize(4, T_ + 1);
     control_traj_.resize(2, T_);
     slack_d_.resize(T_);
     dt_traj_.resize(T_);
-
-    init_traj_.clear();
-    opt_traj_.clear();
+    // Per-step adaptive safety distance: start at the configured minimum and raise
+    // it only for steps that stay in collision (see the ADMM loop).
+    sd_min_.assign(T_, rda_params_.min_sd() > 0 ? rda_params_.min_sd() : 0.1);
+    collision_streak_ = 0;
 
     // Estimate a nominal speed from the path length so that the linearized
     // dynamics are non-degenerate at the first ADMM iteration (v = 0 would make
@@ -635,22 +704,46 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
 
     // Initialize state / control / slack / dt from the input path
     for (std::size_t i = 0; i <= T_; ++i) {
-        state_traj_(0, i) = init_path[i].x;
-        state_traj_(1, i) = init_path[i].y;
-        state_traj_(2, i) = init_path[i].theta;
+        state_traj_(0, i) = init_path[i].x - origin_.x();
+        state_traj_(1, i) = init_path[i].y - origin_.y();
+        const double previous_heading = i == 0 ? start_pose.theta : state_traj_(2, i - 1);
+        state_traj_(2, i) = previous_heading + std::atan2(
+            std::sin(init_path[i].theta - previous_heading),
+            std::cos(init_path[i].theta - previous_heading));
         // Give interior points a nominal speed; endpoints stay at zero.
         state_traj_(3, i) = (i == 0 || i == T_) ? 0.0 : v_nominal;
 
-        init_traj_.emplace_back(init_path[i].x, init_path[i].y, init_path[i].theta, 0.0);
+        init_traj_.emplace_back(state_traj_(0, i), state_traj_(1, i), state_traj_(2, i), 0.0);
 
         if (i < T_) {
             control_traj_(0, i) = 0.0;
             control_traj_(1, i) = 0.0;
-            slack_d_(i)         = rda_params_.min_sd() > 0 ? rda_params_.min_sd() : 0.1;
+            slack_d_(i)         = sd_min_[i];
             dt_traj_(i)         = dt_;
         }
     }
 
+    // Keep endpoint constraints on the same continuous angular branch as the path.
+    const double end_heading = state_traj_(2, T_);
+    goal_pose.theta = end_heading + std::atan2(std::sin(goal_pose.theta - end_heading),
+                                              std::cos(goal_pose.theta - end_heading));
+    // The reference can contain reverse segments. A positive speed and zero
+    // steering linearization may make even its first SU problem infeasible.
+    for (std::size_t t = 1; t < T_; ++t) {
+        const double heading = state_traj_(2, t);
+        const double forward = (state_traj_(0, t + 1) - state_traj_(0, t)) * std::cos(heading)
+                             + (state_traj_(1, t + 1) - state_traj_(1, t)) * std::sin(heading);
+        state_traj_(3, t) = forward < 0.0 ? -v_nominal : v_nominal;
+    }
+    const double max_steer = dynamic_model_ptr_->GetVehicleParam().max_steer_angle();
+    for (std::size_t t = 0; t < T_; ++t) {
+        const double speed = state_traj_(3, t);
+        if (std::abs(speed) > 1e-6) {
+            control_traj_(0, t) = std::clamp(std::atan(L_ * (state_traj_(2, t + 1) - state_traj_(2, t))
+                                                    / (speed * dt_traj_(t))), -max_steer, max_steer);
+        }
+        init_traj_[t].w() = speed;
+    }
     getObstaclesFromMap();
 
     // Initialize dual variables
@@ -664,11 +757,6 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
         dual.zeta.setZero(T_);
     }
 
-    if (start_pose_ptr == nullptr || goal_pose_ptr == nullptr) {
-        LOG(ERROR) << "Start or goal pose is null";
-        return false;
-    }
-
     const int    max_iter       = rda_params_.max_iter() > 0 ? rda_params_.max_iter() : 5;
     const double iter_threshold = rda_params_.iter_threshold() > 0 ? rda_params_.iter_threshold() : 0.2;
 
@@ -677,7 +765,7 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
 
     for (int iter = 0; iter < max_iter; ++iter) {
         admm_iter_ = iter;
-        if (!solveSU(*start_pose_ptr, *goal_pose_ptr)) {
+        if (!solveSU(start_pose, goal_pose)) {
             LOG(ERROR) << "Failed to solve SU subproblem at iteration " << iter;
             return false;
         }
@@ -717,9 +805,34 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
         // Save current duals for the next iteration's dual residual
         duals_prev = duals_;
 
+        // ---- Adaptive safety distance (persistence gated) --------------------
+        // Different scenarios need different safety distances, and raising it on
+        // every graze degrades the scenarios that are already fine: the early ADMM
+        // iterates cross obstacles transiently. Raise the safety distance only once
+        // the iterate has stayed in collision for several consecutive iterations,
+        // and never declare convergence on a colliding iterate. max_sd bounds it.
+        const double max_sd = rda_params_.max_sd() > 0 ? rda_params_.max_sd() : 1.0;
+        const double cap    = std::min(max_sd, kSafetyDistanceCap);
+        const std::vector<char> hit = collidingSteps(state_traj_);
+        bool any_collision = false;
+        for (std::size_t t = 0; t < T_; ++t) {
+            if (hit[t]) { any_collision = true; break; }
+        }
+        if (any_collision) {
+            ++collision_streak_;
+        } else {
+            collision_streak_ = 0;
+        }
+        if (collision_streak_ >= kSafetyDistancePersist && !sd_min_.empty() && sd_min_[0] + 1e-9 < cap) {
+            const double next = std::min(cap, sd_min_[0] + kSafetyDistanceStep);
+            LOG(INFO) << "RDA safety distance raised: " << sd_min_[0] << " -> " << next;
+            sd_min_.assign(T_, next);
+        }
+
         // Early stop only after at least 2 iterations (the first SU solve has no
-        // obstacle penalty because all duals start at zero).
-        if (iter >= 1 && resi_pri < iter_threshold && resi_dual < iter_threshold) {
+        // obstacle penalty because all duals start at zero) and only when the
+        // iterate is already collision-free.
+        if (!any_collision && iter >= 1 && resi_pri < iter_threshold && resi_dual < iter_threshold) {
             LOG(INFO) << "RDA early stop at iteration " << iter + 1;
             break;
         }
@@ -727,7 +840,10 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
 
     opt_traj_.clear();
     for (std::size_t i = 0; i <= T_; ++i) {
-        opt_traj_.emplace_back(state_traj_(0, i), state_traj_(1, i), state_traj_(2, i), state_traj_(3, i));
+        opt_traj_.emplace_back(state_traj_(0, i) + origin_.x(), state_traj_(1, i) + origin_.y(),
+                               state_traj_(2, i), state_traj_(3, i));
+        init_traj_[i].x() += origin_.x();
+        init_traj_[i].y() += origin_.y();
     }
 
     return true;

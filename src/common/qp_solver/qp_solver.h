@@ -1,22 +1,25 @@
 #pragma once
 
 #include "OsqpEigen/OsqpEigen.h"
+#include <iostream>
 
 namespace planning {
 namespace backend {
 
 class QPSolver {
   public:
-    QPSolver(bool verbose = false) {
+    QPSolver(bool verbose = false, int max_iterations = 4000) {
         // init solver
         solver_ = OsqpEigen::Solver();
         solver_.settings()->setWarmStart(true);
         solver_.settings()->setVerbosity(verbose);
+        solver_.settings()->setMaxIteration(max_iterations);
     };
     ~QPSolver() = default;
 
     bool Solve(const Eigen::SparseMatrix<double>& H, Eigen::VectorXd& g, const Eigen::SparseMatrix<double>& A,
                Eigen::VectorXd& lowerBound, Eigen::VectorXd& upperBound) {
+        result_.resize(0);
         // clear matrix
         solver_.data()->clearHessianMatrix();
         solver_.data()->clearLinearConstraintsMatrix();
@@ -32,6 +35,14 @@ class QPSolver {
 
         // solve the problem
         if (solver_.solveProblem() != OsqpEigen::ErrorExitFlag::NoError) return false;
+        const auto status = solver_.getStatus();
+        if (status != OsqpEigen::Status::Solved && status != OsqpEigen::Status::SolvedInaccurate) {
+            const auto* info = solver_.solver()->info;
+            std::cerr << "OSQP failed: " << info->status << " (iterations=" << info->iter
+                      << ", primal_residual=" << info->prim_res
+                      << ", dual_residual=" << info->dual_res << ")\n";
+            return false;
+        }
         // store the result
         result_ = solver_.getSolution();
         return true;

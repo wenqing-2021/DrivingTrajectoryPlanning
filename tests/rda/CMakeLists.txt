@@ -52,3 +52,11 @@ add_test(
     COMMAND test_rda_case2
     WORKING_DIRECTORY /tmp
 )
+
+add_executable(test_qp_status test_qp_status.cpp)
+target_link_libraries(test_qp_status PRIVATE Planner)
+add_test(NAME test_qp_status COMMAND test_qp_status)
+
+add_executable(test_rda_coordinates test_rda_coordinates.cpp)
+target_link_libraries(test_rda_coordinates PRIVATE Planner)
+add_test(NAME test_rda_coordinates COMMAND test_rda_coordinates)
