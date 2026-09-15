@@ -46,6 +46,9 @@ obca_params:
   linear_solver: "mumps"
 
 rda_params:
+  workers: 16  # persistent CPU workers for obstacle SOCPs; 0/1 selects serial.
+               # Scale with available cores up to the obstacle count.
+  worker_timeout_ms: 5000  # timeout for one parallel ADMM round, not the whole plan
   max_iter: 50
   endpoint_position_tolerance: 0.05  # m; final start/goal x/y box half-width (formerly 0.05 + 0.05)
   endpoint_heading_tolerance: 0.08   # rad; final start/goal heading box half-width

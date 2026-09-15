@@ -1,6 +1,6 @@
 #pragma once
 
-#include "eicos.hpp"
+#include "rda_workspace.h"
 #include "map/map.h"
 #include "math/box2d.h"
 #include "math/polygon2d.h"
@@ -18,8 +18,8 @@ namespace backend {
 
 struct RDAObstacle {
     std::size_t                  edge_num = 0;   // number of edges of this obstacle
-    std::vector<Eigen::MatrixXd> A_list;         // T+1 size, each edge_num x 2
-    std::vector<Eigen::VectorXd> b_list;         // T+1 size, each edge_num x 1
+    Eigen::MatrixXd A;   // static halfspaces, edge_num x 2
+    Eigen::VectorXd b;   // edge_num
 };
 
 struct RDADualVariables {
@@ -33,7 +33,8 @@ struct RDADualVariables {
 class RDASolver {
   public:
     RDASolver(const std::shared_ptr<vehicle_model::KinematicModel>& dynamic_model_ptr,
-              const std::shared_ptr<map::Map>& map_ptr, const params::RDAParams& rda_params, double dt = 0.1);
+              const std::shared_ptr<map::Map>& map_ptr, const params::RDAParams& rda_params, double dt = 0.1,
+              std::shared_ptr<RDAWorkspace> workspace = nullptr);
     ~RDASolver() = default;
 
     bool Process(const vehicle_model::sdv_path& init_path, std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
@@ -56,6 +57,7 @@ class RDASolver {
     const std::vector<Eigen::Vector4d>& GetInitialStates() const { return init_traj_; }
 
   private:
+    void prepareStructure();
     void getObstaclesFromMap();
     bool solveSU(const vehicle_model::VehiclePose& start_pose, const vehicle_model::VehiclePose& goal_pose);
     bool solveLamMuZ();
@@ -77,6 +79,9 @@ class RDASolver {
     params::RDAParams                              rda_params_;
     double                                         dt_;   // nominal time interval
     std::size_t                                    T_;
+
+    std::shared_ptr<RDAWorkspace> workspace_;
+    std::vector<RDADualVariables> duals_prev_;
 
     std::vector<RDAObstacle>      obstacles_;
     std::vector<RDADualVariables> duals_;

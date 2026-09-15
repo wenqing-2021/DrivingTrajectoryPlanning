@@ -69,6 +69,8 @@ message RDAParams {
     optional double endpoint_heading_tolerance = 17; // final heading box half-width (rad), >= 0; default 0.1
     optional double safety_distance_step = 18; // lower-bound increment (m), >= 0; default 0.1, zero disables adaptation
     optional double safety_distance_cap = 19; // adaptive lower-bound cap (m), default 0.25; clamped to [min_sd, max_sd]
+    int32 workers = 21; // 0/1: serial; >1: persistent worker threads for obstacle SOCPs
+    int32 worker_timeout_ms = 22; // per ADMM round; 0 uses 5000 ms
     optional int32 safety_distance_persist = 20; // consecutive colliding iterations before raising; >= 1, default 1
 }
 

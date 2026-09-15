@@ -70,3 +70,18 @@ endforeach()
 add_executable(test_rda_parameters test_rda_parameters.cpp)
 target_link_libraries(test_rda_parameters PRIVATE Planner)
 add_test(NAME test_rda_parameters COMMAND test_rda_parameters)
+
+add_executable(test_rda_workspace test_rda_workspace.cpp)
+target_link_libraries(test_rda_workspace PRIVATE RDAPlanner)
+add_test(NAME test_rda_workspace COMMAND test_rda_workspace)
+
+# Regression for adaptive OSQP state leaking into the next planning request.
+add_test(NAME test_rda_repeated_request
+    COMMAND "${Python_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/rda/benchmark_runtime.py"
+        --cases 8 --repeats 2 --workers 4 --output "${CMAKE_BINARY_DIR}/runtime_case8.json")
+set_tests_properties(test_rda_repeated_request PROPERTIES TIMEOUT 30)
+
+add_executable(test_cone_thread_pool test_cone_thread_pool.cpp)
+target_link_libraries(test_cone_thread_pool PRIVATE RDAPlanner)
+add_test(NAME test_cone_thread_pool COMMAND test_cone_thread_pool)
+set_tests_properties(test_cone_thread_pool PROPERTIES TIMEOUT 30)

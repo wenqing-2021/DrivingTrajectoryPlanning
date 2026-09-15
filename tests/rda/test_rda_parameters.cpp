@@ -79,6 +79,8 @@ int main() {
             [](auto& p) { p.set_safety_distance_step(-0.1); },
             [](auto& p) { p.set_safety_distance_cap(-0.1); },
             [](auto& p) { p.set_safety_distance_persist(0); },
+            [](auto& p) { p.set_workers(-1); },
+            [](auto& p) { p.set_worker_timeout_ms(-1); },
         };
         for (const auto& mutate : invalid) {
             auto bad = config;

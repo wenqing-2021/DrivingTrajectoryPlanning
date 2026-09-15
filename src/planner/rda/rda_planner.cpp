@@ -13,23 +13,30 @@
 #include "rda_planner.h"
 #include "logger.h"
 #include <cmath>
+#include <chrono>
 #include <algorithm>
 
 namespace planning {
 namespace backend {
 
 namespace {
+using RuntimeClock = std::chrono::steady_clock;
+double elapsedMs(RuntimeClock::time_point start) {
+    return std::chrono::duration<double, std::milli>(RuntimeClock::now()-start).count();
+}
 // Use a moderate "infinity" for OSQP bounds: 1e20 degrades the constraint
 // matrix conditioning and can make OSQP report spurious primal infeasibility.
 constexpr double kInf = 1e10;
 }   // namespace
 
 RDASolver::RDASolver(const std::shared_ptr<vehicle_model::KinematicModel>& dynamic_model_ptr,
-                     const std::shared_ptr<map::Map>& map_ptr, const params::RDAParams& rda_params, double dt)
+                     const std::shared_ptr<map::Map>& map_ptr, const params::RDAParams& rda_params, double dt,
+                     std::shared_ptr<RDAWorkspace> workspace)
     : dynamic_model_ptr_(dynamic_model_ptr)
     , map_ptr_(map_ptr)
     , rda_params_(rda_params)
     , dt_(dt) {
+    workspace_ = workspace ? std::move(workspace) : std::make_shared<RDAWorkspace>();
 
     // Resolve absent optional fields once. Explicit zero remains meaningful for
     // endpoint tolerances, safety distances and the adaptation step.
@@ -164,13 +171,9 @@ void RDASolver::getObstaclesFromMap() {
 
         RDAObstacle rda_obs;
         rda_obs.edge_num = num_edges;
-        // Replicate for all time steps (static obstacles)
-        for (std::size_t t = 0; t <= T_; ++t) {
-            rda_obs.A_list.push_back(A_mat);
-            rda_obs.b_list.push_back(b_vec);
-        }
-
-        obstacles_.push_back(rda_obs);
+        rda_obs.A = std::move(A_mat);
+        rda_obs.b = std::move(b_vec);
+        obstacles_.push_back(std::move(rda_obs));
     }
 }
 
@@ -180,7 +183,30 @@ void RDASolver::getObstaclesFromMap() {
 //   s.t.    linearized dynamics (with dt), start/goal box constraints,
 //           state/control/slack/dt bounds
 // ---------------------------------------------------------------------------
+void RDASolver::prepareStructure() {
+    std::vector<std::size_t> edges;
+    for (const auto& obstacle : obstacles_) edges.push_back(obstacle.edge_num);
+    if (workspace_->prepared_T == T_ && workspace_->prepared_edges == edges && workspace_->su_solver) return;
+    workspace_->threads.reset();
+    workspace_->prepared_T = T_;
+    workspace_->prepared_edges = edges;
+    workspace_->su_h = SparseValues{};
+    workspace_->su_a = SparseValues{};
+    const int variables = (8 + edges.size()) * T_ + 4;
+    const int constraints = (12 + 2 * edges.size()) * T_ + 4;
+    workspace_->su_g.resize(variables);
+    workspace_->su_lower.resize(constraints);
+    workspace_->su_upper.resize(constraints);
+    workspace_->su_solver = std::make_unique<QPSolver>(false, 20000, true);
+    workspace_->su_solver->setVariableNums(variables);
+    workspace_->su_solver->setConstraintNums(constraints);
+    workspace_->cones.clear();
+    workspace_->cones.resize(edges.size());
+    for (std::size_t i = 0; i < edges.size(); ++i) workspace_->cones[i].prepare(T_, edges[i]);
+}
+
 bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehicle_model::VehiclePose& goal_pose) {
+    const auto assembly_start = RuntimeClock::now();
     // Variable layout:
     //   X:  4*(T+1)          [x, y, theta, v] per step
     //   U:  2*T              [delta, a] per step
@@ -216,12 +242,13 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
     const double dt_min     = rda_params_.dt_min() > 0 ? rda_params_.dt_min() : 0.5 * dt_;
     const double dt_max     = rda_params_.dt_max() > 0 ? rda_params_.dt_max() : 2.0 * dt_;
 
-    std::vector<Eigen::Triplet<double>> H_triplets;
-    Eigen::VectorXd                     g = Eigen::VectorXd::Zero(n_var);
-
-    std::vector<Eigen::Triplet<double>> A_triplets;
-    Eigen::VectorXd                     lower_bound = Eigen::VectorXd::Zero(n_cons);
-    Eigen::VectorXd                     upper_bound = Eigen::VectorXd::Zero(n_cons);
+    auto& H_triplets = workspace_->su_h;
+    auto& A_triplets = workspace_->su_a;
+    H_triplets.begin(n_var, n_var);
+    A_triplets.begin(n_cons, n_var);
+    auto& g = workspace_->su_g; g.setZero();
+    auto& lower_bound = workspace_->su_lower; lower_bound.setZero();
+    auto& upper_bound = workspace_->su_upper; upper_bound.setZero();
 
     // ---- Cost: path tracking (x, y, theta) --------------------------------
     for (std::size_t t = 1; t <= T_; ++t) {
@@ -262,14 +289,14 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
     // Hm is linear in theta. Penalty: 0.5 * rho2 * ||Hm||^2 -> quadratic in theta.
     for (std::size_t obs_idx = 0; obs_idx < obstacles_.size(); ++obs_idx) {
         for (std::size_t t = 0; t < T_; ++t) {
-            const Eigen::VectorXd& lam_t  = duals_[obs_idx].lam.col(t + 1);
-            const Eigen::VectorXd& mu_t   = duals_[obs_idx].mu.col(t + 1);
+            const auto lam_t  = duals_[obs_idx].lam.col(t + 1);
+            const auto mu_t   = duals_[obs_idx].mu.col(t + 1);
             double                 z_t    = duals_[obs_idx].z(t);
             double                 zeta_t = duals_[obs_idx].zeta(t);
             const Eigen::Vector2d  xi_t   = duals_[obs_idx].xi.row(t + 1).transpose();
 
-            const Eigen::MatrixXd& A_obs = obstacles_[obs_idx].A_list[t + 1];
-            const Eigen::VectorXd& b_obs = obstacles_[obs_idx].b_list[t + 1];
+            const Eigen::MatrixXd& A_obs = obstacles_[obs_idx].A;
+            const Eigen::VectorXd& b_obs = obstacles_[obs_idx].b;
 
             // --- Im residual via auxiliary variable r (accelerated) ---
             Eigen::RowVector2d Q_s = lam_t.transpose() * A_obs;   // 1 x 2
@@ -326,8 +353,10 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
     // X_{t+1} = A X_t + B U_t + D dt_t + C
     // => X_{t+1} - A X_t - B U_t - D dt_t = C
     for (std::size_t t = 0; t < T_; ++t) {
-        Eigen::MatrixXd A_dyn, B_dyn;
-        Eigen::VectorXd D_dyn, C_dyn;
+        auto& A_dyn = workspace_->dynamics_a;
+        auto& B_dyn = workspace_->dynamics_b;
+        auto& D_dyn = workspace_->dynamics_d;
+        auto& C_dyn = workspace_->dynamics_c;
 
         double v     = state_traj_(3, t);
         double delta = control_traj_(0, t);
@@ -416,22 +445,18 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
     }
 
     // ---- Assemble and solve ---------------------------------------------------
-    Eigen::SparseMatrix<double> H(n_var, n_var);
-    H.setFromTriplets(H_triplets.begin(), H_triplets.end());
-    Eigen::SparseMatrix<double> A_mat(n_cons, n_var);
-    A_mat.setFromTriplets(A_triplets.begin(), A_triplets.end());
+    const auto& H = H_triplets.finish();
+    const auto& A_mat = A_triplets.finish();
+    auto& qp_solver = *workspace_->su_solver;
 
-    // Difficult reverse trajectories need more than OSQP's default 4000
-    // iterations. Keep the convergence criteria; never accept MaxIterReached.
-    QPSolver qp_solver(false, 20000);
-    qp_solver.setVariableNums(n_var);
-    qp_solver.setConstraintNums(n_cons);
-
+    workspace_->timings.su_assembly_ms += elapsedMs(assembly_start);
+    const auto solve_start = RuntimeClock::now();
     if (!qp_solver.Solve(H, g, A_mat, lower_bound, upper_bound)) {
         LOG(ERROR) << "SU QP solver failed.";
         return false;
     }
 
+    workspace_->timings.su_solve_ms += elapsedMs(solve_start);
     const Eigen::VectorXd* sol = qp_solver.GetResult();
 
     // QPSolver checks termination status. This additional guard applies to local
@@ -466,6 +491,7 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
 // epigraph is equivalent to Python's weighted sum_squares(neg(Im)) + Hm cost.
 // ---------------------------------------------------------------------------
 bool RDASolver::solveLamMuZ() {
+    const auto assembly_start = RuntimeClock::now();
     const double rho1        = rda_params_.penalty_weight() > 0 ? rda_params_.penalty_weight() : 200.0;
     const double rho2        = rda_params_.ro2() > 0 ? rda_params_.ro2() : 1.0;
     const double sqrt_rho1_2 = std::sqrt(rho1 / 2.0);
@@ -475,27 +501,13 @@ bool RDASolver::solveLamMuZ() {
         const std::size_t E     = obstacles_[obs_idx].edge_num;
         const std::size_t n_var = T_ * E + T_ * 4 + 2 * T_ + 1;   // lam, mu, z, r, t_epigraph
 
-        // Objective: minimize t_epigraph
-        Eigen::VectorXd c = Eigen::VectorXd::Zero(n_var);
-        c(n_var - 1)      = 1.0;
-
-        // No equality constraints
-        Eigen::SparseMatrix<double> A_eq(0, n_var);
-        Eigen::VectorXd             b_eq(0);
-
-        // Cone layout: [nonnegativity and r >= -Im] [epigraph SOC] [norm SOCs]
-        const std::size_t nonneg_dims  = n_var - 1;
-        const std::size_t lp_dims      = nonneg_dims + T_;
-        const std::size_t epigraph_dim = 1 + 3 * T_;   // t + (r, Hm0, Hm1) per step
-
-        std::vector<std::size_t> soc_dims_vec;
-        soc_dims_vec.push_back(epigraph_dim);
-        for (std::size_t t = 0; t < T_; ++t) { soc_dims_vec.push_back(3); }
-
-        const std::size_t total_rows = lp_dims + epigraph_dim + 3 * T_;
-        Eigen::VectorXd   h          = Eigen::VectorXd::Zero(total_rows);
-
-        std::vector<Eigen::Triplet<double>> G_triplets;
+        auto& workspace = workspace_->cones[obs_idx];
+        const std::size_t nonneg_dims = n_var - 1;
+        const std::size_t lp_dims = nonneg_dims + T_;
+        auto& h = workspace.h;
+        h.setZero();
+        auto& G_triplets = workspace.coefficients;
+        G_triplets.begin(h.size(), n_var);
 
         auto lam_idx = [&](std::size_t t) { return t * E; };
         auto mu_idx  = [&](std::size_t t) { return T_ * E + t * 4; };
@@ -517,8 +529,8 @@ bool RDASolver::solveLamMuZ() {
             Rot << std::cos(theta), -std::sin(theta), std::sin(theta), std::cos(theta);
             Eigen::Vector2d trans = state_traj_.col(t + 1).head(2);
 
-            const Eigen::MatrixXd& A_obs = obstacles_[obs_idx].A_list[t + 1];
-            const Eigen::VectorXd& b_obs = obstacles_[obs_idx].b_list[t + 1];
+            const Eigen::MatrixXd& A_obs = obstacles_[obs_idx].A;
+            const Eigen::VectorXd& b_obs = obstacles_[obs_idx].b;
 
             // r >= -Im, where Im = lam^T(A s - b) - mu^T h - z - d + zeta.
             // In the positive orthant, h - G*w = Im + r >= 0.
@@ -554,7 +566,7 @@ bool RDASolver::solveLamMuZ() {
 
         // 3) Dual-norm SOC: || A_obs^T lam_t || <= 1
         for (std::size_t t = 0; t < T_; ++t) {
-            const Eigen::MatrixXd& A_obs = obstacles_[obs_idx].A_list[t + 1];
+            const Eigen::MatrixXd& A_obs = obstacles_[obs_idx].A;
             h(row)                       = 1.0;
             row++;
             Eigen::MatrixXd lam_G = -A_obs.transpose();   // 2 x E
@@ -564,19 +576,32 @@ bool RDASolver::solveLamMuZ() {
             row += 2;
         }
 
-        Eigen::SparseMatrix<double> G(total_rows, n_var);
-        G.setFromTriplets(G_triplets.begin(), G_triplets.end());
+        G_triplets.finish();
+    }
 
-        Eigen::VectorXi q_dims(soc_dims_vec.size());
-        for (std::size_t i = 0; i < soc_dims_vec.size(); ++i) { q_dims(i) = soc_dims_vec[i]; }
+    workspace_->timings.cone_assembly_ms += elapsedMs(assembly_start);
+    const auto solve_start = RuntimeClock::now();
+    const int workers = std::max(1, rda_params_.workers());
+    if (workers > 1 && workspace_->cones.size() > 1) {
+        const int timeout = rda_params_.worker_timeout_ms() > 0 ? rda_params_.worker_timeout_ms() : 5000;
+        if (!workspace_->threads.solve(workspace_->cones, workers, timeout)) return false;
+    } else {
+        workspace_->threads.reset();
+        for (auto& cone : workspace_->cones) cone.solve();
+    }
 
-        EiCOS::Solver   solver(G, A_eq, c, h, b_eq, q_dims);
-        EiCOS::exitcode status = solver.solve();
-
+    workspace_->timings.cone_solve_ms += elapsedMs(solve_start);
+    for (std::size_t obs_idx = 0; obs_idx < obstacles_.size(); ++obs_idx) {
+        const std::size_t E = obstacles_[obs_idx].edge_num;
+        auto lam_idx = [&](std::size_t t) { return t * E; };
+        auto mu_idx = [&](std::size_t t) { return T_ * E + t * 4; };
+        auto z_idx = [&](std::size_t t) { return T_ * E + T_ * 4 + t; };
+        const auto& workspace = workspace_->cones[obs_idx];
+        const auto status = workspace.status;
         bool ok = (status == EiCOS::exitcode::optimal || status == EiCOS::exitcode::close_to_optimal ||
                    status == EiCOS::exitcode::close_to_primal_infeasible);
         if (ok) {
-            const Eigen::VectorXd& sol = solver.solution();
+            const Eigen::VectorXd& sol = workspace.result;
             for (std::size_t t = 0; t < T_; ++t) {
                 duals_[obs_idx].lam.col(t + 1) = sol.segment(lam_idx(t), E);
                 duals_[obs_idx].mu.col(t + 1)  = sol.segment(mu_idx(t), 4);
@@ -603,8 +628,8 @@ bool RDASolver::solveLamMuZ() {
 void RDASolver::updateMultipliers() {
     for (std::size_t obs_idx = 0; obs_idx < obstacles_.size(); ++obs_idx) {
         for (std::size_t t = 0; t < T_; ++t) {
-            const Eigen::VectorXd& lam_t = duals_[obs_idx].lam.col(t + 1);
-            const Eigen::VectorXd& mu_t  = duals_[obs_idx].mu.col(t + 1);
+            const auto lam_t = duals_[obs_idx].lam.col(t + 1);
+            const auto mu_t  = duals_[obs_idx].mu.col(t + 1);
             double                 z_t   = duals_[obs_idx].z(t);
 
             double          theta = state_traj_(2, t + 1);
@@ -612,8 +637,8 @@ void RDASolver::updateMultipliers() {
             Rot << std::cos(theta), -std::sin(theta), std::sin(theta), std::cos(theta);
             Eigen::Vector2d trans = state_traj_.col(t + 1).head(2);
 
-            const Eigen::MatrixXd& A_obs = obstacles_[obs_idx].A_list[t + 1];
-            const Eigen::VectorXd& b_obs = obstacles_[obs_idx].b_list[t + 1];
+            const Eigen::MatrixXd& A_obs = obstacles_[obs_idx].A;
+            const Eigen::VectorXd& b_obs = obstacles_[obs_idx].b;
 
             // Update xi
             Eigen::Vector2d Hm_val = G_vehicle_.transpose() * mu_t + (A_obs * Rot).transpose() * lam_t;
@@ -661,6 +686,8 @@ std::vector<char> RDASolver::collidingSteps(const Eigen::MatrixXd& state) const 
 bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
                         std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
                         std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr) {
+    const auto process_start = RuntimeClock::now();
+    workspace_->timings = {};
     opt_traj_.clear();
     init_traj_.clear();
     const auto nonnegative = [](double value) { return std::isfinite(value) && value >= 0.0; };
@@ -669,9 +696,10 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
         !nonnegative(rda_params_.endpoint_position_tolerance()) ||
         !nonnegative(rda_params_.endpoint_heading_tolerance()) ||
         !nonnegative(rda_params_.safety_distance_step()) ||
-        !nonnegative(rda_params_.safety_distance_cap()) || rda_params_.safety_distance_persist() < 1) {
+        !nonnegative(rda_params_.safety_distance_cap()) || rda_params_.safety_distance_persist() < 1 ||
+        rda_params_.workers() < 0 || rda_params_.worker_timeout_ms() < 0) {
         LOG(ERROR) << "Invalid RDA configuration: require 0 <= min_sd <= max_sd, finite nonnegative "
-                   << "endpoint tolerances/safety step/cap and safety_distance_persist >= 1.";
+                   << "endpoint tolerances/safety step/cap, safety_distance_persist >= 1 and nonnegative worker settings.";
         return false;
     }
     if (init_path.size() < 2 || !start_pose_ptr || !goal_pose_ptr) { return false; }
@@ -750,6 +778,8 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
         init_traj_[t].w() = speed;
     }
     getObstaclesFromMap();
+    prepareStructure();
+    workspace_->su_solver->Reset();
 
     // Initialize dual variables
     duals_.resize(obstacles_.size());
@@ -766,9 +796,12 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
     const double iter_threshold = rda_params_.iter_threshold() > 0 ? rda_params_.iter_threshold() : 0.2;
 
     // Previous-iteration dual variables (for the dual residual)
-    std::vector<RDADualVariables> duals_prev = duals_;
+    auto& duals_prev = duals_prev_;
+    duals_prev = duals_;
 
+    workspace_->timings.prepare_ms = elapsedMs(process_start);
     for (int iter = 0; iter < max_iter; ++iter) {
+        ++workspace_->timings.iterations;
         if (!solveSU(start_pose, goal_pose)) {
             LOG(ERROR) << "Failed to solve SU subproblem at iteration " << iter;
             return false;
@@ -783,12 +816,12 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
         double resi_pri = 0.0;
         for (std::size_t obs_idx = 0; obs_idx < obstacles_.size(); ++obs_idx) {
             for (std::size_t t = 0; t < T_; ++t) {
-                const Eigen::VectorXd& lam_t = duals_[obs_idx].lam.col(t + 1);
-                const Eigen::VectorXd& mu_t  = duals_[obs_idx].mu.col(t + 1);
+                const auto lam_t = duals_[obs_idx].lam.col(t + 1);
+                const auto mu_t  = duals_[obs_idx].mu.col(t + 1);
                 double                 theta = state_traj_(2, t + 1);
                 Eigen::Matrix2d        Rot;
                 Rot << std::cos(theta), -std::sin(theta), std::sin(theta), std::cos(theta);
-                const Eigen::MatrixXd& A_obs = obstacles_[obs_idx].A_list[t + 1];
+                const Eigen::MatrixXd& A_obs = obstacles_[obs_idx].A;
                 Eigen::Vector2d        Hm    = G_vehicle_.transpose() * mu_t + (A_obs * Rot).transpose() * lam_t;
                 resi_pri += Hm.squaredNorm();
             }
@@ -850,6 +883,13 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
         init_traj_[i].x() += origin_.x();
         init_traj_[i].y() += origin_.y();
     }
+
+    const auto& timing = workspace_->timings;
+    LOG(INFO) << "RDA runtime total_ms=" << elapsedMs(process_start)
+              << " prepare_ms=" << timing.prepare_ms
+              << " su_assembly_ms=" << timing.su_assembly_ms << " su_solve_ms=" << timing.su_solve_ms
+              << " cone_assembly_ms=" << timing.cone_assembly_ms << " cone_solve_ms=" << timing.cone_solve_ms
+              << " iterations=" << timing.iterations << " workers=" << std::max(1, rda_params_.workers());
 
     return true;
 }
