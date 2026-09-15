@@ -8,17 +8,17 @@ Park's Bokeh viewer and ESDF/control-curve figures remain available.
 ## Run and export
 
 Build once after this change to regenerate protobufs, compile timestamp export,
-and install the Python sources used by `scripts/run.sh`:
+and install the Python sources used by `scripts/run_park.sh`:
 
 ```bash
 bash scripts/build.sh
 bash scripts/run_urban.sh --visualize both --curves
-bash scripts/run.sh --visualize both --curves
+bash scripts/run_park.sh --visualize both --curves
 ```
 
 `--visualize` accepts `none`, `png`, `gif`, or `both`. Urban defaults to PNG.
 Park keeps its original Bokeh workflow when this option is omitted; specifying it
-makes `scripts/run.sh` a batch run without starting a server.
+makes `scripts/run_park.sh` a batch run without starting a server.
 Urban also saves its separate control/cost PNGs when PNG export is selected.
 
 Outputs go to the existing result directory:

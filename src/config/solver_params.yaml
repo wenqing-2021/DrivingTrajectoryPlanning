@@ -7,11 +7,11 @@ hybrid_a_star_param: # NOTE: the following key's name MUST be the same as those 
   max_iter: 20 # iterations
   expand_s: 1.5 # m
   expand_step_num: 5 # number of steps to expand for collision check
-  max_steer_angle: 0.75 # rad
+  max_steer_angle: 0.75 # rad; must match vehicle_cfg.yaml max_steer_angle
   search_front_num: 5 # number of search front
   search_back_num: 3 # number of search back
   rs_radius: 15 # meters (in this circle, try RS curve to reach the goal)
-  rs_step_size: 0.3 # meters (step size of RS path for collision check)
+  rs_step_size: 0.1 # meters (step size of RS path for collision check)
   wheel_base: 2.5 # meters
   node_resolution_x: 0.5 # meters
   node_resolution_y: 0.5 # meters
@@ -47,19 +47,23 @@ obca_params:
 
 rda_params:
   max_iter: 50
-  convergence_tolerance: 0.05
+  endpoint_position_tolerance: 0.05  # m; final start/goal x/y box half-width (formerly 0.05 + 0.05)
+  endpoint_heading_tolerance: 0.08   # rad; final start/goal heading box half-width
   penalty_weight: 200.0  # rho1: ADMM penalty on the Im (distance) residual
   use_warm_start: false
-  l1_weight: 8.0
+  l1_weight: 10.0
   w_s: 1.0
-  w_u: 1.0
+  w_u: 0.5
   ro2: 50.0  # rho2: ADMM penalty on the Hm (dual-feasibility) residual.
              # NOTE: rho2=1 (Python default) is too small for parking scenarios
              # with large heading changes -> Hm diverges (resi_pri grows) and the
              # trajectory collides. rho2 ~ 50 balances rho1 and keeps ADMM stable.
-  min_sd: 0.1
-  max_sd: 1.0
+  min_sd: 0.1  # m; initial lower bound of optimized safety distance d (zero is valid)
+  max_sd: 1.0  # m; upper bound of d; must be >= min_sd
+  safety_distance_step: 0.1  # m; raise the lower bound at all steps while collisions persist; 0 disables
+  safety_distance_cap: 0.25 # m; cap on the adaptive lower bound, clamped to [min_sd, max_sd], not an upper bound on d
+  safety_distance_persist: 1 # consecutive colliding iterations before raising; then raise each colliding iteration
   dt_min: 0.05
   dt_max: 0.2
-  w_dt: 1.0
-  iter_threshold: 0.05
+  w_dt: 0.5
+  iter_threshold: 0.01

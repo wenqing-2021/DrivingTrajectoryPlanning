@@ -75,6 +75,11 @@ params::RDAParams LoadRDAParamsFromYaml(const std::string& yaml_path) {
         if (node["dt_max"]) p.set_dt_max(node["dt_max"].as<double>());
         if (node["w_dt"]) p.set_w_dt(node["w_dt"].as<double>());
         if (node["iter_threshold"]) p.set_iter_threshold(node["iter_threshold"].as<double>());
+        if (node["endpoint_position_tolerance"]) p.set_endpoint_position_tolerance(node["endpoint_position_tolerance"].as<double>());
+        if (node["endpoint_heading_tolerance"]) p.set_endpoint_heading_tolerance(node["endpoint_heading_tolerance"].as<double>());
+        if (node["safety_distance_step"]) p.set_safety_distance_step(node["safety_distance_step"].as<double>());
+        if (node["safety_distance_cap"]) p.set_safety_distance_cap(node["safety_distance_cap"].as<double>());
+        if (node["safety_distance_persist"]) p.set_safety_distance_persist(node["safety_distance_persist"].as<int>());
         LOG(INFO) << "Loaded rda_params from " << yaml_path;
     }
     catch (const std::exception& e) {
@@ -226,7 +231,7 @@ int main() {
         goal_pose_ptr->theta = 0.0;
 
         // ==================== RDA params (from solver_params.yaml) ====================
-        const std::string solver_params_yaml = "/root/workspace/AutomatedPark/src/config/solver_params.yaml";
+        const std::string solver_params_yaml = RDA_TEST_CONFIG_PATH;
         params::RDAParams rda_params         = LoadRDAParamsFromYaml(solver_params_yaml);
         LOG(INFO) << "RDA params: max_iter=" << rda_params.max_iter() << " rho1=" << rda_params.penalty_weight()
                   << " ro2=" << rda_params.ro2() << " w_s=" << rda_params.w_s() << " w_u=" << rda_params.w_u()

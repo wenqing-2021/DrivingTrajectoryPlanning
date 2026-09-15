@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPOSITORY_ROOT="$(cd "${SCRIPT_DIRECTORY}/.." && pwd)"
+REPOSITORY_ROOT="$(cd "${SCRIPT_DIRECTORY}/../.." && pwd)"
 SOURCE_DIRECTORY="${REPOSITORY_ROOT}/.cache/cppad/sources/CppAD"
 BUILD_DIRECTORY="${REPOSITORY_ROOT}/.cache/cppad/build"
 CPPAD_PREFIX="${CPPAD_PREFIX:-${REPOSITORY_ROOT}/.local/cppad}"

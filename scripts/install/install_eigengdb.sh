@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPOSITORY_ROOT="$(cd "${SCRIPT_DIRECTORY}/.." && pwd)"
+REPOSITORY_ROOT="$(cd "${SCRIPT_DIRECTORY}/../.." && pwd)"
 EIGENGDB_DIRECTORY="${REPOSITORY_ROOT}/third-party/EigenGdb"
 GDB_INIT_DIRECTORY="${HOME}/.gdbinit.d"
 GDB_INIT_FILE="${HOME}/.gdbinit"

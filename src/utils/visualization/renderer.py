@@ -22,6 +22,7 @@ class RenderConfig:
     height: float = 6.0
     dpi: int = 120
     curves: bool = False
+    footprints: bool = False
 
     def __post_init__(self):
         """Reject invalid image dimensions."""
@@ -120,6 +121,18 @@ class SceneRenderer:
                 ax.add_patch(
                     Polygon(scene.vehicle.polygon(pose), label=name, **RENDER[style])
                 )
+        if config.footprints:
+            ax.add_collection(
+                PolyCollection(
+                    [scene.vehicle.polygon(state) for state in scene.states],
+                    facecolors="none",
+                    edgecolors="#b86400",
+                    linewidths=0.6,
+                    alpha=0.4,
+                    zorder=4.5,
+                    label="Vehicle footprints",
+                )
+            )
         (self.trail,) = ax.plot(
             [],
             [],

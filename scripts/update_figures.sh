@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 # Refresh the RDA park-benchmark figures.
 #
-#   1. build the project (Release by default)
+#   1. align Debug/Release dependencies, then build the project (Release by
+#      default; switching build type rebuilds the Conan and OSQP dependencies)
 #   2. re-run the benchmark cases, each limited to SOLVE_TIME_LIMIT seconds of
 #      solver.run
-#   3. render every successful case to PNG and GIF, overwriting the files in
+#   3. render cases in parallel to PNG and GIF, overwriting the files in
 #      assets/rda_benchmark
 #
 # Environment variables (all optional):
 #   BUILD_TYPE=Release   SKIP_BUILD=1 (reuse the existing build)
-#   SOLVE_TIME_LIMIT=10  PNG_DPI=120  GIF_DPI=60
+#   SOLVE_TIME_LIMIT=15  PNG_DPI=120  GIF_DPI=300
+#     (the heaviest cases take about 12 s since rs_step_size=0.1 densifies the
+#      frontend path, so the old 10 s limit killed them before they finished)
+#   RENDER_JOBS=4 (maximum concurrent rendering processes)
 #   RESULTS_DIRECTORY=...  FIGURE_DIRECTORY=...  STAGING_DIRECTORY=...
 set -euo pipefail
 
@@ -19,9 +23,14 @@ cd "${REPOSITORY_ROOT}"
 
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
-SOLVE_TIME_LIMIT="${SOLVE_TIME_LIMIT:-10}"
+SOLVE_TIME_LIMIT="${SOLVE_TIME_LIMIT:-15}"
 PNG_DPI="${PNG_DPI:-120}"
-GIF_DPI="${GIF_DPI:-60}"
+GIF_DPI="${GIF_DPI:-300}"
+RENDER_JOBS="${RENDER_JOBS:-4}"
+if [[ ! "${RENDER_JOBS}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "RENDER_JOBS must be a positive integer" >&2
+    exit 1
+fi
 CASES=(1 2 3 4 5 6 8 11 12 13 14 16 17 18)
 RESULTS_DIRECTORY="${RESULTS_DIRECTORY:-${REPOSITORY_ROOT}/solve_results/rda_benchmark_rerun}"
 FIGURE_DIRECTORY="${FIGURE_DIRECTORY:-${REPOSITORY_ROOT}/assets/rda_benchmark}"
@@ -34,8 +43,9 @@ export RDA_CASES="${CASES[*]}"
 export RDA_TIME_LIMIT="${SOLVE_TIME_LIMIT}"
 
 if [[ "${SKIP_BUILD}" != "1" ]]; then
+    BUILD_TYPE="${BUILD_TYPE}" bash "${SCRIPT_DIRECTORY}/install/ensure_build_dependencies.sh"
     echo "==> Building (${BUILD_TYPE})"
-    BUILD_TYPE="${BUILD_TYPE}" bash scripts/build.sh
+    BUILD_TYPE="${BUILD_TYPE}" bash "${SCRIPT_DIRECTORY}/build.sh"
 fi
 
 echo "==> Running ${#CASES[@]} benchmark cases (${SOLVE_TIME_LIMIT}s solve limit each)"
@@ -152,20 +162,33 @@ else:
 PY
 uv run --frozen --no-sync python "${RESULTS_DIRECTORY}/run_cases.py"
 
-echo "==> Rendering figures to ${FIGURE_DIRECTORY}"
+echo "==> Rendering figures to ${FIGURE_DIRECTORY} (${RENDER_JOBS} parallel cases)"
 mkdir -p "${FIGURE_DIRECTORY}" "${STAGING_DIRECTORY}"
-for case_id in "${CASES[@]}"; do
-    result_directory="${RESULTS_DIRECTORY}/Case${case_id}"
+render_case() {
+    local case_id="$1"
+    local result_directory="${RESULTS_DIRECTORY}/Case${case_id}"
+    local staging_directory="${STAGING_DIRECTORY}/Case${case_id}"
     if [[ ! -f "${result_directory}/plan_res.pb" ]]; then
         echo "    Case${case_id}: no result (failed or timed out), skipped"
-        continue
+        return 0
     fi
+    mkdir -p "${staging_directory}"
+    echo "    Case${case_id}: rendering (log: ${staging_directory}/render.log)"
+    # Each worker renders its PNG/GIF sequentially into its own directory.
+    # xargs bounds the number of simultaneous Matplotlib processes.
     bash scripts/visualize.sh "${result_directory}" --kind park --visualize png \
-        --dpi "${PNG_DPI}" --output "${STAGING_DIRECTORY}/Case${case_id}" >/dev/null
-    cp "${STAGING_DIRECTORY}/Case${case_id}/trajectory.png" "${FIGURE_DIRECTORY}/Case${case_id}.png"
+        --footprints --dpi "${PNG_DPI}" --output "${staging_directory}" >"${staging_directory}/render.log" 2>&1
     bash scripts/visualize.sh "${result_directory}" --kind park --visualize gif \
-        --dpi "${GIF_DPI}" --output "${STAGING_DIRECTORY}/Case${case_id}" >/dev/null
-    cp "${STAGING_DIRECTORY}/Case${case_id}/trajectory.gif" "${FIGURE_DIRECTORY}/Case${case_id}.gif"
+        --dpi "${GIF_DPI}" --output "${staging_directory}" >>"${staging_directory}/render.log" 2>&1
+    cp "${staging_directory}/trajectory.png" "${FIGURE_DIRECTORY}/Case${case_id}.png"
+    cp "${staging_directory}/trajectory.gif" "${FIGURE_DIRECTORY}/Case${case_id}.gif"
     echo "    Case${case_id}: PNG + GIF updated"
-done
+}
+export -f render_case
+export RESULTS_DIRECTORY FIGURE_DIRECTORY STAGING_DIRECTORY PNG_DPI GIF_DPI
+printf '%s\0' "${CASES[@]}" | xargs -0 -n 1 -P "${RENDER_JOBS}" bash -c '
+    set -eEuo pipefail
+    trap '\''echo "    Case$1: rendering failed; check ${STAGING_DIRECTORY}/Case$1/render.log" >&2'\'' ERR
+    render_case "$1"
+' _
 echo "==> Done. ${FIGURE_DIRECTORY} now holds $(find "${FIGURE_DIRECTORY}" -type f | wc -l) files"

@@ -95,8 +95,7 @@ class RDASolver {
     Eigen::Vector2d origin_ = Eigen::Vector2d::Zero();
     double          L_;           // wheelbase
 
-    int admm_iter_ = 0;   // current ADMM iteration (for trust-region scheduling)
-    std::vector<double> sd_min_;          // per-step lower bound of the safety distance d
+    double              sd_min_ = 0.0;   // shared adaptive lower bound of the safety distance d
     int                 collision_streak_ = 0;   // consecutive colliding ADMM iterations
 };
 

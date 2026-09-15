@@ -60,3 +60,13 @@ add_test(NAME test_qp_status COMMAND test_qp_status)
 add_executable(test_rda_coordinates test_rda_coordinates.cpp)
 target_link_libraries(test_rda_coordinates PRIVATE Planner)
 add_test(NAME test_rda_coordinates COMMAND test_rda_coordinates)
+
+# Use this checkout's configuration even when CTest runs from /tmp.
+foreach(rda_test test_rda_main test_rda_case2)
+    target_compile_definitions(${rda_test} PRIVATE
+        RDA_TEST_CONFIG_PATH="${PROJECT_SOURCE_DIR}/src/config/solver_params.yaml")
+endforeach()
+
+add_executable(test_rda_parameters test_rda_parameters.cpp)
+target_link_libraries(test_rda_parameters PRIVATE Planner)
+add_test(NAME test_rda_parameters COMMAND test_rda_parameters)

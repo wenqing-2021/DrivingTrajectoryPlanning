@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOSITORY_ROOT="$(cd "${SCRIPT_DIRECTORY}/.." && pwd)"
+BUILD_TYPE="${BUILD_TYPE:-Debug}"
+export BUILD_TYPE
 
 export UV_CACHE_DIR="${UV_CACHE_DIR:-${REPOSITORY_ROOT}/.cache/uv}"
 
@@ -58,9 +60,8 @@ if [[ -f "${REPOSITORY_ROOT}/.venv/bin/cmake" ]] \
     uv_sync_arguments+=(--reinstall)
 fi
 uv "${uv_sync_arguments[@]}"
-bash "${SCRIPT_DIRECTORY}/install_cppad.sh"
-bash "${SCRIPT_DIRECTORY}/install_conan.sh"
-bash "${SCRIPT_DIRECTORY}/install_ipopt.sh"
-bash "${SCRIPT_DIRECTORY}/install_osqp.sh"
-bash "${SCRIPT_DIRECTORY}/install_eigengdb.sh"
+bash "${SCRIPT_DIRECTORY}/install/install_cppad.sh"
+bash "${SCRIPT_DIRECTORY}/install/install_ipopt.sh"
+bash "${SCRIPT_DIRECTORY}/install/ensure_build_dependencies.sh"
+bash "${SCRIPT_DIRECTORY}/install/install_eigengdb.sh"
 exec bash "${SCRIPT_DIRECTORY}/build.sh"

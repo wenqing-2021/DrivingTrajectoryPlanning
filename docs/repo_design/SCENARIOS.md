@@ -7,7 +7,7 @@ build and common vehicle/planning utilities.
 
 `scenarios.park.main` is the original parking pipeline. It reads benchmark CSV
 polygons, builds the existing protobuf problem, calls `solver_pybind`, and
-stores protobuf results for the Bokeh visualizer. `scripts/run.sh` invokes this
+stores protobuf results for the Bokeh visualizer. `scripts/run_park.sh` invokes this
 module directly; there is no root `src/main.py` compatibility entry point.
 
 ## Urban
@@ -68,7 +68,7 @@ bash scripts/build.sh
 Run the existing park workflow:
 
 ```bash
-bash scripts/run.sh
+bash scripts/run_park.sh
 ```
 
 Run the built-in urban demo:

@@ -59,6 +59,11 @@ params::RDAParams LoadRDAParamsFromYaml(const std::string& yaml_path) {
             if (node["dt_max"]) p.set_dt_max(node["dt_max"].as<double>());
             if (node["w_dt"]) p.set_w_dt(node["w_dt"].as<double>());
             if (node["iter_threshold"]) p.set_iter_threshold(node["iter_threshold"].as<double>());
+            if (node["endpoint_position_tolerance"]) p.set_endpoint_position_tolerance(node["endpoint_position_tolerance"].as<double>());
+            if (node["endpoint_heading_tolerance"]) p.set_endpoint_heading_tolerance(node["endpoint_heading_tolerance"].as<double>());
+            if (node["safety_distance_step"]) p.set_safety_distance_step(node["safety_distance_step"].as<double>());
+            if (node["safety_distance_cap"]) p.set_safety_distance_cap(node["safety_distance_cap"].as<double>());
+            if (node["safety_distance_persist"]) p.set_safety_distance_persist(node["safety_distance_persist"].as<int>());
         }
     }
     catch (const std::exception& e) {
@@ -217,7 +222,7 @@ int main() {
         vehicle_model::sdv_path init_path = backend::RDASolver::Vec3dToSdvPath(*frontend_path);
 
         params::RDAParams rda_params =
-            LoadRDAParamsFromYaml("/root/workspace/AutomatedPark/src/config/solver_params.yaml");
+            LoadRDAParamsFromYaml(RDA_TEST_CONFIG_PATH);
         double             dt = 0.1;
         backend::RDASolver rda_solver(dynamic_model_ptr, map_ptr, rda_params, dt);
 
