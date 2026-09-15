@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPOSITORY_ROOT="$(cd "${SCRIPT_DIRECTORY}/.." && pwd)"
+REPOSITORY_ROOT="$(cd "${SCRIPT_DIRECTORY}/../.." && pwd)"
 SOURCE_ROOT="${REPOSITORY_ROOT}/.cache/osqp/sources"
 BUILD_ROOT="${REPOSITORY_ROOT}/.cache/osqp/build"
 OSQP_PREFIX="${OSQP_PREFIX:-${REPOSITORY_ROOT}/.local/osqp}"
@@ -34,21 +34,21 @@ if [[ ! -f "${CONAN_OUTPUT_DIRECTORY}/conan_toolchain.cmake" \
     || ! -f "${CONAN_OUTPUT_DIRECTORY}/.build-type" \
     || ! -f "${CONAN_OUTPUT_DIRECTORY}/.repository-root" ]]; then
     echo "Missing Conan dependency environment." >&2
-    echo "Run 'bash scripts/install_conan.sh' first." >&2
+    echo "Run 'bash scripts/install/install_conan.sh' first." >&2
     exit 1
 fi
 conan_build_type=""
 IFS= read -r conan_build_type < "${CONAN_OUTPUT_DIRECTORY}/.build-type" || true
 if [[ "${conan_build_type}" != "${BUILD_TYPE}" ]]; then
     echo "Conan dependencies were not installed for ${BUILD_TYPE}." >&2
-    echo "Run 'BUILD_TYPE=${BUILD_TYPE} bash scripts/install_conan.sh' first." >&2
+    echo "Run 'BUILD_TYPE=${BUILD_TYPE} bash scripts/install/install_conan.sh' first." >&2
     exit 1
 fi
 conan_repository_root=""
 IFS= read -r conan_repository_root < "${CONAN_OUTPUT_DIRECTORY}/.repository-root" || true
 if [[ "${conan_repository_root}" != "${REPOSITORY_ROOT}" ]]; then
     echo "Conan dependencies belong to a different repository path." >&2
-    echo "Run 'bash scripts/install_conan.sh' first." >&2
+    echo "Run 'bash scripts/install/install_conan.sh' first." >&2
     exit 1
 fi
 

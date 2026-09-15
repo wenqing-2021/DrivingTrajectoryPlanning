@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPOSITORY_ROOT="$(cd "${SCRIPT_DIRECTORY}/.." && pwd)"
+REPOSITORY_ROOT="$(cd "${SCRIPT_DIRECTORY}/../.." && pwd)"
 CONAN_OUTPUT_DIRECTORY="${REPOSITORY_ROOT}/build/conan"
 BUILD_TYPE="${BUILD_TYPE:-Debug}"
 CONAN_CPPSTD="${CONAN_CPPSTD:-17}"

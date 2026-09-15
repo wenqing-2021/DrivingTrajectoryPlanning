@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPOSITORY_ROOT="$(cd "${SCRIPT_DIRECTORY}/.." && pwd)"
+REPOSITORY_ROOT="$(cd "${SCRIPT_DIRECTORY}/../.." && pwd)"
 SOURCE_ROOT="${REPOSITORY_ROOT}/.cache/ipopt/sources"
 BUILD_ROOT="${REPOSITORY_ROOT}/.cache/ipopt/build"
 IPOPT_PREFIX="${IPOPT_PREFIX:-${REPOSITORY_ROOT}/.local/ipopt}"

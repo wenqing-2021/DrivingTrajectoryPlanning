@@ -1,6 +1,7 @@
 """Export replay files or legacy Park/Urban results without running a solver."""
 
 import argparse
+from dataclasses import replace
 from pathlib import Path
 
 from utils.visualization.export import (
@@ -43,6 +44,11 @@ def add_render_arguments(
         action="store_true",
         help="Include synchronized curves in PNG (always enabled for GIF).",
     )
+    parser.add_argument(
+        "--footprints",
+        action="store_true",
+        help="Overlay vehicle outlines at every recorded trajectory state in PNG.",
+    )
     parser.add_argument("--no-loop", action="store_true", help="Play the GIF once.")
 
 
@@ -59,7 +65,12 @@ def export_scene(
     directory = Path(directory)
     scene.save(directory / "replay.json")
     if args.visualize in ("png", "both"):
-        save_png(scene, directory / f"{stem}.png", time=time, config=config)
+        save_png(
+            scene,
+            directory / f"{stem}.png",
+            time=time,
+            config=replace(config, footprints=args.footprints),
+        )
     if args.visualize in ("gif", "both"):
         save_gif(
             scene,

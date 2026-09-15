@@ -22,26 +22,6 @@ namespace {
 // Use a moderate "infinity" for OSQP bounds: 1e20 degrades the constraint
 // matrix conditioning and can make OSQP report spurious primal infeasibility.
 constexpr double kInf = 1e10;
-// Trust region (rad) limiting per-iteration change of theta so that the
-// first-order linearization of R(theta) stays valid (large-heading parking).
-constexpr double kThetaTrustRegion = 0.5;
-// Small neighborhood (m, and rad for theta) by which the start/goal boxes may be
-// met. These boxes are the hard linearized form of nonlinear reach targets: after
-// a reference update the linearized dynamics plus exact endpoint boxes can be
-// marginally inconsistent (Case18 needs about 2e-3 m more room), which makes the
-// SU subproblem infeasible and aborts the whole solve. Meeting the endpoints
-// within a small neighborhood keeps the linearized iterate feasible; the tracking
-// cost still pulls the poses toward the exact start/goal.
-constexpr double kEndpointRelaxation = 0.05;
-// Step by which the adaptive safety distance is raised per ADMM iteration while
-// the current iterate still overlaps an obstacle.
-constexpr double kSafetyDistanceStep = 0.1;
-// Upper bound for the adaptive raise. min_sd is not a monotone lever: beyond about
-// 0.25 m the ADMM shifts to worse solutions and collisions grow, so cap it there.
-constexpr double kSafetyDistanceCap = 0.25;
-// Consecutive colliding iterations required before the safety distance is raised.
-// 1 = raise as soon as an iterate overlaps an obstacle.
-constexpr int kSafetyDistancePersist = 1;
 }   // namespace
 
 RDASolver::RDASolver(const std::shared_ptr<vehicle_model::KinematicModel>& dynamic_model_ptr,
@@ -50,6 +30,23 @@ RDASolver::RDASolver(const std::shared_ptr<vehicle_model::KinematicModel>& dynam
     , map_ptr_(map_ptr)
     , rda_params_(rda_params)
     , dt_(dt) {
+
+    // Resolve absent optional fields once. Explicit zero remains meaningful for
+    // endpoint tolerances, safety distances and the adaptation step.
+    if (!rda_params_.has_min_sd()) { rda_params_.set_min_sd(0.1); }
+    if (!rda_params_.has_max_sd()) { rda_params_.set_max_sd(1.0); }
+    // Preserve old configs: convergence_tolerance used to receive an extra 0.05.
+    const double legacy_endpoint = rda_params_.convergence_tolerance() > 0
+        ? rda_params_.convergence_tolerance() + 0.05 : 0.1;
+    if (!rda_params_.has_endpoint_position_tolerance()) {
+        rda_params_.set_endpoint_position_tolerance(legacy_endpoint);
+    }
+    if (!rda_params_.has_endpoint_heading_tolerance()) {
+        rda_params_.set_endpoint_heading_tolerance(legacy_endpoint);
+    }
+    if (!rda_params_.has_safety_distance_step()) { rda_params_.set_safety_distance_step(0.1); }
+    if (!rda_params_.has_safety_distance_cap()) { rda_params_.set_safety_distance_cap(0.25); }
+    if (!rda_params_.has_safety_distance_persist()) { rda_params_.set_safety_distance_persist(1); }
 
     L_ = dynamic_model_ptr_->GetVehicleParam().wheel_base();
 
@@ -215,7 +212,7 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
     const double rho1       = rda_params_.penalty_weight() > 0 ? rda_params_.penalty_weight() : 200.0;
     const double rho2       = rda_params_.ro2() > 0 ? rda_params_.ro2() : 1.0;
     const double w_dt       = rda_params_.w_dt() > 0 ? rda_params_.w_dt() : 1.0;
-    const double max_sd     = rda_params_.max_sd() > 0 ? rda_params_.max_sd() : 1.0;
+    const double max_sd     = rda_params_.max_sd();
     const double dt_min     = rda_params_.dt_min() > 0 ? rda_params_.dt_min() : 0.5 * dt_;
     const double dt_max     = rda_params_.dt_max() > 0 ? rda_params_.dt_max() : 2.0 * dt_;
 
@@ -369,10 +366,8 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
     }
 
     // Start / goal box constraints (with tolerance)
-    double tol_xy         = rda_params_.convergence_tolerance() > 0 ? rda_params_.convergence_tolerance() : 0.05;
-    double tol_theta      = tol_xy;
-    double tol_end        = tol_xy + kEndpointRelaxation;
-    double tol_end_theta  = tol_theta + kEndpointRelaxation;
+    const double tol_end       = rda_params_.endpoint_position_tolerance();
+    const double tol_end_theta = rda_params_.endpoint_heading_tolerance();
 
     for (std::size_t t = 0; t <= T_; ++t) {
         if (t == 0) {
@@ -396,17 +391,6 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
         } else {
             lower_bound(bnd + idx_X(t) + 3) = -max_speed;
             upper_bound(bnd + idx_X(t) + 3) = max_speed;
-
-            // Trust region on theta: keep the linearization of R(theta) valid by
-            // limiting how far theta can move from the current reference in one
-            // ADMM iteration. Skip the trust region on the very first iteration
-            // (reference is a coarse straight-line guess that may be far from the
-            // feasible manifold); apply it from the second iteration onward.
-            if (admm_iter_ > 0) {
-                double theta_ref                = state_traj_(2, t);
-                lower_bound(bnd + idx_X(t) + 2) = theta_ref - kThetaTrustRegion;
-                upper_bound(bnd + idx_X(t) + 2) = theta_ref + kThetaTrustRegion;
-            }
         }
     }
 
@@ -417,8 +401,8 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
         lower_bound(bnd + idx_U(t) + 1) = -max_acc;
         upper_bound(bnd + idx_U(t) + 1) = max_acc;
         // Safety-distance slack bounds
-        // Per-step lower bound so the adaptive raise only moves the stuck steps.
-        lower_bound(bnd + idx_d(t)) = t < sd_min_.size() ? sd_min_[t] : 0.1;
+        // The adaptive lower bound is shared by all time steps.
+        lower_bound(bnd + idx_d(t)) = sd_min_;
         upper_bound(bnd + idx_d(t)) = max_sd;
         // Time interval bounds
         lower_bound(bnd + idx_dt(t)) = dt_min;
@@ -472,11 +456,14 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
 
 // ---------------------------------------------------------------------------
 // LamMuZ subproblem: one SOCP per obstacle, solved with EiCOS.
-// Variables: [lam(E*T), mu(4*T), z(T), t_epigraph(1)]
+// Variables: [lam(E*T), mu(4*T), z(T), r(T), t_epigraph(1)]
 //   minimize  t
-//   s.t.      || [sqrt(rho1/2)*Im_t; sqrt(rho2/2)*Hm_t] || <= t   (epigraph SOC)
+//   s.t.      || [sqrt(rho1/2)*r_t; sqrt(rho2/2)*Hm_t] || <= t    (epigraph SOC)
+//             r_t >= -Im_t, r_t >= 0                            (negative part)
 //             || A_obs^T lam_t || <= 1                            (dual-norm SOC)
 //             lam >= 0, mu >= 0, z >= 0                           (positive orthant)
+// Im and Hm include the scaled multipliers zeta and xi. Minimizing the
+// epigraph is equivalent to Python's weighted sum_squares(neg(Im)) + Hm cost.
 // ---------------------------------------------------------------------------
 bool RDASolver::solveLamMuZ() {
     const double rho1        = rda_params_.penalty_weight() > 0 ? rda_params_.penalty_weight() : 200.0;
@@ -486,7 +473,7 @@ bool RDASolver::solveLamMuZ() {
 
     for (std::size_t obs_idx = 0; obs_idx < obstacles_.size(); ++obs_idx) {
         const std::size_t E     = obstacles_[obs_idx].edge_num;
-        const std::size_t n_var = T_ * E + T_ * 4 + T_ + 1;   // lam, mu, z, t_epigraph
+        const std::size_t n_var = T_ * E + T_ * 4 + 2 * T_ + 1;   // lam, mu, z, r, t_epigraph
 
         // Objective: minimize t_epigraph
         Eigen::VectorXd c = Eigen::VectorXd::Zero(n_var);
@@ -496,9 +483,10 @@ bool RDASolver::solveLamMuZ() {
         Eigen::SparseMatrix<double> A_eq(0, n_var);
         Eigen::VectorXd             b_eq(0);
 
-        // Cone layout: [positive orthant (lam, mu, z)] [epigraph SOC] [norm SOCs]
-        const std::size_t lp_dims      = T_ * E + T_ * 4 + T_;
-        const std::size_t epigraph_dim = 1 + 3 * T_;   // t + (Im, Hm0, Hm1) per step
+        // Cone layout: [nonnegativity and r >= -Im] [epigraph SOC] [norm SOCs]
+        const std::size_t nonneg_dims  = n_var - 1;
+        const std::size_t lp_dims      = nonneg_dims + T_;
+        const std::size_t epigraph_dim = 1 + 3 * T_;   // t + (r, Hm0, Hm1) per step
 
         std::vector<std::size_t> soc_dims_vec;
         soc_dims_vec.push_back(epigraph_dim);
@@ -512,9 +500,10 @@ bool RDASolver::solveLamMuZ() {
         auto lam_idx = [&](std::size_t t) { return t * E; };
         auto mu_idx  = [&](std::size_t t) { return T_ * E + t * 4; };
         auto z_idx   = [&](std::size_t t) { return T_ * E + T_ * 4 + t; };
+        auto r_idx   = [&](std::size_t t) { return T_ * E + T_ * 4 + T_ + t; };
 
-        // 1) Positive orthant: lam, mu, z >= 0  =>  -I * w <= 0
-        for (std::size_t i = 0; i < lp_dims; ++i) { G_triplets.emplace_back(i, i, -1.0); }
+        // 1) Positive orthant: lam, mu, z, r >= 0  =>  -I * w <= 0
+        for (std::size_t i = 0; i < nonneg_dims; ++i) { G_triplets.emplace_back(i, i, -1.0); }
 
         std::size_t row = lp_dims;
 
@@ -531,15 +520,21 @@ bool RDASolver::solveLamMuZ() {
             const Eigen::MatrixXd& A_obs = obstacles_[obs_idx].A_list[t + 1];
             const Eigen::VectorXd& b_obs = obstacles_[obs_idx].b_list[t + 1];
 
-            // --- Im component: sqrt(rho1/2) * (lam^T(A s - b) - mu^T h - z - d + zeta) ---
-            h(row) = sqrt_rho1_2 * (-slack_d_(t) + duals_[obs_idx].zeta(t));
+            // r >= -Im, where Im = lam^T(A s - b) - mu^T h - z - d + zeta.
+            // In the positive orthant, h - G*w = Im + r >= 0.
+            const std::size_t row_r = nonneg_dims + t;
+            h(row_r) = -slack_d_(t) + duals_[obs_idx].zeta(t);
 
-            Eigen::RowVectorXd lam_G1 = -sqrt_rho1_2 * (A_obs * trans - b_obs).transpose();
-            for (std::size_t e = 0; e < E; ++e) { G_triplets.emplace_back(row, lam_idx(t) + e, lam_G1(e)); }
+            Eigen::RowVectorXd lam_G1 = -(A_obs * trans - b_obs).transpose();
+            for (std::size_t e = 0; e < E; ++e) { G_triplets.emplace_back(row_r, lam_idx(t) + e, lam_G1(e)); }
             for (std::size_t j = 0; j < 4; ++j) {
-                G_triplets.emplace_back(row, mu_idx(t) + j, sqrt_rho1_2 * h_vehicle_(j));
+                G_triplets.emplace_back(row_r, mu_idx(t) + j, h_vehicle_(j));
             }
-            G_triplets.emplace_back(row, z_idx(t), sqrt_rho1_2);
+            G_triplets.emplace_back(row_r, z_idx(t), 1.0);
+            G_triplets.emplace_back(row_r, r_idx(t), -1.0);
+
+            // --- Negative-part component: sqrt(rho1/2) * r ---
+            G_triplets.emplace_back(row, r_idx(t), -sqrt_rho1_2);
             row++;
 
             // --- Hm components: sqrt(rho2/2) * (G^T mu + (A R)^T lam + xi) ---
@@ -668,6 +663,17 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
                         std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr) {
     opt_traj_.clear();
     init_traj_.clear();
+    const auto nonnegative = [](double value) { return std::isfinite(value) && value >= 0.0; };
+    if (!nonnegative(rda_params_.min_sd()) || !nonnegative(rda_params_.max_sd()) ||
+        rda_params_.min_sd() > rda_params_.max_sd() ||
+        !nonnegative(rda_params_.endpoint_position_tolerance()) ||
+        !nonnegative(rda_params_.endpoint_heading_tolerance()) ||
+        !nonnegative(rda_params_.safety_distance_step()) ||
+        !nonnegative(rda_params_.safety_distance_cap()) || rda_params_.safety_distance_persist() < 1) {
+        LOG(ERROR) << "Invalid RDA configuration: require 0 <= min_sd <= max_sd, finite nonnegative "
+                   << "endpoint tolerances/safety step/cap and safety_distance_persist >= 1.";
+        return false;
+    }
     if (init_path.size() < 2 || !start_pose_ptr || !goal_pose_ptr) { return false; }
     origin_ << start_pose_ptr->x, start_pose_ptr->y;
     auto start_pose = *start_pose_ptr;
@@ -683,9 +689,8 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
     control_traj_.resize(2, T_);
     slack_d_.resize(T_);
     dt_traj_.resize(T_);
-    // Per-step adaptive safety distance: start at the configured minimum and raise
-    // it only for steps that stay in collision (see the ADMM loop).
-    sd_min_.assign(T_, rda_params_.min_sd() > 0 ? rda_params_.min_sd() : 0.1);
+    // Start with the configured lower bound; persistent collisions raise it globally.
+    sd_min_ = rda_params_.min_sd();
     collision_streak_ = 0;
 
     // Estimate a nominal speed from the path length so that the linearized
@@ -718,7 +723,7 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
         if (i < T_) {
             control_traj_(0, i) = 0.0;
             control_traj_(1, i) = 0.0;
-            slack_d_(i)         = sd_min_[i];
+            slack_d_(i)         = sd_min_;
             dt_traj_(i)         = dt_;
         }
     }
@@ -764,7 +769,6 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
     std::vector<RDADualVariables> duals_prev = duals_;
 
     for (int iter = 0; iter < max_iter; ++iter) {
-        admm_iter_ = iter;
         if (!solveSU(start_pose, goal_pose)) {
             LOG(ERROR) << "Failed to solve SU subproblem at iteration " << iter;
             return false;
@@ -811,22 +815,23 @@ bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
         // iterates cross obstacles transiently. Raise the safety distance only once
         // the iterate has stayed in collision for several consecutive iterations,
         // and never declare convergence on a colliding iterate. max_sd bounds it.
-        const double max_sd = rda_params_.max_sd() > 0 ? rda_params_.max_sd() : 1.0;
-        const double cap    = std::min(max_sd, kSafetyDistanceCap);
+        const double max_sd = rda_params_.max_sd();
+        const double cap    = std::clamp(rda_params_.safety_distance_cap(), rda_params_.min_sd(), max_sd);
         const std::vector<char> hit = collidingSteps(state_traj_);
         bool any_collision = false;
         for (std::size_t t = 0; t < T_; ++t) {
             if (hit[t]) { any_collision = true; break; }
         }
         if (any_collision) {
-            ++collision_streak_;
+            collision_streak_ = std::min(collision_streak_, rda_params_.safety_distance_persist() - 1) + 1;
         } else {
             collision_streak_ = 0;
         }
-        if (collision_streak_ >= kSafetyDistancePersist && !sd_min_.empty() && sd_min_[0] + 1e-9 < cap) {
-            const double next = std::min(cap, sd_min_[0] + kSafetyDistanceStep);
-            LOG(INFO) << "RDA safety distance raised: " << sd_min_[0] << " -> " << next;
-            sd_min_.assign(T_, next);
+        if (collision_streak_ >= rda_params_.safety_distance_persist() &&
+            rda_params_.safety_distance_step() > 0 && sd_min_ + 1e-9 < cap) {
+            const double next = std::min(cap, sd_min_ + rda_params_.safety_distance_step());
+            LOG(INFO) << "RDA safety distance raised: " << sd_min_ << " -> " << next;
+            sd_min_ = next;
         }
 
         // Early stop only after at least 2 iterations (the first SU solve has no

@@ -108,14 +108,15 @@ $$
 对每个障碍物分别求解对偶变量 $(\lambda, \mu, z)$：
 
 $$
-\min_{\lambda,\mu,z,t}\; t
+\min_{\lambda,\mu,z,r,\tau}\; \tau
 \quad \text{s.t.}\quad
-\left\| \begin{bmatrix} \sqrt{\rho_1/2}\, I_{m,t} \\ \sqrt{\rho_2/2}\, H_{m,t} \end{bmatrix} \right\| \le t,\quad
+\left\| \operatorname{col}_{t=1}^{T}\begin{bmatrix} \sqrt{\rho_1/2}\, r_t \\ \sqrt{\rho_2/2}\, H_{m,t} \end{bmatrix} \right\|_2 \le \tau,\quad
+r_t \ge -I_{m,t},\ r_t \ge 0,\quad
 \|A_{obs}^\top \lambda_t\| \le 1,\quad
 \lambda \ge 0,\ \mu \ge 0,\ z \ge 0
 $$
 
-第一个约束是 epigraph 二阶锥（SOC），第二个是对偶范数 SOC。
+第一个约束是覆盖全部时间点的 epigraph 二阶锥（SOC），另有逐时间点的对偶范数 SOC。$I_m$、$H_m$ 包含缩放乘子 $\zeta$、$\xi$。辅助变量 $r$ 将距离残差目标改为 Python 加速模式的 `sum_squares(neg(Im))`：只惩罚负残差，原有 $\rho_1$、$\rho_2$ 权重不变。
 
 ### 2.3 对偶变量更新
 
@@ -185,3 +186,22 @@ python3 /root/workspace/AutomatedPark/tests/rda/visualize_rda_result.py
 | 最小安全间距 | 1.70 m |
 | 最大横向偏移 | 2.00 m（向下绕障） |
 | 最大速度 | 3.21 m/s |
+
+## RDA 参数配置
+
+运行配置位于 `src/config/solver_params.yaml` 的 `rda_params`。以下默认值保持迁移前的行为。
+
+| 参数 | 默认值 | 含义 |
+| --- | --- | --- |
+| `endpoint_position_tolerance` | 0.1 m | 起终点 x/y 约束框的最终半宽，允许为 0 |
+| `endpoint_heading_tolerance` | 0.1 rad | 起终点航向约束框的最终半宽，允许为 0 |
+| `min_sd` / `max_sd` | 0.1 / 1.0 m | 优化安全距离 d 的初始下界与固定上界，要求 0 <= min_sd <= max_sd |
+| `safety_distance_step` | 0.1 m | 持续碰撞时每轮抬高共享下界的幅度；0 关闭自适应抬高 |
+| `safety_distance_cap` | 0.25 m | 自适应下界的上限，实际值裁剪到 [min_sd, max_sd]，不是 d 的上界 |
+| `safety_distance_persist` | 1 | 连续多少轮存在碰撞后开始抬高；达到阈值后每个碰撞轮都抬高，要求 >= 1 |
+
+所有浮点参数必须有限。自适应调整作用于全部时间点的共享下界：初值为 `min_sd`，每次增加 `safety_distance_step`，不超过有效 cap；无碰撞会清零连续碰撞计数，但不会降低已抬高的下界。例如默认下界按 0.1 → 0.2 → 0.25 m 变化，d 的上界仍然是 1.0 m。
+
+原 `convergence_tolerance` 仅保留旧配置兼容：新端点字段未设置时，使用旧正值加 0.05；无有效旧值时使用 0.1。显式设置的新端点字段优先，不再叠加隐藏松弛量。ADMM 停止阈值仍由 `iter_threshold` 控制，与端点容差无关。
+
+新增字段及 `min_sd`、`max_sd` 使用 protobuf optional，以区分未配置与显式 0。修改 proto 后需重新构建并安装生成的 protobuf 和 Python 扩展。

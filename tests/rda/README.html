@@ -141,13 +141,14 @@ $$
 <div class="step"><b>阶段 2 — LamMuZ 子问题（SOCP，EiCOS 求解）</b>：更新对偶变量 $(\lambda, \mu, z)$</div>
 <p>对每个障碍物分别求解：</p>
 $$
-\min_{\lambda,\mu,z,t}\; t
+\min_{\lambda,\mu,z,r,\tau}\; \tau
 \quad \text{s.t.}\quad
-\left\| \begin{bmatrix} \sqrt{\rho_1/2}\, I_{m,t} \\ \sqrt{\rho_2/2}\, H_{m,t} \end{bmatrix} \right\| \le t,\quad
+\left\| \operatorname{col}_{t=1}^{T}\begin{bmatrix} \sqrt{\rho_1/2}\, r_t \\ \sqrt{\rho_2/2}\, H_{m,t} \end{bmatrix} \right\|_2 \le \tau,\quad
+r_t \ge -I_{m,t},\ r_t \ge 0,\quad
 \|A_{obs}^\top \lambda_t\| \le 1,\quad
 \lambda \ge 0,\ \mu \ge 0,\ z \ge 0
 $$
-<p>第一个约束是 epigraph 二阶锥（SOC），第二个是对偶范数 SOC。</p>
+<p>第一个约束是覆盖全部时间点的 epigraph 二阶锥（SOC），另有逐时间点的对偶范数 SOC。$I_m$、$H_m$ 包含缩放乘子 $\zeta$、$\xi$。辅助变量 $r$ 将距离残差目标改为 Python 加速模式的 <code>sum_squares(neg(Im))</code>：只惩罚负残差，原有 $\rho_1$、$\rho_2$ 权重不变。</p>
 
 <div class="step"><b>阶段 3 — 对偶变量更新</b>：累积 $\xi, \zeta$</div>
 $$
@@ -218,5 +219,18 @@ python3 /root/workspace/AutomatedPark/tests/rda/visualize_rda_result.py</code></
 </table>
 
 </div>
+<h2>RDA 参数配置</h2>
+<p>配置位于 <code>src/config/solver_params.yaml</code> 的 <code>rda_params</code>。</p>
+<ul>
+<li><code>endpoint_position_tolerance: 0.1</code>（m）、<code>endpoint_heading_tolerance: 0.1</code>（rad）：起终点约束框的最终半宽，允许为 0。</li>
+<li><code>min_sd: 0.1</code>、<code>max_sd: 1.0</code>：安全距离 d 的初始下界和固定上界，要求 0 &lt;= min_sd &lt;= max_sd。</li>
+<li><code>safety_distance_step: 0.1</code>：m，持续碰撞时每轮抬高全部时间点的共享下界；0 关闭自适应抬高。</li>
+<li><code>safety_distance_cap: 0.25</code>：m，自适应下界的上限，实际裁剪到 [min_sd, max_sd]，不是 d 的上界。</li>
+<li><code>safety_distance_persist: 1</code>：连续碰撞轮数阈值，要求 &gt;= 1；达到后每个碰撞轮都抬高。无碰撞清零计数，但不降低下界。</li>
+</ul>
+<p>默认共享下界按 0.1 → 0.2 → 0.25 m 变化，d 的上界仍为 1.0 m。所有浮点参数必须有限。</p>
+<p>旧 <code>convergence_tolerance</code> 仅作兼容：新端点字段缺省时使用旧正值加 0.05，否则默认 0.1。新字段优先且不叠加松弛。ADMM 停止阈值仍由 <code>iter_threshold</code> 控制。</p>
+<p>新增字段及 min_sd/max_sd 使用 protobuf optional 区分缺省与显式 0；修改 proto 后需重新构建并安装生成的 protobuf 和 Python 扩展。</p>
+
 </body>
 </html>

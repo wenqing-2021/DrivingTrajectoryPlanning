@@ -61,7 +61,8 @@ if [[ ! -f "${CPPAD_PREFIX}/include/cppad/cppad.hpp" ]] \
 fi
 if (( ${#missing_dependencies[@]} > 0 )); then
     echo "Missing dependencies: ${missing_dependencies[*]}" >&2
-    echo "Run 'bash scripts/setup.sh' to install them." >&2
+    echo "Run 'bash scripts/setup.sh', or 'BUILD_TYPE=${BUILD_TYPE} bash scripts/install/ensure_build_dependencies.sh'" >&2
+    echo "to install the Conan and OSQP dependencies for this build type." >&2
     exit 1
 fi
 

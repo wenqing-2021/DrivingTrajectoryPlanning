@@ -51,19 +51,25 @@ message OBCAParams {
 
 message RDAParams {
     int32 max_iter = 1;
-    double convergence_tolerance = 2;
+    double convergence_tolerance = 2; // legacy endpoint tolerance; new endpoint_* fields take precedence
     double penalty_weight = 3;   // ro1 in ADMM
     bool use_warm_start = 4;
     double l1_weight = 5;        // slack gain for safety distance
     double w_s = 6;
     double w_u = 7;
     double ro2 = 8;              // second ADMM penalty weight
-    double min_sd = 9;           // minimum safety distance
-    double max_sd = 10;          // maximum safety distance
+    optional double min_sd = 9;  // initial safety-distance lower bound (m), default 0.1; zero is valid
+    optional double max_sd = 10; // safety-distance upper bound (m), default 1.0
     double dt_min = 11;          // minimum time interval
     double dt_max = 12;          // maximum time interval
     double w_dt = 13;            // weight for dt regularization
     double iter_threshold = 14;  // ADMM early-stop residual threshold
+    reserved 15;
+    optional double endpoint_position_tolerance = 16; // final x/y box half-width (m), >= 0; default 0.1
+    optional double endpoint_heading_tolerance = 17; // final heading box half-width (rad), >= 0; default 0.1
+    optional double safety_distance_step = 18; // lower-bound increment (m), >= 0; default 0.1, zero disables adaptation
+    optional double safety_distance_cap = 19; // adaptive lower-bound cap (m), default 0.25; clamped to [min_sd, max_sd]
+    optional int32 safety_distance_persist = 20; // consecutive colliding iterations before raising; >= 1, default 1
 }
 
 message SolverParams {

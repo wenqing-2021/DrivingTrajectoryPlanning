@@ -66,7 +66,7 @@ bash scripts/setup.sh
 To install the recommended VS Code extensions:
 
 ```bash
-bash scripts/install_vscode_extensions.sh
+bash scripts/install/install_vscode_extensions.sh
 ```
 
 # 2. Run
@@ -77,10 +77,27 @@ Build the C++ libraries and pybind11 modules after changing native code:
 bash scripts/build.sh
 ```
 
+Builds default to `Debug`. Set `BUILD_TYPE=Release` for optimized runs, for example
+`BUILD_TYPE=Release bash scripts/build.sh`. The Conan toolchain under `build/conan`
+and the OSQP stack under `.local/osqp` hold one build type at a time, so switching
+types rebuilds them:
+
+```bash
+# Align dependencies with the requested build type, then build.
+BUILD_TYPE=Release bash scripts/install/ensure_build_dependencies.sh
+BUILD_TYPE=Release bash scripts/build.sh
+
+# Install everything for Release in one step.
+BUILD_TYPE=Release bash scripts/setup.sh
+```
+
+`scripts/setup.sh` and `scripts/update_figures.sh` call the dependency script
+themselves, so they never mix Debug and Release dependencies.
+
 Run the existing parking scenario:
 
 ```bash
-bash scripts/run.sh
+bash scripts/run_park.sh
 ```
 
 Run the built-in CommonRoad urban scenario:
@@ -110,7 +127,7 @@ Urban and Park share PNG/GIF export and standalone result replay:
 
 ```bash
 bash scripts/run_urban.sh --visualize both
-bash scripts/run.sh --visualize both
+bash scripts/run_park.sh --visualize both
 bash scripts/visualize.sh solve_results/urban/<run> --visualize gif
 ```
 
