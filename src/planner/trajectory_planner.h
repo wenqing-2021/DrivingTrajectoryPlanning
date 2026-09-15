@@ -23,7 +23,8 @@ class TrajPlanner {
   public:
     TrajPlanner(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr,
                 const std::shared_ptr<collision_check::BaseCheck>& collision_checker,
-                const kinematic_model::VehicleParam&               vehicle_param);
+                const kinematic_model::VehicleParam&               vehicle_param,
+                std::shared_ptr<backend::RDAWorkspace> rda_workspace = nullptr);
     ~TrajPlanner() = default;
 
     bool          Process(const vehicle_model::VehiclePose& start_vec,

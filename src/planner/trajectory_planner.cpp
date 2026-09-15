@@ -37,7 +37,8 @@ Eigen::MatrixXd TrajPlanner::ReconstructTrajectoryControls(const Eigen::MatrixXd
 
 TrajPlanner::TrajPlanner(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr,
                          const std::shared_ptr<collision_check::BaseCheck>& collision_checker,
-                         const kinematic_model::VehicleParam&               vehicle_param) {
+                         const kinematic_model::VehicleParam&               vehicle_param,
+                         std::shared_ptr<backend::RDAWorkspace> rda_workspace) {
     // initial common parameters
     backend_solver_    = solver_params.backend_solver().empty() ? "obca" : solver_params.backend_solver();
     vehicle_model_ptr_ = std::make_shared<vehicle_model::KinematicModel>(vehicle_param);
@@ -50,7 +51,8 @@ TrajPlanner::TrajPlanner(const params::SolverParams& solver_params, const std::s
     pwj_speed_ptr_ = std::make_unique<pwjspeed>(solver_params.piesewise_jerk_params(), solver_params.dt());
 
     rda_solver_ptr_ =
-        std::make_unique<rdaopt>(vehicle_model_ptr_, map_ptr, solver_params.rda_params(), solver_params.dt());
+        std::make_unique<rdaopt>(vehicle_model_ptr_, map_ptr, solver_params.rda_params(), solver_params.dt(),
+                                 std::move(rda_workspace));
     initObcaSolver(solver_params, map_ptr);
 };
 

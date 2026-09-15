@@ -1,8 +1,8 @@
 #include "qp_solver/qp_solver.h"
 #include <iostream>
 
-int main() {
-    planning::backend::QPSolver solver;
+int check(bool reuse) {
+    planning::backend::QPSolver solver(false, 4000, reuse);
     solver.setVariableNums(1);
     solver.setConstraintNums(2);
     Eigen::SparseMatrix<double> h(1, 1), a(2, 1);
@@ -20,5 +20,12 @@ int main() {
         std::cerr << "An infeasible solve must not expose a solution or stale result\n";
         return 2;
     }
+    solver.Reset();
+    upper(1) = 2.0;
+    if (!solver.Solve(h, g, a, lower, upper)) return 3;
     return 0;
+}
+
+int main() {
+    return check(false) || check(true);
 }

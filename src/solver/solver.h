@@ -46,6 +46,8 @@ class Solver {
     std::shared_ptr<map::Map>                   map_ptr_;
     std::shared_ptr<collision_check::BaseCheck> collision_check_ptr_;
     std::unique_ptr<planning::TrajPlanner>      traj_planner_ptr_;
+    std::shared_ptr<planning::backend::RDAWorkspace> rda_workspace_ =
+        std::make_shared<planning::backend::RDAWorkspace>();
 
     planning::vehicle_model::VehiclePose start_vec_;   // [x, y, theta]
     planning::vehicle_model::VehiclePose goal_vec_;
