@@ -683,6 +683,14 @@ std::vector<char> RDASolver::collidingSteps(const Eigen::MatrixXd& state) const 
     return hit;
 }
 
+// Native optimized commands in the export order expected by the planner.
+Eigen::MatrixXd RDASolver::GetControlsResult() const {
+    Eigen::MatrixXd controls(control_traj_.cols(), 2);
+    controls.col(0) = control_traj_.row(1).transpose();   // acceleration
+    controls.col(1) = control_traj_.row(0).transpose();   // steering angle
+    return controls;
+}
+
 bool RDASolver::Process(const vehicle_model::sdv_path&               init_path,
                         std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
                         std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr) {

@@ -10,6 +10,7 @@
 #include "hybrid_a_star/hybrid_a_star.h"
 #include "obca/obca_planner.h"
 #include "rda/rda_planner.h"
+#include "ocean/ocean_planner.h"
 #include "speed_planner/piece_wise_jerk.h"
 
 #include <string>
@@ -24,7 +25,8 @@ class TrajPlanner {
     TrajPlanner(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr,
                 const std::shared_ptr<collision_check::BaseCheck>& collision_checker,
                 const kinematic_model::VehicleParam&               vehicle_param,
-                std::shared_ptr<backend::RDAWorkspace> rda_workspace = nullptr);
+                std::shared_ptr<backend::RDAWorkspace> rda_workspace = nullptr,
+                std::shared_ptr<backend::OCEANWorkspace> ocean_workspace = nullptr);
     ~TrajPlanner() = default;
 
     bool          Process(const vehicle_model::VehiclePose& start_vec,
@@ -36,18 +38,20 @@ class TrajPlanner {
     const vehicle_model::opt_states&     GetInitStates() const { return init_states_; };     // get the init states
     const vehicle_model::opt_control&    GetInitControls() const { return init_controls_; };   // get the init controls
 
-    static Eigen::MatrixXd ReconstructTrajectoryControls(const Eigen::MatrixXd& states,
-                                                        const std::vector<double>& timestamps,
-                                                        double wheelbase);
-
+    void SetRemainingTimeBudget(double seconds) { remaining_budget_ = seconds; }
+    const problem::PlannerDiagnostics& GetDiagnostics() const { return diagnostics_; }
     const std::vector<double>& GetOptTimestamps() const { return opt_timestamps_; }
 
   private:
     void initObcaSolver(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr);
     bool runBackendOpt(const std::vector<Eigen::Vector3d>* const frontend_path,
                        const vehicle_model::VehiclePose& start_vec, const vehicle_model::VehiclePose& goal_vec);
-    bool setstatesControls(vehicle_model::opt_states& opt_states, vehicle_model::opt_control& opt_controls,
-                           const std::vector<Eigen::Vector4d>& opt_traj);
+    static bool setStates(vehicle_model::opt_states& states, const std::vector<Eigen::Vector4d>& traj);
+    // Copy a backend's own commands: rows = segments, columns = [acceleration, steering].
+    // Nothing is derived from the trajectory, so a backend that has no commands of
+    // its own (the speed planner) leaves the control list empty instead.
+    static bool setControls(vehicle_model::opt_control& controls, const Eigen::MatrixXd& native,
+                            Eigen::Index segments);
 
     std::unique_ptr<frontend::HybridAstar>         hybrid_astar_ptr_;   // pointer to the hybrid A* planner
     std::unique_ptr<pwjspeed>                      pwj_speed_ptr_;
@@ -55,6 +59,10 @@ class TrajPlanner {
     std::unique_ptr<obcaopt>                       obca_solver_ptr_;   // pointer to the OBCA solver
     std::shared_ptr<vehicle_model::KinematicModel> vehicle_model_ptr_;
     std::vector<Eigen::Vector3d>                   debug_node_list_;
+    std::unique_ptr<backend::OCEANSolver>          ocean_solver_ptr_;   // pointer to the OCEAN solver
+    problem::PlannerDiagnostics                    diagnostics_;        // per-request backend diagnostics
+    double                                         nominal_dt_{0.1};
+    double                                         remaining_budget_{15.0};   // seconds for solver.run
     std::string                                    backend_solver_;
     std::vector<double> opt_timestamps_;
     std::vector<Eigen::Vector4d>                   init_traj_;   // initial trajectory for optimization
@@ -63,7 +71,6 @@ class TrajPlanner {
     vehicle_model::opt_control                     opt_controls_;
     vehicle_model::opt_states                      init_states_;
     vehicle_model::opt_control                     init_controls_;
-    constexpr static double                        kEpsilon = 1e-5;
 
 };   // class BasePlanner
 

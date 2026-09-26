@@ -49,6 +49,9 @@ class Solver {
     std::shared_ptr<planning::backend::RDAWorkspace> rda_workspace_ =
         std::make_shared<planning::backend::RDAWorkspace>();
 
+    std::shared_ptr<planning::backend::OCEANWorkspace> ocean_workspace_ =
+        std::make_shared<planning::backend::OCEANWorkspace>();
+
     planning::vehicle_model::VehiclePose start_vec_;   // [x, y, theta]
     planning::vehicle_model::VehiclePose goal_vec_;
     problem::PlanRes                     plan_res_;

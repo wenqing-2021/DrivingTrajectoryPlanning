@@ -313,6 +313,15 @@ public:
   std::vector<std::array<double, 3>> GetConvexSet() const;
 
   /**
+   * @brief Decompose this polygon into convex pieces.
+   *
+   * Vertices are clipped ear by ear, so the union of the pieces is the original
+   * polygon: no area is added and none is lost. A convex polygon yields itself.
+   * @return The convex pieces, or an empty vector if this polygon is not simple.
+   */
+  std::vector<Polygon2d> DecomposeConvex() const;
+
+  /**
    * @brief Get a string containing essential information about the polygon
    *        for debugging purpose.
    * @return Essential information about the polygon for debugging purpose.

@@ -1,9 +1,5 @@
 # RDA Planner Tests
 
-add_executable(test_trajectory_controls test_trajectory_controls.cpp)
-target_link_libraries(test_trajectory_controls PRIVATE Planner)
-add_test(NAME test_trajectory_controls COMMAND test_trajectory_controls)
-
 add_executable(test_rda_main
     test_rda_main.cpp
 )
@@ -61,8 +57,15 @@ add_executable(test_rda_coordinates test_rda_coordinates.cpp)
 target_link_libraries(test_rda_coordinates PRIVATE Planner)
 add_test(NAME test_rda_coordinates COMMAND test_rda_coordinates)
 
+add_executable(test_rda_controls test_rda_controls.cpp)
+target_link_libraries(test_rda_controls PRIVATE RDAPlanner)
+add_test(NAME test_rda_controls COMMAND test_rda_controls)
+set_tests_properties(test_rda_controls PROPERTIES TIMEOUT 60)
+
+# The exported commands must be the solver's own, so they stay inside the
+# configured actuation limits instead of being derived from the states.
 # Use this checkout's configuration even when CTest runs from /tmp.
-foreach(rda_test test_rda_main test_rda_case2)
+foreach(rda_test test_rda_main test_rda_case2 test_rda_controls)
     target_compile_definitions(${rda_test} PRIVATE
         RDA_TEST_CONFIG_PATH="${PROJECT_SOURCE_DIR}/src/config/solver_params.yaml")
 endforeach()
@@ -76,9 +79,12 @@ target_link_libraries(test_rda_workspace PRIVATE RDAPlanner)
 add_test(NAME test_rda_workspace COMMAND test_rda_workspace)
 
 # Regression for adaptive OSQP state leaking into the next planning request.
+# Keep the runtime report out of the build root.
+set(RDA_BENCHMARK_RESULT_DIRECTORY "${CMAKE_BINARY_DIR}/rda/solve_res_test"
+    CACHE PATH "Directory receiving the RDA runtime benchmark JSON")
 add_test(NAME test_rda_repeated_request
     COMMAND "${Python_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/rda/benchmark_runtime.py"
-        --cases 8 --repeats 2 --workers 4 --output "${CMAKE_BINARY_DIR}/runtime_case8.json")
+        --cases 8 --repeats 2 --workers 4 --output "${RDA_BENCHMARK_RESULT_DIRECTORY}/runtime_case8.json")
 set_tests_properties(test_rda_repeated_request PROPERTIES TIMEOUT 30)
 
 add_executable(test_cone_thread_pool test_cone_thread_pool.cpp)

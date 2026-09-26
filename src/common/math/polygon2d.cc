@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <numeric>
 #include <utility>
 
 #define _USE_MATH_DEFINES
@@ -530,6 +531,45 @@ std::string Polygon2d::DebugString() const {
                             "  area = ",
                             area_,
                             " )");
+}
+
+std::vector<Polygon2d> Polygon2d::DecomposeConvex() const {
+    if (num_points_ < 3) { return {}; }
+    if (is_convex_) { return {*this}; }
+    // points_ is counter-clockwise (see BuildFromPoints), so an ear is a convex
+    // corner whose triangle contains no other remaining vertex. Clipping ears
+    // keeps the union of the pieces equal to this polygon.
+    const std::vector<Vec2d> points = points_;
+    std::vector<int>         remaining(num_points_);
+    std::iota(remaining.begin(), remaining.end(), 0);
+    const auto cross = [&points](int a, int b, int c) { return CrossProd(points[a], points[b], points[c]); };
+    std::vector<Polygon2d> pieces;
+    while (remaining.size() > 3) {
+        bool clipped = false;
+        for (std::size_t i = 0; i < remaining.size(); ++i) {
+            const int last = remaining[(i + remaining.size() - 1) % remaining.size()];
+            const int here = remaining[i];
+            const int next = remaining[(i + 1) % remaining.size()];
+            if (cross(last, here, next) <= kMathEpsilon) { continue; }
+            bool contains_vertex = false;
+            for (int other : remaining) {
+                if (other == last || other == here || other == next) { continue; }
+                if (cross(last, here, other) >= -kMathEpsilon && cross(here, next, other) >= -kMathEpsilon &&
+                    cross(next, last, other) >= -kMathEpsilon) {
+                    contains_vertex = true;
+                    break;
+                }
+            }
+            if (contains_vertex) { continue; }
+            pieces.emplace_back(std::vector<Vec2d>{points[last], points[here], points[next]});
+            remaining.erase(remaining.begin() + i);
+            clipped = true;
+            break;
+        }
+        if (!clipped) { return {}; }
+    }
+    pieces.emplace_back(std::vector<Vec2d>{points[remaining[0]], points[remaining[1]], points[remaining[2]]});
+    return pieces;
 }
 
 }   // namespace math
