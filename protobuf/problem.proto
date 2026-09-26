@@ -27,6 +27,44 @@ message PlanProblem {
     MapBound map_bound = 6;
 }
 
+message PlannerDiagnostics {
+    string backend = 1;
+    string status = 2;
+    int32 iterations = 3;
+    int32 inner_iterations = 4;
+    int32 sqp_iterations = 5;
+    double primal_squared = 6;
+    double step_inf = 7;
+    double dynamics_inf = 8;
+    double prepare_ms = 9;
+    double obstacle_ms = 10;
+    double speed_ms = 11;
+    double time_ms = 12;
+    double path_ms = 13;
+    double residual_ms = 14;
+    double validation_ms = 15;
+    double frontend_ms = 16;
+    double load_ms = 17;
+    double total_ms = 18;
+    int32 segments = 19;
+    int32 obstacles = 20;
+    string control_source = 21;
+    int32 subproblem_status = 22;
+    int32 reused_certificates = 26;
+    int32 projected_certificates = 27;
+    double certificate_error = 28; // worst KKT error of a rejected obstacle certificate
+    double feasibility_violation = 29; // worst accepted cone/box violation
+    // RDA backend split: `su` is its state/control QP, `cone` its obstacle SOCPs.
+    double su_assembly_ms = 30;
+    double su_solve_ms = 31;
+    double cone_assembly_ms = 32;
+    double cone_solve_ms = 33;
+    // Debug candidate on failure only. Never a successful planning output.
+    repeated kinematic_model.StateVar candidate_states = 23;
+    repeated kinematic_model.ControlVar candidate_controls = 24;
+    repeated double candidate_timestamps = 25;
+}
+
 message PlanRes {
     repeated kinematic_model.ControlVar control_list = 1;
     repeated kinematic_model.StateVar state_list = 2;
@@ -39,6 +77,7 @@ message PlanRes {
     repeated kinematic_model.ControlVar pre_opt_controls = 9;
     // Optimized trajectory timestamps in seconds, starting at zero.
     repeated double init_timestamps = 10;
+    PlannerDiagnostics diagnostics = 11;
 }
 
 message SolverInput {

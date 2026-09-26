@@ -56,6 +56,14 @@ class RDASolver {
     const Eigen::VectorXd& GetTimeSteps() const { return dt_traj_; }
     const std::vector<Eigen::Vector4d>& GetInitialStates() const { return init_traj_; }
 
+    // Native commands of the solved trajectory, one row per segment with columns
+    // [acceleration, steering]. These are the values the QP optimized and bounded;
+    // control_traj_ stores the same pair per column as (steering, acceleration).
+    Eigen::MatrixXd GetControlsResult() const;
+
+    // Wall-clock split of the last Process() call, for comparing backends.
+    const RDAWorkspace::Timings& GetTimings() const { return workspace_->timings; }
+
   private:
     void prepareStructure();
     void getObstaclesFromMap();

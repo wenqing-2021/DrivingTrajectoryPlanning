@@ -17,7 +17,10 @@
 #include "math_utils.h"
 
 #define  _USE_MATH_DEFINES
+#include <algorithm>
+#include <cmath>
 #include <math.h>
+#include <stdexcept>
 #include <utility>
 
 namespace common {
@@ -110,6 +113,58 @@ std::vector<bool> GetPathGears(const std::vector<double> &x, const std::vector<d
   return gears;
 }
 
+
+
+double OptimalTimeStep(const double quadratic, const double linear, const double reciprocal,
+                       const double lo, const double hi) {
+  if (!std::isfinite(quadratic) || !std::isfinite(linear) || !std::isfinite(reciprocal) ||
+      !std::isfinite(lo) || !std::isfinite(hi) || quadratic < 0.0 || reciprocal < 0.0 || lo <= 0.0 ||
+      hi < lo) {
+    throw std::invalid_argument("Invalid separable time objective");
+  }
+  const auto derivative = [&](double h) { return 2.0 * quadratic * h + linear - reciprocal / (h * h); };
+  if (derivative(lo) >= 0.0) {
+    return lo;
+  }
+  if (derivative(hi) <= 0.0) {
+    return hi;
+  }
+  double lower = lo;
+  double upper = hi;
+  for (int i = 0; i < 60; ++i) {
+    const double mid = 0.5 * (lower + upper);
+    if (derivative(mid) > 0.0) {
+      upper = mid;
+    } else {
+      lower = mid;
+    }
+  }
+  return 0.5 * (lower + upper);
+}
+
+double OptimalDistance(const double offset, const double rho, const double weight, const double upper) {
+  const auto gradient = [&](double d) { return rho * (d + offset) + weight * std::exp(d); };
+  if (gradient(upper) <= 0.0) {
+    return upper;
+  }
+  double lo = std::min(upper, -offset - weight / rho - 1.0);
+  double hi = upper;
+  double d = Clamp(-offset, lo, hi);
+  for (int i = 0; i < 40; ++i) {
+    const double grad = gradient(d);
+    if (std::abs(grad) <= 1e-12 * (1.0 + rho)) {
+      break;
+    }
+    if (grad > 0.0) {
+      hi = d;
+    } else {
+      lo = d;
+    }
+    const double next = d - grad / (rho + weight * std::exp(d));
+    d = (next > lo && next < hi) ? next : 0.5 * (lo + hi);
+  }
+  return d;
+}
 
 }  // namespace math
 }  // namespace common

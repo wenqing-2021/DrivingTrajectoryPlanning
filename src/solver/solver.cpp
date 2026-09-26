@@ -2,6 +2,7 @@
 #include "collision_check/gjk_check.h"
 #include "kinematic_model.pb.h"
 #include "logger.h"
+#include <chrono>
 #include <memory>
 #include <string>
 #include <utility>
@@ -35,10 +36,12 @@ void Solver::LoadProblem(const problem::PlanProblem& plan_problem, const params:
     // 5. Set trajectory planner
     LOG(INFO) << "Set trajectory planner...";
     traj_planner_ptr_ = std::make_unique<planning::TrajPlanner>(
-        solver_params, map_ptr_, collision_check_ptr_, plan_problem.vehicle_param(), rda_workspace_);
+        solver_params, map_ptr_, collision_check_ptr_, plan_problem.vehicle_param(), rda_workspace_, ocean_workspace_);
 };
 
 const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {
+    const auto total_start = std::chrono::steady_clock::now();
+    plan_res_.Clear();
     LOG(INFO) << "Run solver...";
     // 1. load plan problem
     const problem::PlanProblem plan_problem  = solver_input.plan_problem();
@@ -48,6 +51,11 @@ const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {
     plan_res_.clear_init_timestamps();
     plan_res_.set_solve_success(false);
 
+    const double load_ms =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - total_start).count();
+    // The backend planner must leave room for the map/frontend work already done.
+    const auto ocean_params = planning::backend::OCEANSolver::Defaults(solver_params.ocean_params());
+    traj_planner_ptr_->SetRemainingTimeBudget(ocean_params.time_limit() - load_ms / 1000.0);
     // 2. process
     LOG(INFO) << "Process...";
     if (traj_planner_ptr_->Process(start_vec_, goal_vec_)) {
@@ -75,6 +83,10 @@ const problem::PlanRes& Solver::Run(const problem::SolverInput& solver_input) {
         plan_res_.set_solve_success(false);
     }
 
+    *plan_res_.mutable_diagnostics() = traj_planner_ptr_->GetDiagnostics();
+    plan_res_.mutable_diagnostics()->set_load_ms(load_ms);
+    plan_res_.mutable_diagnostics()->set_total_ms(
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - total_start).count());
     return plan_res_;
 };
 
@@ -85,7 +97,8 @@ void Solver::setOptTraj(const planning::vehicle_model::opt_states&  opt_states,
     if (opt_states.rows() < 2) {
         LOG(WARNING) << "The opt states size is less than 2";
         return;
-    } else if (opt_states.rows() != opt_controls.rows() + 1) {
+    } else if (opt_controls.rows() != 0 && opt_states.rows() != opt_controls.rows() + 1) {
+        // A backend without commands of its own exports states and timing only.
         LOG(WARNING) << "The opt states size is not equal to the opt controls size + 1";
         return;
     }
@@ -121,7 +134,7 @@ void Solver::setPreOptTraj(const planning::vehicle_model::opt_states&  init_stat
     if (init_states.rows() < 2) {
         LOG(WARNING) << "The init states size is less than 2";
         return;
-    } else if (init_states.rows() != init_controls.rows() + 1) {
+    } else if (init_controls.rows() != 0 && init_states.rows() != init_controls.rows() + 1) {
         LOG(WARNING) << "The init states size is not equal to the init controls size + 1";
         return;
     }

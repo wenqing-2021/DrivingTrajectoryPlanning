@@ -1,59 +1,35 @@
 #include "trajectory_planner.h"
-#include <cmath>
-#include <stdexcept>
+#include <chrono>
 
 namespace planning {
-
-// Invert the rear-axle forward-Euler bicycle model used by RDA and OBCA.
-// States: [x, y, heading, signed speed]; controls: [acceleration, steering].
-Eigen::MatrixXd TrajPlanner::ReconstructTrajectoryControls(const Eigen::MatrixXd& states,
-                                                     const std::vector<double>& timestamps,
-                                                     double wheelbase) {
-    if (states.cols() != 4 || states.rows() < 2 || !states.allFinite() ||
-        timestamps.size() != static_cast<std::size_t>(states.rows()) ||
-        !std::isfinite(wheelbase) || wheelbase <= 0.0) {
-        throw std::invalid_argument("Invalid trajectory control reconstruction input");
-    }
-    Eigen::MatrixXd controls(states.rows() - 1, 2);
-    double steering = 0.0;
-    for (Eigen::Index i = 0; i < controls.rows(); ++i) {
-        const double dt = timestamps[i + 1] - timestamps[i];
-        if (!std::isfinite(timestamps[i]) || !std::isfinite(dt) || dt <= 0.0) {
-            throw std::invalid_argument("Trajectory timestamps must be finite and increasing");
-        }
-        controls(i, 0) = (states(i + 1, 3) - states(i, 3)) / dt;
-        const double heading_change = std::atan2(std::sin(states(i + 1, 2) - states(i, 2)),
-                                                std::cos(states(i + 1, 2) - states(i, 2)));
-        // At rest steering is unobservable from motion; ignore solver noise and
-        // retain the previous angle. The initial steering is defined to be zero.
-        if (i > 0 && std::abs(states(i, 3)) > 1e-4) {
-            steering = std::atan(wheelbase * heading_change / (states(i, 3) * dt));
-        }
-        controls(i, 1) = steering;
-    }
-    return controls;
-}
-
 
 TrajPlanner::TrajPlanner(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr,
                          const std::shared_ptr<collision_check::BaseCheck>& collision_checker,
                          const kinematic_model::VehicleParam&               vehicle_param,
-                         std::shared_ptr<backend::RDAWorkspace> rda_workspace) {
+                         std::shared_ptr<backend::RDAWorkspace> rda_workspace,
+                         std::shared_ptr<backend::OCEANWorkspace> ocean_workspace) {
     // initial common parameters
     backend_solver_    = solver_params.backend_solver().empty() ? "obca" : solver_params.backend_solver();
     vehicle_model_ptr_ = std::make_shared<vehicle_model::KinematicModel>(vehicle_param);
+
+    nominal_dt_ = solver_params.dt();
+    diagnostics_.set_backend(backend_solver_);
 
     // initial frontend solver
     hybrid_astar_ptr_ =
         std::make_unique<frontend::HybridAstar>(solver_params.hybrid_a_star_param(), map_ptr, collision_checker);
 
-    // initial backend solvers
-    pwj_speed_ptr_ = std::make_unique<pwjspeed>(solver_params.piesewise_jerk_params(), solver_params.dt());
-
-    rda_solver_ptr_ =
-        std::make_unique<rdaopt>(vehicle_model_ptr_, map_ptr, solver_params.rda_params(), solver_params.dt(),
-                                 std::move(rda_workspace));
-    initObcaSolver(solver_params, map_ptr);
+    // Construct only the selected backend.
+    if (backend_solver_ == "pwj")
+        pwj_speed_ptr_ = std::make_unique<pwjspeed>(solver_params.piesewise_jerk_params(), solver_params.dt());
+    else if (backend_solver_ == "rda")
+        rda_solver_ptr_ = std::make_unique<rdaopt>(vehicle_model_ptr_, map_ptr, solver_params.rda_params(),
+                                                  solver_params.dt(), std::move(rda_workspace));
+    else if (backend_solver_ == "ocean")
+        ocean_solver_ptr_ =
+            std::make_unique<backend::OCEANSolver>(vehicle_model_ptr_, map_ptr, solver_params.ocean_params(),
+                                                   solver_params.dt(), std::move(ocean_workspace));
+    else if (backend_solver_ == "obca") initObcaSolver(solver_params, map_ptr);
 };
 
 void TrajPlanner::initObcaSolver(const params::SolverParams& solver_params, const std::shared_ptr<map::Map>& map_ptr) {
@@ -94,6 +70,7 @@ void TrajPlanner::initObcaSolver(const params::SolverParams& solver_params, cons
 }
 
 bool TrajPlanner::Process(const vehicle_model::VehiclePose& start_vec, const vehicle_model::VehiclePose& goal_vec) {
+    const auto frontend_start = std::chrono::steady_clock::now();
     // 1. frontend path plan
     LOG(INFO) << "Start to search the frontend path...";
     if (hybrid_astar_ptr_->Plan(start_vec, goal_vec)) {
@@ -103,9 +80,12 @@ bool TrajPlanner::Process(const vehicle_model::VehiclePose& start_vec, const veh
         LOG(WARNING) << "Failed to find the frontend path...";
         debug_node_list_ = hybrid_astar_ptr_->GetDebugNodeList();
         LOG(INFO) << "The debug node list size is: " << debug_node_list_.size();
+        diagnostics_.set_status("frontend_failed");
         return false;
     }
 
+    diagnostics_.set_frontend_ms(
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frontend_start).count());
     // 2. generate the trajectory with TrajOptimizer
     const std::vector<Eigen::Vector3d>* const frontend_path = hybrid_astar_ptr_->GetPath();
     LOG(INFO) << "Start to optimize the trajectory with backend solver: " << backend_solver_;
@@ -120,77 +100,112 @@ bool TrajPlanner::Process(const vehicle_model::VehiclePose& start_vec, const veh
 bool TrajPlanner::runBackendOpt(const std::vector<Eigen::Vector3d>* const frontend_path,
                                 const vehicle_model::VehiclePose&         start_vec,
                                 const vehicle_model::VehiclePose&         goal_vec) {
+    // OCEAN owns its control and time-interval variables, so it also owns the
+    // timestamps and returns both directly, without the shared timing block below.
+    if (backend_solver_ == "ocean" && ocean_solver_ptr_) {
+        vehicle_model::sdv_path path;
+        for (const auto& point : *frontend_path) path.push_back({point.x(), point.y(), point.z()});
+        auto         start       = std::make_shared<vehicle_model::VehiclePose>(start_vec);
+        auto         goal        = std::make_shared<vehicle_model::VehiclePose>(goal_vec);
+        const double frontend_ms = diagnostics_.frontend_ms();
+        ocean_solver_ptr_->SetTimeBudget(remaining_budget_ - frontend_ms / 1000.0);
+        const bool success = ocean_solver_ptr_->Process(path, start, goal);
+        diagnostics_       = ocean_solver_ptr_->GetStats();
+        diagnostics_.set_frontend_ms(frontend_ms);
+        if (!success) return false;
+        if (!setStates(opt_states_, ocean_solver_ptr_->GetStatesResult()) ||
+            !setStates(init_states_, ocean_solver_ptr_->GetInitialStates()) ||
+            !setControls(opt_controls_, ocean_solver_ptr_->GetControlsResult(), opt_states_.rows() - 1))
+            return false;
+        const Eigen::VectorXd& intervals = ocean_solver_ptr_->GetTimeSteps();
+        opt_timestamps_.assign(opt_states_.rows(), 0.0);
+        for (Eigen::Index k = 0; k < intervals.size(); ++k) opt_timestamps_[k + 1] = opt_timestamps_[k] + intervals[k];
+        return true;
+    }
     if (backend_solver_ == "obca" && obca_solver_ptr_ != nullptr) {
         auto sdv_path      = obcaopt::Vec3dToSdvPath(*frontend_path);
         auto start_vec_ptr = std::make_shared<vehicle_model::VehiclePose>(start_vec);
         auto goal_vec_ptr  = std::make_shared<vehicle_model::VehiclePose>(goal_vec);
         obca_solver_ptr_->Process(sdv_path, start_vec_ptr, goal_vec_ptr);
-        setstatesControls(opt_states_, opt_controls_, obca_solver_ptr_->GetStatesResult());
-        setstatesControls(init_states_, init_controls_, obca_solver_ptr_->GetInitStates());
+        const auto&     obca_controls = obca_solver_ptr_->GetControlsResult();
+        Eigen::MatrixXd native(obca_controls.size(), 2);
+        for (std::size_t i = 0; i < obca_controls.size(); ++i) native.row(i) = obca_controls[i];
+        diagnostics_.set_control_source("native");
+        if (!setStates(opt_states_, obca_solver_ptr_->GetStatesResult()) ||
+            !setStates(init_states_, obca_solver_ptr_->GetInitStates()) ||
+            !setControls(opt_controls_, native, opt_states_.rows() - 1))
+            return false;
     } else if (backend_solver_ == "pwj" && pwj_speed_ptr_ != nullptr) {
         pwj_speed_ptr_->Optimize(*frontend_path, start_vec);
-        setstatesControls(opt_states_, opt_controls_, pwj_speed_ptr_->GetResult());
+        if (!setStates(opt_states_, pwj_speed_ptr_->GetResult())) return false;
+        // The piecewise-jerk planner optimizes a speed profile along the path, so it
+        // has no commands to export; an empty control list is a valid result.
+        opt_controls_.resize(0, 0);
+        diagnostics_.set_control_source("none");
     } else if (backend_solver_ == "rda" && rda_solver_ptr_ != nullptr) {
         auto sdv_path      = rdaopt::Vec3dToSdvPath(*frontend_path);
         auto start_vec_ptr = std::make_shared<vehicle_model::VehiclePose>(start_vec);
         auto goal_vec_ptr  = std::make_shared<vehicle_model::VehiclePose>(goal_vec);
         if (!rda_solver_ptr_->Process(sdv_path, start_vec_ptr, goal_vec_ptr)) {
             LOG(WARNING) << "RDA solver failed to optimize the trajectory.";
+            diagnostics_.set_status("backend_failed");
             return false;
         }
-        setstatesControls(opt_states_, opt_controls_, rda_solver_ptr_->GetStatesResult());
-        setstatesControls(init_states_, init_controls_, rda_solver_ptr_->GetInitialStates());
+        const auto& timings = rda_solver_ptr_->GetTimings();
+        diagnostics_.set_iterations(timings.iterations);
+        diagnostics_.set_prepare_ms(timings.prepare_ms);
+        diagnostics_.set_su_assembly_ms(timings.su_assembly_ms);
+        diagnostics_.set_su_solve_ms(timings.su_solve_ms);
+        diagnostics_.set_cone_assembly_ms(timings.cone_assembly_ms);
+        diagnostics_.set_cone_solve_ms(timings.cone_solve_ms);
+        diagnostics_.set_control_source("native");
+        if (!setStates(opt_states_, rda_solver_ptr_->GetStatesResult()) ||
+            !setStates(init_states_, rda_solver_ptr_->GetInitialStates()) ||
+            !setControls(opt_controls_, rda_solver_ptr_->GetControlsResult(), opt_states_.rows() - 1))
+            return false;
     } else {
         LOG(ERROR) << "The backend solver " << backend_solver_ << " is not supported or not initialized.";
+        diagnostics_.set_status("unsupported_backend");
         return false;
     }
 
-    // Reconstruct optimized controls using actual timing and signed velocity.
-    const double nominal_dt = backend_solver_ == "obca" ? obca_solver_ptr_->GetDt() : pwj_speed_ptr_->GetDt();
+    // Timing is each backend's own: RDA accumulates its optimized per-segment
+    // interval, OBCA and the speed planner use their configured solver interval.
+    const double nominal_dt = backend_solver_ == "obca" ? obca_solver_ptr_->GetDt() : nominal_dt_;
     opt_timestamps_.assign(opt_states_.rows(), 0.0);
     for (std::size_t i = 1; i < opt_timestamps_.size(); ++i) {
         const double dt = backend_solver_ == "rda" ? rda_solver_ptr_->GetTimeSteps()(i - 1) : nominal_dt;
         opt_timestamps_[i] = opt_timestamps_[i - 1] + dt;
     }
-    opt_controls_ = ReconstructTrajectoryControls(
-        opt_states_, opt_timestamps_, vehicle_model_ptr_->GetVehicleParam().wheel_base());
+    diagnostics_.set_status("success");
+    diagnostics_.set_segments(static_cast<int>(opt_states_.rows()) - 1);
 
     return true;
 };
 
-bool TrajPlanner::setstatesControls(vehicle_model::opt_states& opt_states, vehicle_model::opt_control& opt_controls,
-                                    const std::vector<Eigen::Vector4d>& opt_traj) {
-    // 1. set the init states
-    if (opt_traj.size() < 2) {
+bool TrajPlanner::setStates(vehicle_model::opt_states& states, const std::vector<Eigen::Vector4d>& traj) {
+    if (traj.size() < 2) {
         LOG(WARNING) << "The opt traj size is less than 2";
         return false;
     }
-    opt_states.resize(opt_traj.size(), vehicle_model::KinematicModel::GetStateSize());
-    opt_controls.resize(opt_traj.size() - 1, vehicle_model::KinematicModel::GetControlSize());
-    for (std::size_t i = 0; i < opt_traj.size(); ++i) {
-        opt_states(i, 0) = opt_traj[i].x();   // x
-        opt_states(i, 1) = opt_traj[i].y();   // y
-        opt_states(i, 2) = opt_traj[i].z();   // theta
-        opt_states(i, 3) = opt_traj[i].w();   // v
+    states.resize(traj.size(), vehicle_model::KinematicModel::GetStateSize());
+    for (std::size_t i = 0; i < traj.size(); ++i) {
+        states(i, 0) = traj[i].x();   // x
+        states(i, 1) = traj[i].y();   // y
+        states(i, 2) = traj[i].z();   // theta
+        states(i, 3) = traj[i].w();   // v
     }
+    return true;
+};
 
-    // 2. set the init controls using the forward difference
-    const double dt = backend_solver_ == "obca" ? obca_solver_ptr_->GetDt() : pwj_speed_ptr_->GetDt();
-    const double L  = vehicle_model_ptr_->GetVehicleParam().wheel_base();
-    for (std::size_t i = 0; i < opt_traj.size() - 1; ++i) {
-        opt_controls(i, 0) = (opt_traj[i + 1].w() - opt_traj[i].w()) / dt;   // a
-        // compute steer angle
-        double delta_theta = common::math::NormalizeAngle(opt_traj[i + 1].z() - opt_traj[i].z());
-        double delta_x     = opt_traj[i + 1].x() - opt_traj[i].x();
-        double delta_y     = opt_traj[i + 1].y() - opt_traj[i].y();
-        double delta_s     = delta_x * std::cos(opt_traj[i].z()) + delta_y * std::sin(opt_traj[i].z());
-        if (i == 0 || std::abs(delta_s) < kEpsilon) {
-            opt_controls(i, 1) = 0.0;
-        } else {
-            opt_controls(i, 1) = std::atan(L * delta_theta / delta_s);
-        }
+bool TrajPlanner::setControls(vehicle_model::opt_control& controls, const Eigen::MatrixXd& native,
+                              Eigen::Index segments) {
+    if (segments < 0 || native.rows() != segments || native.cols() != 2 || !native.allFinite()) {
+        LOG(ERROR) << "The backend returned " << native.rows() << " control rows for " << segments
+                   << " segments";
+        return false;
     }
-
+    controls = native;
     return true;
 };
 

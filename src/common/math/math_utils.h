@@ -29,6 +29,8 @@
 
 #include "vec2d.h"
 
+#include <Eigen/Core>
+
 /**
  * @namespace apollo::common::math
  * @brief apollo::common::math
@@ -198,6 +200,56 @@ inline double GetTriangleAera(const Vec2d& A, const Vec2d& B, const Vec2d& C) {
     double c = (A - B).Length();
     double s = (a + b + c) / 2;
     return std::sqrt(s * (s - a) * (s - b) * (s - c));
+}
+
+
+/**
+ * @brief Tangent majorant of exp(d) around `at`, valid for d <= 0.
+ *
+ * On d <= 0 the exponential has curvature at most one, so this quadratic touches
+ * exp(d) at `at` and stays above it. Minimizing the majorant and repeating the
+ * step converges to the minimizer of the exponential itself, which is how a
+ * solver without an exponential cone can still keep an exp(d) objective.
+ * @param d The point at which the bound is evaluated.
+ * @param at The point where the quadratic touches exp.
+ * @return The value of the majorant at d.
+ */
+inline double ExponentialUpperBound(const double d, const double at) {
+  const double difference = d - at;
+  return std::exp(at) * (1.0 + difference) + 0.5 * difference * difference;
+}
+
+/**
+ * @brief Minimize quadratic * h^2 + linear * h + reciprocal / h on [lo, hi].
+ *
+ * The derivative 2 * quadratic * h + linear - reciprocal / h^2 is strictly
+ * increasing for h > 0, so bisection returns the exact minimizer. The objective
+ * is separable, which is the shape the OCEAN time subproblem has once the other
+ * blocks are fixed.
+ * @return The optimal h, or lo/hi when the minimizer lies outside the interval.
+ * @throw std::invalid_argument if the interval or a coefficient is not finite,
+ *        or if quadratic/reciprocal is negative, or if lo <= 0.
+ */
+double OptimalTimeStep(const double quadratic, const double linear, const double reciprocal,
+                       const double lo, const double hi);
+
+/**
+ * @brief Minimize weight * exp(d) + rho / 2 * (d + offset)^2 subject to d <= upper.
+ *
+ * The derivative is strictly increasing, so a safeguarded Newton iteration
+ * converges to the exact minimizer.
+ * @param upper The upper bound of d, which the optimum never exceeds.
+ * @return The optimal d.
+ */
+double OptimalDistance(const double offset, const double rho, const double weight, const double upper);
+
+/**
+ * @brief Counter-clockwise rotation matrix of `theta`.
+ */
+inline Eigen::Matrix2d RotationMatrix2d(const double theta) {
+  Eigen::Matrix2d rotation;
+  rotation << std::cos(theta), -std::sin(theta), std::sin(theta), std::cos(theta);
+  return rotation;
 }
 
 }   // namespace math

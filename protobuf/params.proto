@@ -74,6 +74,32 @@ message RDAParams {
     optional int32 safety_distance_persist = 20; // consecutive colliding iterations before raising; >= 1, default 1
 }
 
+// OCEAN parameters are independent of RDA. Optional fields preserve explicit zero.
+message OCEANParams {
+    optional int32 max_iter = 1;
+    optional double rho = 2;
+    optional double primal_tolerance = 3; // sum of squared physical equality residuals
+    optional double step_tolerance = 4;
+    optional double w_state = 5;
+    optional double w_control = 6;
+    optional double w_state_diff = 7;
+    optional double w_control_diff = 8;
+    optional double w_distance = 9;
+    optional double dt_min = 10;
+    optional double dt_max = 11;
+    optional double endpoint_position_tolerance = 12;
+    optional double endpoint_heading_tolerance = 13;
+    optional double min_clearance = 14;
+    optional int32 max_inner_iter = 15;
+    optional double inner_tolerance = 16;
+    optional int32 max_sqp_iter = 17;
+    optional double trust_region = 18;
+    optional double dynamics_tolerance = 19;
+    optional int32 workers = 20; // 0/1 serial
+    optional int32 worker_timeout_ms = 21;
+    optional double time_limit = 22; // total solver.run budget in seconds
+}
+
 message SolverParams {
     double max_iter = 1;
     double map_resolution = 2;
@@ -83,4 +109,5 @@ message SolverParams {
     RDAParams rda_params = 6;
     string backend_solver = 7;
     double dt = 8;
+    OCEANParams ocean_params = 9;
 }
