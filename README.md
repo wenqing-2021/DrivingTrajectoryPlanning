@@ -29,9 +29,6 @@ MPPI planner and Python simulation/rendering.
 ├── data/
 │   └── BenchmarkCases/        # Test cases (CSV format)
 ├── conanfile.py               # C++ dependency manifest
-├── docs/
-│   ├── paper/                 # Related papers
-│   └── repo_design/           # Repository design documentation
 ├── protobuf/                  # Protocol Buffers definitions
 ├── scripts/                   # Utility scripts (build, run, format)
 ├── src/
@@ -69,36 +66,55 @@ To install the recommended VS Code extensions:
 bash scripts/install/install_vscode_extensions.sh
 ```
 
-# 2. Run
+After changing code, rebuild (default: Debug):
 
-Build the C++ libraries and pybind11 modules after changing native code:
-
-```
+```bash
 bash scripts/build.sh
 ```
 
-Builds default to `Debug`. Set `BUILD_TYPE=Release` for optimized runs, for example
-`BUILD_TYPE=Release bash scripts/build.sh`. The Conan toolchain under `build/conan`
-and the OSQP stack under `.local/osqp` hold one build type at a time, so switching
-types rebuilds them:
+To switch to Release and build:
 
 ```bash
-# Align dependencies with the requested build type, then build.
-BUILD_TYPE=Release bash scripts/install/ensure_build_dependencies.sh
-BUILD_TYPE=Release bash scripts/build.sh
-
-# Install everything for Release in one step.
 BUILD_TYPE=Release bash scripts/setup.sh
 ```
 
-`scripts/setup.sh` and `scripts/update_figures.sh` call the dependency script
-themselves, so they never mix Debug and Release dependencies.
+For subsequent Release rebuilds, use `BUILD_TYPE=Release bash scripts/build.sh`.
 
-Run the existing parking scenario:
+# 2. Run
+
+Run this complete parking demo from the repository root after building:
 
 ```bash
-bash scripts/run_park.sh
+# Solve Case2 and save the result, PNG and GIF in a dedicated directory.
+RES_SAVE_PATH="$PWD/solve_results/park/case2_pwj_demo" \
+  bash scripts/run_park.sh \
+    --file "$PWD/data/BenchmarkCases/Case2.csv" \
+    --params "$PWD/src/config/solver_params.yaml" \
+    --vehicle_yaml "$PWD/src/config/vehicle_cfg.yaml" \
+    --visualize both \
+    --curves --footprints \
+    --dpi 150 --fps 10 --playback-speed 1.0
 ```
+
+| Argument | Meaning |
+| --- | --- |
+| `--file`, `-f` | Parking benchmark CSV; replace `Case2.csv` to select another case. Defaults to Case2. |
+| `--params`, `-p` | Solver YAML. Set `backend_solver` to `rda`, `ocean`, `obca` or `pwj` in this file; there is no `--backend` option. The current configuration selects `pwj`. |
+| `--vehicle_yaml` | Vehicle geometry and limits YAML. |
+| `RES_SAVE_PATH` | Result directory, shared by the solver and interactive viewer. Reusing the demo directory overwrites its result files. |
+| `--visualize` | `png`, `gif`, `both` or `none`. Explicitly supplying this option skips the interactive viewer; `none` only saves data. Omit it to open the Bokeh viewer after solving. |
+| `--curves`, `--footprints` | Include synchronized curves and vehicle outlines in the PNG. GIFs always include curves. |
+| `--dpi`, `--fps`, `--playback-speed` | Image resolution, GIF simulation frequency (10–100 Hz), and playback speed multiplier. |
+| `--debug`, `-d` | Enable solver debug mode. |
+
+The demo writes `plan_problem.pb` and `plan_res.pb`; a successful solve also
+writes `replay.json`, `main.png` and `main.gif`. Without `RES_SAVE_PATH`, results
+go to `solve_results/park/场景_<solve time>/`.
+
+Use absolute paths as shown: the script changes into `build/install/src` before
+running. Without `--params` or `--vehicle_yaml`, it reads the installed copies
+under `build/install/src/config/`. The demo explicitly reads the source YAMLs,
+so configuration edits are used immediately; code changes still require a rebuild.
 
 Run the built-in CommonRoad urban scenario:
 
@@ -116,8 +132,7 @@ bash scripts/run_urban.sh --scenario path/to/scenario.xml \
 Urban results (trajectory, control curves, and raw data) are saved under
 `solve_results/urban/场景_<solve time>/`, e.g.
 `solve_results/urban/场景_20260730-132629/trajectory.png`. Park results are
-saved under `solve_results/park/场景_<solve time>/`. See
-[`docs/repo_design/SCENARIOS.md`](docs/repo_design/SCENARIOS.md) for the architecture and data flow.
+saved under `solve_results/park/场景_<solve time>/`.
 Planner and simulation parameters are stored in
 [`src/config/urban_mppi.yaml`](src/config/urban_mppi.yaml).
 
@@ -127,20 +142,28 @@ Urban and Park share PNG/GIF export and standalone result replay:
 
 ```bash
 bash scripts/run_urban.sh --visualize both
-bash scripts/run_park.sh --visualize both
+# Replay the parking demo above without solving again.
+bash scripts/visualize.sh "$PWD/solve_results/park/case2_pwj_demo" --visualize both
 bash scripts/visualize.sh solve_results/urban/<run> --visualize gif
 ```
-
-See [shared visualization](docs/repo_design/VISUALIZATION.md) for export options,
-legacy result loading, timing conventions, and architecture.
 
 Here are the latest trajectory planning results:
 
 ### Urban (MPPI)
 ![Urban MPPI Trajectory](assets/urban_mppi_trajectory.png)
 
-### Park (RDA)
-![Park RDA Trajectory](assets/park_rda_main.png)
+### Park (Case2)
+
+<table>
+  <tr>
+    <td width="50%" align="center"><strong>OBCA</strong><br><img src="assets/demo_gif/case2_obca.gif" alt="Case2 parking trajectory with OBCA" width="100%"></td>
+    <td width="50%" align="center"><strong>OCEAN</strong><br><img src="assets/demo_gif/case2_ocean.gif" alt="Case2 parking trajectory with OCEAN" width="100%"></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><strong>Piecewise-jerk (PWJ)</strong><br><img src="assets/demo_gif/case2_pwj.gif" alt="Case2 parking trajectory with piecewise-jerk speed optimization" width="100%"></td>
+    <td width="50%" align="center"><strong>RDA</strong><br><img src="assets/demo_gif/case2_rda.gif" alt="Case2 parking trajectory with RDA" width="100%"></td>
+  </tr>
+</table>
 
 # 3. Optimization planner
 
@@ -153,8 +176,10 @@ Core implementation and related modules:
 ## 3.2 backend-opt
 The backend optimization stage refines the frontend path into a smoother and dynamically feasible trajectory.
 This project currently supports:
+
 - **OBCA** (IPOPT-based) — [paper](https://arxiv.org/abs/1711.03449)
-- **RDA** (OSQP & EiCOS-based) — [paper](<docs/paper/RDA An Accelerated Collision Free Motion Planner for Autonomous Navigation in Cluttered Environments.pdf>)
+- **RDA** (OSQP & EiCOS-based) — [paper](https://arxiv.org/pdf/2210.00192v4)
+- **OCEAN** (ADMM-based, using OSQP & EiCOS) — jointly optimizes path, speed and time steps; [paper](https://arxiv.org/abs/2403.05090)
 - **Piecewise-jerk speed optimization** (OSQP-based)
 - **MPPI (Model Predictive Path Integral)** for CommonRoad urban scenarios
 
@@ -162,6 +187,7 @@ Core implementation and related modules:
 - [Solver configuration](src/config/solver_params.yaml)
 - [OBCA solver interface](src/planner/obca/obca_planner.h)
 - [RDA solver interface](src/planner/rda/rda_planner.h)
+- [OCEAN solver interface](src/planner/ocean/ocean_planner.h)
 - [Piecewise jerk speed optimizer](src/planner/speed_planner/piece_wise_jerk.cpp)
 - [ADMM module](src/planner/admm/admm_planner.cpp)
 - [Planner backend dispatch](src/planner/trajectory_planner.cpp)
