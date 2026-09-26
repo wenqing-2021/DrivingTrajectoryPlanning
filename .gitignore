@@ -44,3 +44,5 @@ solve_results/
 *.pyi
 coinhsl.zip
 assets/rda_benchmark/*
+assets/ocean_benchmark/*
+.agent-message/*
