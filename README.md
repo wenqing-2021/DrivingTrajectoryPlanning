@@ -86,7 +86,7 @@ Run this complete parking demo from the repository root after building:
 
 ```bash
 # Solve Case2 and save the result, PNG and GIF in a dedicated directory.
-RES_SAVE_PATH="$PWD/solve_results/park/case2_pwj_demo" \
+RES_SAVE_PATH="$PWD/solve_results/park/case2_ocean_demo" \
   bash scripts/run_park.sh \
     --file "$PWD/data/BenchmarkCases/Case2.csv" \
     --params "$PWD/src/config/solver_params.yaml" \
@@ -99,7 +99,7 @@ RES_SAVE_PATH="$PWD/solve_results/park/case2_pwj_demo" \
 | Argument | Meaning |
 | --- | --- |
 | `--file`, `-f` | Parking benchmark CSV; replace `Case2.csv` to select another case. Defaults to Case2. |
-| `--params`, `-p` | Solver YAML. Set `backend_solver` to `rda`, `ocean`, `obca` or `pwj` in this file; there is no `--backend` option. The current configuration selects `pwj`. |
+| `--params`, `-p` | Solver YAML. Set `backend_solver` to `rda`, `ocean`, `obca` or `pwj` in this file; there is no `--backend` option. The current configuration selects `ocean`. |
 | `--vehicle_yaml` | Vehicle geometry and limits YAML. |
 | `RES_SAVE_PATH` | Result directory, shared by the solver and interactive viewer. Reusing the demo directory overwrites its result files. |
 | `--visualize` | `png`, `gif`, `both` or `none`. Explicitly supplying this option skips the interactive viewer; `none` only saves data. Omit it to open the Bokeh viewer after solving. |
@@ -143,7 +143,7 @@ Urban and Park share PNG/GIF export and standalone result replay:
 ```bash
 bash scripts/run_urban.sh --visualize both
 # Replay the parking demo above without solving again.
-bash scripts/visualize.sh "$PWD/solve_results/park/case2_pwj_demo" --visualize both
+bash scripts/visualize.sh "$PWD/solve_results/park/case2_ocean_demo" --visualize both
 bash scripts/visualize.sh solve_results/urban/<run> --visualize gif
 ```
 
@@ -154,14 +154,27 @@ Here are the latest trajectory planning results:
 
 ### Park (Case2)
 
+OCEAN, RDA and OBCA minimize time-integrated squared jerk, front-wheel steering
+rate and steering acceleration alongside their existing objectives. Derivatives
+use actual control timestamps, including nonuniform optimized intervals. Set the
+three weights under `<backend>_params.smoothness` in
+[`solver_params.yaml`](src/config/solver_params.yaml); zero disables a term.
+PWJ remains available for speed optimization along the frontend path.
+
+The OCEAN, RDA and OBCA animations below use native optimized commands and passed
+independent endpoint, control-limit, dense collision, map-boundary and dynamics checks.
+Use [`benchmark_planners.py`](tests/benchmark/benchmark_planners.py) to validate
+native commands and report time-weighted RMS smoothness metrics. The disabled-cost
+RDA candidate failed dynamics validation on Case2; the enabled result passed.
+
 <table>
   <tr>
-    <td width="50%" align="center"><strong>OBCA</strong><br><img src="assets/demo_gif/case2_obca.gif" alt="Case2 parking trajectory with OBCA" width="100%"></td>
     <td width="50%" align="center"><strong>OCEAN</strong><br><img src="assets/demo_gif/case2_ocean.gif" alt="Case2 parking trajectory with OCEAN" width="100%"></td>
+    <td width="50%" align="center"><strong>RDA</strong><br><img src="assets/demo_gif/case2_rda.gif" alt="Case2 parking trajectory with RDA" width="100%"></td>
   </tr>
   <tr>
+    <td width="50%" align="center"><strong>OBCA</strong><br><img src="assets/demo_gif/case2_obca.gif" alt="Case2 parking trajectory with OBCA" width="100%"></td>
     <td width="50%" align="center"><strong>Piecewise-jerk (PWJ)</strong><br><img src="assets/demo_gif/case2_pwj.gif" alt="Case2 parking trajectory with piecewise-jerk speed optimization" width="100%"></td>
-    <td width="50%" align="center"><strong>RDA</strong><br><img src="assets/demo_gif/case2_rda.gif" alt="Case2 parking trajectory with RDA" width="100%"></td>
   </tr>
 </table>
 

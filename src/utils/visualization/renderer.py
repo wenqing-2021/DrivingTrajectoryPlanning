@@ -64,13 +64,10 @@ class SceneRenderer:
             self.ax = self.figure.add_subplot(grid[:, :2])
             for index, (times, values, label) in enumerate(channels):
                 axis = self.figure.add_subplot(grid[index, 2])
-                if label == "Speed (m/s)":
-                    axis.plot(times, values, color="tab:blue")
-                else:
-                    if len(times) == len(scene.times) - 1:
-                        times = np.append(times, scene.times[-1])
-                        values = np.append(values, values[-1])
-                    axis.step(times, values, where="post", color="tab:blue")
+                if len(times) == len(scene.times) - 1:
+                    times = np.append(times, scene.times[-1])
+                    values = np.append(values, values[-1])
+                axis.plot(times, values, color="tab:blue")
                 axis.set_ylabel(label)
                 axis.set_xlabel(
                     "Sample" if scene.time_basis == "samples" else "Time (s)"
