@@ -449,6 +449,9 @@ bool OCEANSolver::initialize(const vehicle_model::sdv_path& path, const vehicle_
     for (double value : positive)
         if (!std::isfinite(value) || value <= 0) return fail("invalid_parameters");
     const std::vector<double> nonnegative = {p_.w_state(),
+                                             p_.smoothness().jerk_weight(),
+                                             p_.smoothness().steering_rate_weight(),
+                                             p_.smoothness().steering_acceleration_weight(),
                                              p_.w_control(),
                                              p_.w_state_diff(),
                                              p_.w_control_diff(),
@@ -599,6 +602,11 @@ bool OCEANSolver::solveSpeed() {
         q.square({{states + k, 1}}, 0, p_.w_control());
         q.square({{k + 1, 1}, {k, -1}}, 0, p_.w_state_diff() / h_[k]);
         if (k > 0) q.square({{states + k, 1}, {states + k - 1, -1}}, 0, p_.w_control_diff() / h_[k]);
+        if (k > 0) {
+            const auto r = vehicle_model::KinematicModel::ControlRate(h_[k - 1]);
+            q.square({{states + k - 1, r.coefficients[0]}, {states + k, r.coefficients[1]}},
+                     0, p_.smoothness().jerk_weight());
+        }
         // Dynamics of the first three states, linear in v and a for fixed pose.
         const Eigen::Vector3d rate(std::cos(x_(2, k)), std::sin(x_(2, k)), std::tan(steer_[k]) / vehicle.wheel_base());
         for (int j = 0; j < 3; ++j)
@@ -615,8 +623,8 @@ bool OCEANSolver::solveSpeed() {
 }
 
 // Eq. (19): the segment durations. With the other blocks fixed the objective is
-// separable and each term is quadratic * h^2 + linear * h + reciprocal / h, so
-// every segment is minimized exactly instead of being approximated by a QP.
+// separable when the added derivative costs are disabled. Higher derivatives
+// couple adjacent intervals; use bounded coordinate minimization in that case.
 bool OCEANSolver::solveTime() {
     const double wheelbase = model_->GetVehicleParam().wheel_base();
     for (int k = 0; k < N_; ++k) {
@@ -629,8 +637,52 @@ bool OCEANSolver::solveTime() {
         if (k > 0)
             reciprocal +=
                 p_.w_control_diff() * (std::pow(steer_[k] - steer_[k - 1], 2) + std::pow(acc_[k] - acc_[k - 1], 2));
-        h_[k] = common::math::OptimalTimeStep(
-            p_.rho() / 2 * rate.squaredNorm(), p_.rho() * rate.dot(offset), reciprocal, p_.dt_min(), p_.dt_max());
+        const auto& smoothness = p_.smoothness();
+        if (smoothness.jerk_weight() == 0 && smoothness.steering_rate_weight() == 0 &&
+            smoothness.steering_acceleration_weight() == 0) {
+            h_[k] = common::math::OptimalTimeStep(
+                p_.rho() / 2 * rate.squaredNorm(), p_.rho() * rate.dot(offset), reciprocal, p_.dt_min(), p_.dt_max());
+            continue;
+        }
+        const double old = h_[k];
+        auto cost = [&](double h) {
+            h_[k] = h;
+            double value = p_.rho() / 2 * (h * rate + offset).squaredNorm() + reciprocal / h;
+            // Only derivative stencils containing h[k] vary in this coordinate.
+            if (k + 1 < N_) {
+                const auto r = vehicle_model::KinematicModel::ControlRate(h);
+                value += smoothness.jerk_weight() * std::pow(r(acc_[k], acc_[k + 1]), 2) +
+                         smoothness.steering_rate_weight() * std::pow(r(steer_[k], steer_[k + 1]), 2);
+            }
+            for (int end = std::max(2, k + 1); end <= std::min(N_ - 1, k + 2); ++end) {
+                const auto r = vehicle_model::KinematicModel::ControlAcceleration(h_[end - 2], h_[end - 1]);
+                value += smoothness.steering_acceleration_weight() *
+                         std::pow(r(steer_[end - 2], steer_[end - 1], steer_[end]), 2);
+            }
+            return value;
+        };
+        double best_h = old, best = cost(old);
+        auto consider = [&](double h) {
+            const double value = cost(h);
+            if (value < best) { best = value; best_h = h; }
+            return value;
+        };
+        double lo = p_.dt_min(), hi = p_.dt_max();
+        consider(lo);
+        consider(hi);
+        constexpr double ratio = 0.6180339887498949;
+        double left = hi - ratio * (hi - lo), right = lo + ratio * (hi - lo);
+        double fl = consider(left), fr = consider(right);
+        for (int iteration = 0; iteration < 30; ++iteration) {
+            if (fl < fr) {
+                hi = right; right = left; fr = fl;
+                left = hi - ratio * (hi - lo); fl = consider(left);
+            } else {
+                lo = left; left = right; fl = fr;
+                right = lo + ratio * (hi - lo); fr = consider(right);
+            }
+        }
+        h_[k] = best_h; // Always keep the old value if no candidate decreases cost.
     }
     return h_.allFinite();
 }
@@ -679,6 +731,16 @@ bool OCEANSolver::solvePath() {
                     std::min(vehicle.max_steer_angle(), steer_[k] + p_.trust_region()));
             q.square({{steering, 1}}, 0, p_.w_control());
             if (k > 0) q.square({{steering, 1}, {steering - 1, -1}}, 0, p_.w_control_diff() / h_[k]);
+            if (k > 0) {
+                const auto r = vehicle_model::KinematicModel::ControlRate(h_[k - 1]);
+                q.square({{steering - 1, r.coefficients[0]}, {steering, r.coefficients[1]}},
+                         0, p_.smoothness().steering_rate_weight());
+            }
+            if (k > 1) {
+                const auto r = vehicle_model::KinematicModel::ControlAcceleration(h_[k - 2], h_[k - 1]);
+                q.square({{steering - 2, r.coefficients[0]}, {steering - 1, r.coefficients[1]},
+                          {steering, r.coefficients[2]}}, 0, p_.smoothness().steering_acceleration_weight());
+            }
             // Dynamics, linearized in the pose and the steering angle, with
             // sin(theta), cos(theta) and tan(delta) replaced by Eq. (21).
             const double theta = x_(2, k), distance = x_(3, k) * h_[k];
@@ -798,6 +860,17 @@ double OCEANSolver::objective() const {
                      (std::pow(steer_[k] - steer_[k - 1], 2) + std::pow(acc_[k] - acc_[k - 1], 2)) / h_[k];
     }
     for (const auto& obstacle : w_->obstacles) value += p_.w_distance() * obstacle.d.array().exp().sum();
+    const auto& smoothness = p_.smoothness();
+    for (int k = 1; k < N_; ++k) {
+        const auto r = vehicle_model::KinematicModel::ControlRate(h_[k - 1]);
+        value += smoothness.jerk_weight() * std::pow(r(acc_[k - 1], acc_[k]), 2) +
+                 smoothness.steering_rate_weight() * std::pow(r(steer_[k - 1], steer_[k]), 2);
+        if (k >= 2) {
+            const auto second = vehicle_model::KinematicModel::ControlAcceleration(h_[k - 2], h_[k - 1]);
+            value += smoothness.steering_acceleration_weight() *
+                     std::pow(second(steer_[k - 2], steer_[k - 1], steer_[k]), 2);
+        }
+    }
     return value;
 }
 

@@ -235,9 +235,9 @@ int main() {
 
         std::string ipopt_options;
         ipopt_options += "Integer print_level      5\n";
-        ipopt_options += "Integer max_iter         15\n";
-        ipopt_options += "Numeric tol              1e-3\n";
-        ipopt_options += "Numeric acceptable_tol   5e-2\n";
+        ipopt_options += "Integer max_iter         300\n";
+        ipopt_options += "Numeric tol              1e-6\n";
+        ipopt_options += "Numeric acceptable_tol   1e-4\n";
         ipopt_options += "Integer acceptable_iter  10\n";
         ipopt_options += "String mu_strategy       adaptive\n";
         ipopt_options += "String linear_solver     mumps\n";
@@ -250,7 +250,20 @@ int main() {
         obca_params.set_ref_weight(2.0);
         obca_params.set_smooth_weight(0.5);
         obca_params.set_control_weight(1.0);
-        backend::OBCASolver obca_solver(ipopt_options, dynamic_model_ptr, map_ptr, obca_params);
+        // 30 m cannot be covered in 5.9 s from/to rest with |a| <= 2,
+        // |v| <= 5. Use a feasible 11.8 s horizon and exercise non-default dt.
+        constexpr double dt = 0.2;
+        obca_params.mutable_smoothness()->set_jerk_weight(0.1);
+        obca_params.mutable_smoothness()->set_steering_rate_weight(0.1);
+        obca_params.mutable_smoothness()->set_steering_acceleration_weight(0.005);
+        std::string limited_options = "Integer max_iter 1\nInteger print_level 0\n";
+        backend::OBCASolver limited_solver(limited_options, dynamic_model_ptr, map_ptr, obca_params, dt);
+        if (limited_solver.Process(init_path, start_pose_ptr, goal_pose_ptr) ||
+            !limited_solver.GetStatesResult().empty() || !limited_solver.GetControlsResult().empty()) {
+            LOG(ERROR) << "Non-converged OBCA result was accepted";
+            return 1;
+        }
+        backend::OBCASolver obca_solver(ipopt_options, dynamic_model_ptr, map_ptr, obca_params, dt);
         LOG(INFO) << "OBCA solver created";
 
         LOG(INFO) << "Running OBCA optimization...";
@@ -267,6 +280,16 @@ int main() {
         LOG(INFO) << "Extracting results...";
         const auto& states   = obca_solver.GetStatesResult();
         const auto& controls = obca_solver.GetControlsResult();
+        for (std::size_t i = 0; i < controls.size(); ++i) {
+            const auto& state = states[i];
+            Eigen::Vector4d predicted = state + dt * Eigen::Vector4d(
+                state[3] * std::cos(state[2]), state[3] * std::sin(state[2]),
+                state[3] * std::tan(controls[i][1]) / vehicle_param.wheel_base(), controls[i][0]);
+            if (!predicted.allFinite() || (predicted - states[i + 1]).lpNorm<Eigen::Infinity>() > 1e-3) {
+                LOG(ERROR) << "OBCA dynamics residual at segment " << i;
+                return 1;
+            }
+        }
 
         LOG(INFO) << "Number of states: " << states.size();
         LOG(INFO) << "Number of controls: " << controls.size();

@@ -1,4 +1,7 @@
 # OBCA Planner Tests
+add_executable(test_control_smoothness test_control_smoothness.cpp)
+target_link_libraries(test_control_smoothness PRIVATE Planner)
+add_test(NAME test_control_smoothness COMMAND test_control_smoothness)
 
 # C++ executable test for OBCA planner
 add_executable(test_obca_main

@@ -66,7 +66,7 @@ void TrajPlanner::initObcaSolver(const params::SolverParams& solver_params, cons
     options += "String linear_solver     " + ipopt_linear_solver + "\n";
     options += "String mu_strategy       adaptive\n";
 
-    obca_solver_ptr_ = std::make_unique<obcaopt>(options, vehicle_model_ptr_, map_ptr, obca_params);
+    obca_solver_ptr_ = std::make_unique<obcaopt>(options, vehicle_model_ptr_, map_ptr, obca_params, solver_params.dt());
 }
 
 bool TrajPlanner::Process(const vehicle_model::VehiclePose& start_vec, const vehicle_model::VehiclePose& goal_vec) {
@@ -126,7 +126,10 @@ bool TrajPlanner::runBackendOpt(const std::vector<Eigen::Vector3d>* const fronte
         auto sdv_path      = obcaopt::Vec3dToSdvPath(*frontend_path);
         auto start_vec_ptr = std::make_shared<vehicle_model::VehiclePose>(start_vec);
         auto goal_vec_ptr  = std::make_shared<vehicle_model::VehiclePose>(goal_vec);
-        obca_solver_ptr_->Process(sdv_path, start_vec_ptr, goal_vec_ptr);
+        if (!obca_solver_ptr_->Process(sdv_path, start_vec_ptr, goal_vec_ptr)) {
+            diagnostics_.set_status("backend_failed");
+            return false;
+        }
         const auto&     obca_controls = obca_solver_ptr_->GetControlsResult();
         Eigen::MatrixXd native(obca_controls.size(), 2);
         for (std::size_t i = 0; i < obca_controls.size(); ++i) native.row(i) = obca_controls[i];

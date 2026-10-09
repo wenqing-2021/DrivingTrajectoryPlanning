@@ -1,6 +1,6 @@
 max_iter: 50
 map_resolution: 0.3 # meters
-backend_solver: "pwj" # optional: "obca" or "pwj" or "rda" or "ocean"
+backend_solver: "ocean" # optional: "obca" or "pwj" or "rda" or "ocean"
 dt: 0.1 # seconds (time step for optimization)
 
 hybrid_a_star_param: # NOTE: the following key's name MUST be the same as those in protobuf/params.proto
@@ -36,16 +36,25 @@ piesewise_jerk_params:
   w_a_end: 50.0
 
 obca_params:
+  min_clearance: 0.2 # Case2's exact goal has only 0.351 m clearance.
+  smoothness:
+    jerk_weight: 10.0
+    steering_rate_weight: 0.5
+    steering_acceleration_weight: 0.02
   ref_weight: 2.0
   smooth_weight: 0.5
   control_weight: 1.0
-  ipopt_max_iter: 10
-  ipopt_tol: 1.0e-3
-  ipopt_acceptable_tol: 5.0e-2
+  ipopt_max_iter: 300
+  ipopt_tol: 1.0e-6
+  ipopt_acceptable_tol: 1.0e-4
   ipopt_acceptable_iter: 3
   linear_solver: "mumps"
 
 rda_params:
+  smoothness:
+    jerk_weight: 0.1
+    steering_rate_weight: 0.5
+    steering_acceleration_weight: 0.02
   workers: 16  # persistent CPU workers for obstacle SOCPs; 0/1 selects serial.
                # Scale with available cores up to the obstacle count.
   worker_timeout_ms: 5000  # timeout for one parallel ADMM round, not the whole plan
@@ -73,6 +82,10 @@ rda_params:
 
 # Experimental OCEAN backend; independent of RDA tuning.
 ocean_params:
+  smoothness:
+    jerk_weight: 0.1
+    steering_rate_weight: 0.1
+    steering_acceleration_weight: 0.005
   max_iter: 1000
   rho: 1000.0
   primal_tolerance: 0.001

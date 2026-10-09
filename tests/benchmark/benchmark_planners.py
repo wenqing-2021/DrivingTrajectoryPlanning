@@ -21,6 +21,30 @@ ROOT = Path(__file__).resolve().parents[2]
 CASES = [1, 2, 3, 4, 5, 6, 8, 11, 12, 13, 14, 16, 17, 18]
 
 
+def smoothness_metrics(controls, timestamps):
+    """Derivatives of commands at segment starts, using actual optimized times."""
+    import numpy as np
+
+    u, t = np.asarray(controls), np.asarray(timestamps)
+    h = np.diff(t[:-1])
+    metrics = {"duration": float(t[-1] - t[0])}
+    if len(h) == 0:
+        return metrics
+    rates = np.diff(u, axis=0) / h[:, None]
+    derivatives = [("jerk", rates[:, 0], h), ("steering_rate", rates[:, 1], h)]
+    if len(h) > 1:
+        middle = (h[:-1] + h[1:]) / 2
+        derivatives.append(
+            ("steering_acceleration", np.diff(rates[:, 1]) / middle, middle)
+        )
+    for name, values, intervals in derivatives:
+        energy = float(np.sum(values**2 * intervals))
+        metrics[name + "_energy"] = energy
+        metrics[name + "_rms"] = float(np.sqrt(energy / intervals.sum()))
+        metrics[name + "_max"] = float(np.max(np.abs(values)))
+    return metrics
+
+
 def validate(problem, states, controls, timestamps, dt_min, dt_max, bound_margin=1e-3):
     """Independent geometry, dynamics and limit checks for one result.
 
@@ -159,6 +183,7 @@ def validate(problem, states, controls, timestamps, dt_min, dt_max, bound_margin
         control_min=u.min(axis=0).tolist(),
         control_max=u.max(axis=0).tolist(),
         bound_margin=bound_margin,
+        smoothness=smoothness_metrics(u, t),
     )
 
 
@@ -168,7 +193,7 @@ def git_read(*args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--backend", choices=["rda", "ocean"], required=True)
+    parser.add_argument("--backend", choices=["rda", "ocean", "obca"], required=True)
     parser.add_argument("--cases", nargs="+", type=int, default=CASES)
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--repeats", type=int, default=1)
@@ -206,7 +231,8 @@ def main():
     params = load_solver_params(str(args.config))
     params.backend_solver = args.backend
     backend_params = getattr(params, args.backend + "_params")
-    backend_params.workers = args.workers
+    if args.backend != "obca":
+        backend_params.workers = args.workers
     if args.backend == "ocean":
         backend_params.time_limit = args.time_limit
     metadata = dict(
@@ -292,8 +318,8 @@ def main():
                 states,
                 controls,
                 timestamps,
-                backend_params.dt_min,
-                backend_params.dt_max,
+                backend_params.dt_min if args.backend != "obca" else params.dt,
+                backend_params.dt_max if args.backend != "obca" else params.dt,
             )
             diagnostic = MessageToDict(
                 result.diagnostics, preserving_proto_field_name=True
