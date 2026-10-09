@@ -6,6 +6,8 @@ namespace backend {
 bool OBCASolver::Process(const vehicle_model::sdv_path&               init_path,
                          std::shared_ptr<vehicle_model::VehiclePose>& start_pose_ptr,
                          std::shared_ptr<vehicle_model::VehiclePose>& goal_pose_ptr) {
+    states_result_.clear();
+    controls_result_.clear();
     if (init_path.size() < 2) {
         LOG(WARNING) << "The initial path is not valid, the size is less than 2.";
         return false;
@@ -39,14 +41,19 @@ bool OBCASolver::Process(const vehicle_model::sdv_path&               init_path,
     // update variable nums and constraint nums
     fg_eval_.updateProblemSize(init_variables.size(), gl.size());
     CppAD::ipopt::solve_result<Dvector> solution;   // solution
+    // The trajectory Jacobian/Hessian are sparse. Dense derivatives make even
+    // Case2 prohibitively slow as the horizon and obstacle count grow.
+    std::string options = this->getOptions();
+    if (options.find("Sparse ") == std::string::npos) options += "Sparse true forward\n";
     CppAD::ipopt::solve<Dvector, FG_eval>(
-        this->getOptions(), init_variables, xl, xu, gl, gu, fg_eval_, solution);   // solve the problem
+        options, init_variables, xl, xu, gl, gu, fg_eval_, solution);
 
     // 5. get the result
-    if (solution.status != CppAD::ipopt::solve_result<Dvector>::success) {
+    if (solution.status != CppAD::ipopt::solve_result<Dvector>::success &&
+        solution.status != CppAD::ipopt::solve_result<Dvector>::stop_at_acceptable_point) {
         LOG(WARNING) << "The solver failed to find a solution.";
         LOG(WARNING) << "Solver status: " << solution.status;
-        // return false;
+        return false;
     }
 
     // 6. store the result
@@ -272,7 +279,7 @@ CppAD::AD<double> OBCAFG_eval::getCostFunction(const ADvector& x) {
     double            ref_weight     = obca_params_.ref_weight();
     double            control_weight = obca_params_.control_weight();
     for (std::size_t i = 0; i < N_ - 1; ++i) {
-        // Match Python OBCA objective: state tracking + control effort, no control smoothness term.
+        // State tracking and native control effort.
         CppAD::AD<double> x_pos = x[i * (state_num_ + control_num_) + VariableIndex::X];
         CppAD::AD<double> y_pos = x[i * (state_num_ + control_num_) + VariableIndex::Y];
         CppAD::AD<double> theta = x[i * (state_num_ + control_num_) + VariableIndex::THETA];
@@ -288,6 +295,24 @@ CppAD::AD<double> OBCAFG_eval::getCostFunction(const ADvector& x) {
                 x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE];
         cost += control_weight * x[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION] *
                 x[i * (state_num_ + control_num_) + VariableIndex::ACCELERATION];
+    }
+
+    const auto& p = obca_params_.smoothness();
+    vehicle_model::KinematicModel::ValidateSmoothness(p);
+    for (std::size_t i = 1; i < N_ - 1; ++i) {
+        for (const auto& term : {std::pair<int, double>{VariableIndex::ACCELERATION, p.jerk_weight()},
+                                {VariableIndex::STEER_ANGLE, p.steering_rate_weight()}}) {
+            const auto r = (x[i * (state_num_ + control_num_) + term.first] -
+                            x[(i - 1) * (state_num_ + control_num_) + term.first]) / std::sqrt(kDt);
+            cost += term.second * r * r;
+        }
+        if (i >= 2) {
+            const auto r = (x[i * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE] -
+                            2 * x[(i - 1) * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE] +
+                            x[(i - 2) * (state_num_ + control_num_) + VariableIndex::STEER_ANGLE]) /
+                           std::pow(kDt, 1.5);
+            cost += p.steering_acceleration_weight() * r * r;
+        }
     }
 
     return cost;
@@ -578,7 +603,8 @@ bool OBCAFG_eval::setAvoidanceConstraints(const FG_eval::ADvector& x, FG_eval::A
 bool OBCAFG_eval::setAvoidanceConstraintsBound(IpoptSolver::Dvector* lb, IpoptSolver::Dvector* ub) {
     std::size_t obstacle_num = obstable_bound_num_vec_.size();
     // Safe distance to maintain from obstacles (meters)
-    double safe_dist = kSafeDist;   // Use the predefined safe distance (0.05m)
+    double safe_dist = obca_params_.has_min_clearance() ? obca_params_.min_clearance() : kSafeDist;
+    if (!std::isfinite(safe_dist) || safe_dist < 0) throw std::invalid_argument("Invalid OBCA clearance");
     lb->resize(4 * N_ * obstacle_num);
     ub->resize(4 * N_ * obstacle_num);
     std::size_t constraint_idx = 0;

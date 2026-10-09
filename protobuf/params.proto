@@ -38,6 +38,13 @@ message PiecewiseJerkParams {
     double w_a_end = 12;
 }
 
+// Time-integrated squared derivatives of native controls; zero disables a term.
+message ControlSmoothnessParams {
+    double jerk_weight = 1;                  // acceleration derivative (m/s^3)
+    double steering_rate_weight = 2;         // steering derivative (rad/s)
+    double steering_acceleration_weight = 3; // steering second derivative (rad/s^2)
+}
+
 message OBCAParams {
     double ref_weight = 1;
     double smooth_weight = 2;
@@ -47,6 +54,8 @@ message OBCAParams {
     double ipopt_acceptable_tol = 6;
     int32 ipopt_acceptable_iter = 7;
     string linear_solver = 8;
+    ControlSmoothnessParams smoothness = 9;
+    optional double min_clearance = 10; // m; absent preserves the legacy 0.5 m
 }
 
 message RDAParams {
@@ -71,6 +80,7 @@ message RDAParams {
     optional double safety_distance_cap = 19; // adaptive lower-bound cap (m), default 0.25; clamped to [min_sd, max_sd]
     int32 workers = 21; // 0/1: serial; >1: persistent worker threads for obstacle SOCPs
     int32 worker_timeout_ms = 22; // per ADMM round; 0 uses 5000 ms
+    ControlSmoothnessParams smoothness = 23;
     optional int32 safety_distance_persist = 20; // consecutive colliding iterations before raising; >= 1, default 1
 }
 
@@ -98,6 +108,7 @@ message OCEANParams {
     optional int32 workers = 20; // 0/1 serial
     optional int32 worker_timeout_ms = 21;
     optional double time_limit = 22; // total solver.run budget in seconds
+    ControlSmoothnessParams smoothness = 23;
 }
 
 message SolverParams {

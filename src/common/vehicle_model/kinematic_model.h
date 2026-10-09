@@ -2,7 +2,11 @@
 
 #include "kinematic_model.pb.h"
 #include "logger.h"
+#include "params.pb.h"
 #include <Eigen/Core>
+#include <array>
+#include <cmath>
+#include <stdexcept>
 
 namespace planning {
 namespace vehicle_model {
@@ -34,11 +38,50 @@ using sdv_traj = std::vector<VehicleState>;
 class KinematicModel {
   public:
     KinematicModel(const kinematic_model::VehicleParam& vehicle_param)
-        : vehicle_param_(vehicle_param){};
+        : vehicle_param_(vehicle_param) {};
     ~KinematicModel() = default;
     const kinematic_model::VehicleParam& GetVehicleParam() const { return vehicle_param_; }
 
   public:
+    static void ValidateSmoothness(const params::ControlSmoothnessParams& p) {
+        for (double w : {p.jerk_weight(), p.steering_rate_weight(), p.steering_acceleration_weight()})
+            if (!std::isfinite(w) || w < 0) throw std::invalid_argument("Invalid control smoothness weight");
+    }
+
+    // Commands live at the left endpoints of segments. The square of each residual
+    // equals the integrated derivative energy. No fictitious endpoint commands are
+    // appended. h0/h1 are consecutive distances in time between control samples.
+    struct ControlDerivative {
+        std::array<double, 3> coefficients;
+        double                operator()(double u0, double u1, double u2 = 0) const {
+            return coefficients[0] * u0 + coefficients[1] * u1 + coefficients[2] * u2;
+        }
+    };
+
+    static ControlDerivative ControlRate(double h0) {
+        const double scale = 1 / std::sqrt(h0);
+        return {{-scale, scale, 0}};
+    }
+
+    static ControlDerivative ControlAcceleration(double h0, double h1) {
+        const double scale = 1 / std::sqrt((h0 + h1) / 2);
+        return {{scale / h0, -scale * (1 / h0 + 1 / h1), scale / h1}};
+    }
+
+    // Derivatives of the integrated residual w.r.t. the time variables for RDA's
+    // Gauss-Newton QP. Including these avoids treating optimized dt as a constant.
+    static double ControlRateTimeJacobian(double u0, double u1, double h0) {
+        return -ControlRate(h0)(u0, u1) / (2 * h0);
+    }
+
+    static std::array<double, 2> ControlAccelerationTimeJacobian(double u0, double u1, double u2, double h0,
+                                                                 double h1) {
+        const double scale = 1 / std::sqrt((h0 + h1) / 2);
+        const double r     = ControlAcceleration(h0, h1)(u0, u1, u2);
+        return {{scale * (u1 - u0) / (h0 * h0) - r / (2 * (h0 + h1)),
+                 -scale * (u2 - u1) / (h1 * h1) - r / (2 * (h0 + h1))}};
+    }
+
     static std::size_t GetStateSize() {
         static const std::size_t kStateSize = kinematic_model::StateVar::descriptor()->field_count();
         bool not_same_size = static_cast<std::size_t>(kStateSize != sizeof(VehicleState) / sizeof(double));

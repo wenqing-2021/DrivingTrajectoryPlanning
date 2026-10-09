@@ -8,13 +8,16 @@ namespace backend {
 
 class QPSolver {
   public:
-    QPSolver(bool verbose = false, int max_iterations = 4000, bool reuse = false)
+    QPSolver(bool verbose = false, int max_iterations = 4000, bool reuse = false,
+             double tolerance = 1e-3)
         : reuse_(reuse) {
         // init solver
         solver_ = OsqpEigen::Solver();
         solver_.settings()->setWarmStart(!reuse);
         solver_.settings()->setVerbosity(verbose);
         solver_.settings()->setMaxIteration(max_iterations);
+        solver_.settings()->setAbsoluteTolerance(tolerance);
+        solver_.settings()->setRelativeTolerance(tolerance);
     };
     ~QPSolver() = default;
 

@@ -37,6 +37,7 @@ RDASolver::RDASolver(const std::shared_ptr<vehicle_model::KinematicModel>& dynam
     , rda_params_(rda_params)
     , dt_(dt) {
     workspace_ = workspace ? std::move(workspace) : std::make_shared<RDAWorkspace>();
+    vehicle_model::KinematicModel::ValidateSmoothness(rda_params_.smoothness());
 
     // Resolve absent optional fields once. Explicit zero remains meaningful for
     // endpoint tolerances, safety distances and the adaptation step.
@@ -197,7 +198,7 @@ void RDASolver::prepareStructure() {
     workspace_->su_g.resize(variables);
     workspace_->su_lower.resize(constraints);
     workspace_->su_upper.resize(constraints);
-    workspace_->su_solver = std::make_unique<QPSolver>(false, 20000, true);
+    workspace_->su_solver = std::make_unique<QPSolver>(false, 20000, true, 1e-7);
     workspace_->su_solver->setVariableNums(variables);
     workspace_->su_solver->setConstraintNums(constraints);
     workspace_->cones.clear();
@@ -226,9 +227,9 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
     const std::size_t n_cons = n_dyn + n_rcon + n_var;   // dynamics + r-constraints + variable bounds
 
     auto idx_X  = [&](std::size_t t) { return 4 * t; };
-    auto idx_U  = [&](std::size_t t) { return n_x + 2 * t; };
+    auto idx_U  = [&](std::size_t t) { return static_cast<int>(n_x + 2 * t); };
     auto idx_d  = [&](std::size_t t) { return n_x + n_u + t; };
-    auto idx_dt = [&](std::size_t t) { return n_x + n_u + n_d + t; };
+    auto idx_dt = [&](std::size_t t) { return static_cast<int>(n_x + n_u + n_d + t); };
     auto idx_r  = [&](std::size_t o, std::size_t t) { return n_x + n_u + n_d + n_dt + o * T_ + t; };
 
     // Parameters (with defaults matching the Python implementation)
@@ -264,6 +265,38 @@ bool RDASolver::solveSU(const vehicle_model::VehiclePose& start_pose, const vehi
     for (std::size_t t = 0; t < T_; ++t) {
         H_triplets.emplace_back(idx_U(t) + 0, idx_U(t) + 0, 2.0 * w_u);
         H_triplets.emplace_back(idx_U(t) + 1, idx_U(t) + 1, 2.0 * w_u);
+    }
+
+    // Integrated native-control derivatives, linearized in both commands and
+    // durations. Squared affine residuals give a positive semidefinite QP.
+    const auto& smoothness = rda_params_.smoothness();
+    auto add_square = [&](const std::vector<std::pair<int, double>>& terms, double offset, double weight) {
+        if (weight == 0) return;
+        for (const auto& [i, vi] : terms) {
+            g(i) += 2 * weight * offset * vi;
+            for (const auto& [j, vj] : terms) H_triplets.emplace_back(i, j, 2 * weight * vi * vj);
+        }
+    };
+    for (std::size_t t = 1; t < T_; ++t) {
+        const double h = dt_traj_(t - 1);
+        const auto rate = vehicle_model::KinematicModel::ControlRate(h);
+        for (const auto& term : {std::pair<int, double>{0, smoothness.steering_rate_weight()},
+                                {1, smoothness.jerk_weight()}}) {
+            const double jh = vehicle_model::KinematicModel::ControlRateTimeJacobian(
+                control_traj_(term.first, t - 1), control_traj_(term.first, t), h);
+            add_square({{idx_U(t - 1) + term.first, rate.coefficients[0]},
+                        {idx_U(t) + term.first, rate.coefficients[1]}, {idx_dt(t - 1), jh}},
+                       -jh * h, term.second);
+        }
+        if (t >= 2 && smoothness.steering_acceleration_weight() > 0) {
+            const double hp = dt_traj_(t - 2);
+            const auto second = vehicle_model::KinematicModel::ControlAcceleration(hp, h);
+            const auto jh = vehicle_model::KinematicModel::ControlAccelerationTimeJacobian(
+                control_traj_(0, t - 2), control_traj_(0, t - 1), control_traj_(0, t), hp, h);
+            add_square({{idx_U(t - 2), second.coefficients[0]}, {idx_U(t - 1), second.coefficients[1]},
+                        {idx_U(t), second.coefficients[2]}, {idx_dt(t - 2), jh[0]}, {idx_dt(t - 1), jh[1]}},
+                       -jh[0] * hp - jh[1] * h, smoothness.steering_acceleration_weight());
+        }
     }
 
     // ---- Cost: safety-distance slack (maximize d => minimize -slack_gain * d)

@@ -30,6 +30,7 @@ class OBCAFG_eval : public FG_eval {
     CppAD::AD<double> getCostFunction(const ADvector& x) override;
     ADvector          getConstraints(const ADvector& x) override;
     inline void       setCostWeights(const params::OBCAParams& obca_params) { obca_params_ = obca_params; }
+    void setTimeStep(double dt) { kDt = dt; }
     inline void       setInitParameters(std::shared_ptr<Eigen::VectorXd>& ref_X_ptr, const std::size_t N,
                                         const std::size_t state_num, const std::size_t control_num,
                                         const std::size_t lambda_num, const std::size_t mu_num,
@@ -102,7 +103,7 @@ class OBCAFG_eval : public FG_eval {
     std::shared_ptr<vehicle_model::VehiclePose>    goal_pose_ptr_;
     Eigen::MatrixXd                                obstacle_A_;                  // obstacle boundary A
     Eigen::VectorXd                                obstacle_b_;                  // obstacle boundary b
-    constexpr static double                        kDt                 = 0.1;    // s
+    double                                         kDt                 = 0.1;    // s
     constexpr static std::size_t                   kVehicleBoundaryNum = 4;      // number of vehicle boundary points
     constexpr static double                        kSafeDist           = 0.5;    // m
     constexpr static double                        kEpsilon            = 1e-4;   // Must match OBCAFG_eval::kEpsilon
@@ -133,6 +134,7 @@ class OBCASolver : public IpoptSolver {
         control_num_       = vehicle_model::KinematicModel::GetControlSize();   // 2: [a, sigma]
         fg_eval_           = OBCAFG_eval();
         fg_eval_.setCostWeights(obca_params);
+        fg_eval_.setTimeStep(dt);
         kDt = dt;
     };
     ~OBCASolver() = default;
