@@ -7,7 +7,7 @@ from typing import List, Optional
 
 import numpy as np
 from commonroad.common.common_lanelet import LaneletType, LineMarking, RoadUser
-from commonroad.common.file_reader import CommonRoadFileReader
+from commonroad.common.reader.file_reader_xml import XMLFileReader
 from commonroad.common.util import AngleInterval, Interval
 from commonroad.geometry.shape import Rectangle
 from commonroad.planning.goal import GoalRegion
@@ -213,7 +213,8 @@ def load_scenario(
     scenario_path: Path, planning_problem_id: Optional[int] = None
 ) -> UrbanScenario:
     """Load a CommonRoad XML scenario and choose one planning problem."""
-    scenario, planning_problem_set = CommonRoadFileReader(str(scenario_path)).open()
+    # The format-dispatching reader imports legacy protobuf stubs even for XML.
+    scenario, planning_problem_set = XMLFileReader(str(scenario_path)).open()
     planning_problem = _select_planning_problem(
         planning_problem_set, planning_problem_id
     )

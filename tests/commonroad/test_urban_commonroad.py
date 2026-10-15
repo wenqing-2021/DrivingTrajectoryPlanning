@@ -1,8 +1,11 @@
 """Tests for the Python CommonRoad urban integration."""
 
 import numpy as np
+from commonroad.common.writer.file_writer_xml import XMLFileWriter
+from commonroad.planning.planning_problem import PlanningProblemSet
+from commonroad.scenario.scenario import Tag
 
-from scenarios.urban.commonroad_scenario import create_demo_scenario
+from scenarios.urban.commonroad_scenario import create_demo_scenario, load_scenario
 from scenarios.urban.config import default_config_path, load_config
 from scenarios.urban.simulation import sample_local_reference
 
@@ -14,6 +17,30 @@ def test_demo_scenario_has_route_and_obstacle() -> None:
     assert len(urban_scenario.reference_path) > 10
     assert len(urban_scenario.obstacle_disks(0)) == 1
     np.testing.assert_allclose(urban_scenario.initial_state[:2], [2.0, 0.0])
+
+
+def test_scenario_xml_round_trip(tmp_path) -> None:
+    """Exercise XML loading without importing CommonRoad's legacy protobuf stubs."""
+    original = create_demo_scenario()
+    scenario_path = tmp_path / "scenario.xml"
+    writer = XMLFileWriter(
+        original.scenario,
+        PlanningProblemSet([original.planning_problem]),
+        author="DrivingTrajectoryPlanning",
+        affiliation="DrivingTrajectoryPlanning",
+        source="Programmatic CommonRoad demo",
+        tags={Tag.URBAN},
+    )
+    writer.write_to_file(str(scenario_path))
+
+    restored = load_scenario(
+        scenario_path, original.planning_problem.planning_problem_id
+    )
+
+    np.testing.assert_allclose(restored.initial_state, original.initial_state)
+    np.testing.assert_allclose(restored.goal_position, original.goal_position)
+    np.testing.assert_allclose(restored.reference_path, original.reference_path)
+    assert restored.obstacle_disks(0) == original.obstacle_disks(0)
 
 
 def test_local_reference_matches_requested_horizon() -> None:

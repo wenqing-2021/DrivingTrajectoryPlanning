@@ -44,7 +44,7 @@ def convert_yaml_to_protobuf(file, protobuf_class, input_dict=None):
     elif input_dict is not None:
         params = input_dict
     # convert to protobuf
-    attr_list = dir(protobuf_class)
+    attr_list = protobuf_class.DESCRIPTOR.fields_by_name
     for key in attr_list:
         if key in params and not isinstance(params[key], dict):
             setattr(protobuf_class, key, params[key])
